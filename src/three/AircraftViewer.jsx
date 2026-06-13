@@ -4,11 +4,22 @@ import { OrbitControls, Stage, useGLTF, Html } from '@react-three/drei'
 import ProceduralAircraft from './ProceduralAircraft.jsx'
 
 /**
+ * Resolve a model path against Vite's deploy base so it works both locally
+ * (base "/") and on GitHub Pages (base "/AirbusEngine3D/"). Data files store
+ * paths as "/models/x.glb"; we strip the leading slash and prepend BASE_URL.
+ */
+function withBase(path) {
+  if (!path) return path
+  if (/^https?:\/\//.test(path)) return path
+  return import.meta.env.BASE_URL.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
+}
+
+/**
  * Loads an authored glTF from /public/models. Suspends while loading; if the
  * path is missing entirely the parent renders the procedural model instead.
  */
 function GltfModel({ url }) {
-  const { scene } = useGLTF(url)
+  const { scene } = useGLTF(withBase(url))
   return <primitive object={scene} />
 }
 

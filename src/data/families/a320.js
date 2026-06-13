@@ -107,7 +107,7 @@ export const a320Aircraft = [
     firstFlightYear: 1987,
     eisYear: 1988,
     built: 4800,
-    model: '',
+    model: '/models/a320.glb',
     engines: [ENGINES['cfm56-5b'], ENGINES['v2500'], ENGINES['leap-1a'], ENGINES['pw1100g']],
     dimensions: {
       lengthM: 37.57,
