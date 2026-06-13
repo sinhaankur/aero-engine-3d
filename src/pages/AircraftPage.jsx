@@ -28,6 +28,15 @@ export default function AircraftPage() {
   const risk = RISK_LEVELS[a.safety.risk]
   const modelUrl = a.model || undefined
 
+  // Engines that have a built 3D model, surfaced via a tab selector below.
+  const modelledEngines = a.engines.filter((e) => ENGINE_MODELS[e.id])
+  const [activeEngine, setActiveEngine] = useState(modelledEngines[0]?.id)
+  // Fall back to the first available engine if the selected one isn't offered
+  // on this variant (e.g. after navigating between aircraft).
+  const resolvedEngine = modelledEngines.some((e) => e.id === activeEngine)
+    ? activeEngine
+    : modelledEngines[0]?.id
+
   return (
     <div>
       <Link to={`/family/${familyId}`} className="back">← {family?.name}</Link>
@@ -91,14 +100,25 @@ export default function AircraftPage() {
         ))}
       </div>
 
-      {/* ---- In-depth engine parts breakdown (for engines with a built model) ---- */}
-      {a.engines
-        .filter((e) => ENGINE_MODELS[e.id])
-        .map((e) => (
-          <div key={`exp-${e.id}`} style={{ marginTop: 18 }}>
-            <EngineExplorer engineId={e.id} />
-          </div>
-        ))}
+      {/* ---- In-depth engine parts breakdown ---- */}
+      {modelledEngines.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          {modelledEngines.length > 1 && (
+            <div className="viewer-toggle" style={{ marginBottom: 12 }}>
+              {modelledEngines.map((e) => (
+                <button
+                  key={e.id}
+                  className={resolvedEngine === e.id ? 'on' : ''}
+                  onClick={() => setActiveEngine(e.id)}
+                >
+                  {e.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <EngineExplorer key={resolvedEngine} engineId={resolvedEngine} />
+        </div>
+      )}
 
       {/* ---- Timeline ---- */}
       <h2 className="section-title">Timeline</h2>
