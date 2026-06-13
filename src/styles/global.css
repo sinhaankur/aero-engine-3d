@@ -128,3 +128,16 @@ code { background: #0a0e14; padding: 1px 5px; border-radius: 4px; font-size: 0.8
 .ee-specs { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
 .ee-specs li { background: var(--bg); border: 1px solid var(--border); border-radius: 20px; padding: 3px 11px; font-size: 12px; color: var(--muted); }
 .ee-hint { margin-top: 12px; color: var(--muted); font-size: 13px; }
+
+/* Engine explorer — controls + how-it-works cycle */
+.ee-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.ee-cycle { display: flex; flex-direction: column; gap: 12px; }
+.ee-cycle-steps { display: flex; flex-direction: column; gap: 6px; }
+.ee-cycle-steps button { display: flex; align-items: center; gap: 10px; text-align: left; background: var(--panel-2); border: 1px solid var(--border); color: var(--ink); padding: 9px 12px; border-radius: 9px; cursor: pointer; font-size: 14px; transition: border-color .15s, background .15s; }
+.ee-cycle-steps button:hover { border-color: var(--accent); }
+.ee-cycle-steps button.on { border-color: var(--accent); background: #16243b; }
+.ee-motto { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); background: var(--bg); border-radius: 20px; padding: 2px 8px; min-width: 54px; text-align: center; }
+.ee-nav { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.ee-nav button { background: var(--panel-2); border: 1px solid var(--border); color: var(--ink); padding: 5px 12px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+.ee-nav button:disabled { opacity: 0.4; cursor: default; }
+.ee-progress { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }

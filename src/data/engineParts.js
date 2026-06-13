@@ -230,3 +230,79 @@ export const ENGINE_PARTS_BY_MODEL = {
 
 // Back-compat export (some code imported LEAP_1A_PARTS directly).
 export const LEAP_1A_PARTS = ENGINE_PARTS_BY_MODEL['leap-1a']
+
+/**
+ * How a turbofan actually works — the Brayton cycle, in order. Each stage names
+ * the part nodes it involves so the "How it works" walkthrough can highlight the
+ * right geometry in 3D as the user steps through Suck → Squeeze → Bang → Blow.
+ *
+ * @typedef {Object} CycleStage
+ * @property {string} key
+ * @property {string} title
+ * @property {string} motto    The classic "suck/squeeze/bang/blow" shorthand.
+ * @property {string[]} nodes  glTF node names highlighted for this stage.
+ * @property {string} what     Plain-language explanation of what happens here.
+ */
+export const TURBOFAN_CYCLE = [
+  {
+    key: 'intake',
+    title: '1 · Intake',
+    motto: 'Suck',
+    nodes: ['01b_Inlet_Lip', '01_Nacelle_Cowl', '03_Spinner'],
+    what:
+      'Air enters through the inlet. The cowl and lip slow and smooth the ' +
+      'airflow so it reaches the fan evenly, even when the aircraft is climbing ' +
+      'or in a crosswind.',
+  },
+  {
+    key: 'fan',
+    title: '2 · Fan & bypass',
+    motto: 'Suck',
+    nodes: ['04_Fan_Blades', '02_Fan_Case'],
+    what:
+      'The big fan grabs a huge mass of air. On a high-bypass engine ~85–90% of ' +
+      'it goes straight around the core as cold "bypass" air — this is what ' +
+      'actually produces most of the thrust, quietly and efficiently. The rest ' +
+      'is fed into the core.',
+  },
+  {
+    key: 'compress',
+    title: '3 · Compression',
+    motto: 'Squeeze',
+    nodes: ['05_Core_Casing', '11_Reduction_Gearbox'],
+    what:
+      'The core air is squeezed by rows of compressor blades to many times ' +
+      'atmospheric pressure (overall pressure ratios of 35–40:1). Squeezing it ' +
+      'first makes the burning far more efficient.',
+  },
+  {
+    key: 'combust',
+    title: '4 · Combustion',
+    motto: 'Bang',
+    nodes: ['06_Combustor'],
+    what:
+      'Fuel is sprayed into the high-pressure air and ignited. It burns ' +
+      'continuously (not in pulses), and the gas temperature shoots up to ' +
+      '~1,500–2,000 °C, expanding violently.',
+  },
+  {
+    key: 'turbine',
+    title: '5 · Turbine',
+    motto: 'Blow',
+    nodes: ['07_Turbine'],
+    what:
+      'The hot, expanding gas blasts through the turbine and spins it. The ' +
+      'turbine is shafted forward to drive the compressor and the fan — so the ' +
+      'engine powers itself. This is the key feedback loop of the whole engine.',
+  },
+  {
+    key: 'exhaust',
+    title: '6 · Exhaust',
+    motto: 'Blow',
+    nodes: ['08_Exhaust_Nozzle', '09_Exhaust_Plug'],
+    what:
+      'Whatever energy is left leaves through the nozzle as a fast jet, adding a ' +
+      "little more thrust. The bypass air and core exhaust mix and leave the " +
+      'back of the engine together.',
+  },
+]
