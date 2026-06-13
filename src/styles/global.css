@@ -107,3 +107,24 @@ code { background: #0a0e14; padding: 1px 5px; border-radius: 4px; font-size: 0.8
 .safety-rate .small { color: var(--muted); font-size: 13px; }
 .safety-notes { color: var(--ink); }
 .safety-sources { color: var(--muted); font-size: 12px; font-style: italic; }
+
+/* Engine explorer */
+.engine-explorer { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+.ee-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.ee-head h3 { margin: 0 0 6px; font-size: 18px; }
+.ee-overview { color: var(--muted); font-size: 14px; max-width: 60ch; margin: 0; }
+.ee-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); white-space: nowrap; cursor: pointer; user-select: none; }
+.ee-body { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-top: 14px; }
+@media (max-width: 720px) { .ee-body { grid-template-columns: 1fr; } }
+.ee-parts ol { list-style: none; margin: 0; padding: 0; counter-reset: none; }
+.ee-parts li { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+.ee-parts li:hover, .ee-parts li.on { background: var(--panel-2); border-color: var(--accent); }
+.ee-num { width: 22px; height: 22px; display: grid; place-items: center; background: var(--bg); border-radius: 50%; font-size: 12px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.ee-name { font-size: 14px; }
+.ee-stage { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.ee-detail { margin-top: 14px; padding: 14px 16px; background: var(--panel-2); border-radius: 10px; border-left: 3px solid var(--accent); }
+.ee-detail h4 { margin: 0 0 6px; font-size: 16px; display: flex; align-items: center; gap: 10px; }
+.ee-detail p { margin: 0 0 10px; color: var(--ink); }
+.ee-specs { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.ee-specs li { background: var(--bg); border: 1px solid var(--border); border-radius: 20px; padding: 3px 11px; font-size: 12px; color: var(--muted); }
+.ee-hint { margin-top: 12px; color: var(--muted); font-size: 13px; }

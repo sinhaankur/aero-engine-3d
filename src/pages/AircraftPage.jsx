@@ -4,6 +4,8 @@ import { getFamily, getAircraft } from '../data/index.js'
 import { RISK_LEVELS } from '../data/schema.js'
 import AircraftViewer from '../three/AircraftViewer.jsx'
 import Blueprint from '../components/Blueprint.jsx'
+import EngineExplorer from '../components/EngineExplorer.jsx'
+import { ENGINE_MODELS } from '../data/engineParts.js'
 
 function Spec({ label, value, unit }) {
   return (
@@ -84,9 +86,19 @@ export default function AircraftPage() {
               <Spec label="Type" value={e.type} />
             </dl>
             <p className="engine-notes">{e.notes}</p>
+            {ENGINE_MODELS[e.id] && <span className="badge badge-live">3D parts breakdown ↓</span>}
           </div>
         ))}
       </div>
+
+      {/* ---- In-depth engine parts breakdown (for engines with a built model) ---- */}
+      {a.engines
+        .filter((e) => ENGINE_MODELS[e.id])
+        .map((e) => (
+          <div key={`exp-${e.id}`} style={{ marginTop: 18 }}>
+            <EngineExplorer engineId={e.id} />
+          </div>
+        ))}
 
       {/* ---- Timeline ---- */}
       <h2 className="section-title">Timeline</h2>

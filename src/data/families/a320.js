@@ -28,7 +28,7 @@ export const a320Aircraft = [
     firstFlightYear: 2002,
     eisYear: 2003,
     built: 80,
-    model: '',
+    model: '/models/a318.glb',
     engines: [ENGINES['cfm56-5b'], ENGINES['pw1100g']],
     dimensions: {
       lengthM: 31.44,
@@ -68,7 +68,7 @@ export const a320Aircraft = [
     firstFlightYear: 1995,
     eisYear: 1996,
     built: 1500,
-    model: '',
+    model: '/models/a319.glb',
     engines: [ENGINES['cfm56-5b'], ENGINES['v2500'], ENGINES['leap-1a'], ENGINES['pw1100g']],
     dimensions: {
       lengthM: 33.84,
@@ -149,7 +149,7 @@ export const a320Aircraft = [
     firstFlightYear: 1993,
     eisYear: 1994,
     built: 3000,
-    model: '',
+    model: '/models/a321.glb',
     engines: [ENGINES['cfm56-5b'], ENGINES['v2500'], ENGINES['leap-1a'], ENGINES['pw1100g']],
     dimensions: {
       lengthM: 44.51,
@@ -188,7 +188,7 @@ export const a320Aircraft = [
     firstFlightYear: 2022,
     eisYear: 2024,
     built: 30,
-    model: '',
+    model: '/models/a321xlr.glb',
     engines: [ENGINES['leap-1a'], ENGINES['pw1100g']],
     dimensions: {
       lengthM: 44.51,
