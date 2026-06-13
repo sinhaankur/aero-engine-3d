@@ -1,0 +1,109 @@
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --panel-2: #1c2330;
+  --border: #30363d;
+  --ink: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #0a0e14; padding: 1px 5px; border-radius: 4px; font-size: 0.85em; }
+
+.app { max-width: 1040px; margin: 0 auto; padding: 0 20px 80px; }
+
+.topbar {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  padding: 22px 0; border-bottom: 1px solid var(--border); margin-bottom: 28px;
+}
+.brand { font-size: 20px; font-weight: 700; color: var(--ink); }
+.brand-sub { color: var(--muted); font-size: 13px; }
+.footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+
+.hero h1 { font-size: 40px; margin: 0 0 12px; letter-spacing: -0.02em; }
+.hero p { color: var(--muted); max-width: 70ch; font-size: 17px; }
+
+.section-title { margin: 40px 0 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.back { display: inline-block; margin-bottom: 16px; font-size: 14px; }
+.lede { font-size: 18px; color: var(--ink); max-width: 70ch; }
+.intro { color: var(--muted); max-width: 72ch; }
+.empty { padding: 30px; background: var(--panel); border: 1px dashed var(--border); border-radius: 12px; color: var(--muted); }
+
+/* Family grid */
+.family-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.family-card { display: block; padding: 18px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; color: var(--ink); transition: border-color .15s, transform .15s; }
+.family-card:hover { border-color: var(--accent); transform: translateY(-2px); text-decoration: none; }
+.family-card.is-stub { opacity: 0.62; }
+.family-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.family-card h3 { margin: 4px 0; font-size: 20px; }
+.family-card p { margin: 0; color: var(--muted); font-size: 14px; }
+.maker { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; }
+.badge-live { background: #12361f; color: #3fb950; }
+.badge-soon { background: #2a2112; color: #d29922; }
+
+/* Family journey */
+.journey { position: relative; }
+.journey-row { display: grid; grid-template-columns: 56px 16px 1fr; gap: 12px; padding: 14px 0; color: var(--ink); border-bottom: 1px solid var(--border); }
+.journey-row:hover { text-decoration: none; }
+.journey-row:hover .journey-body { background: var(--panel); }
+.journey-year { color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 2px; }
+.journey-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin: 8px auto 0; box-shadow: 0 0 0 4px rgba(88,166,255,0.15); }
+.journey-body { padding: 6px 12px; border-radius: 10px; transition: background .15s; }
+.journey-head { display: flex; align-items: center; gap: 12px; }
+.journey-head h3 { margin: 0; font-size: 18px; }
+.journey-body p { margin: 4px 0 8px; color: var(--muted); font-size: 14px; }
+.journey-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+
+.status { font-size: 11px; padding: 2px 9px; border-radius: 20px; text-transform: capitalize; border: 1px solid var(--border); }
+.status-in-production { color: #3fb950; border-color: #1d4427; }
+.status-in-service { color: #58a6ff; border-color: #1d3a5c; }
+.status-retired { color: #8b949e; }
+
+.risk-pill { color: var(--risk, var(--muted)); border: 1px solid var(--risk, var(--border)); padding: 1px 9px; border-radius: 20px; font-size: 12px; }
+
+/* Aircraft page */
+.ac-head { display: flex; align-items: center; gap: 14px; }
+.ac-head h1 { margin: 0; font-size: 34px; }
+.viewer-toggle { display: inline-flex; gap: 4px; background: var(--panel); padding: 4px; border-radius: 10px; border: 1px solid var(--border); margin: 8px 0 12px; }
+.viewer-toggle button { background: none; border: none; color: var(--muted); padding: 6px 16px; border-radius: 7px; cursor: pointer; font-size: 14px; }
+.viewer-toggle button.on { background: var(--panel-2); color: var(--ink); }
+.model-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+.spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 0; }
+.spec-grid.compact { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.spec { background: var(--panel); padding: 12px 14px; margin: 0; }
+.spec dt { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+.spec dd { margin: 4px 0 0; font-size: 18px; font-variant-numeric: tabular-nums; }
+.spec .unit { color: var(--muted); font-size: 13px; }
+
+.engine-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.engine-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.engine-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.engine-head h3 { margin: 0; font-size: 17px; }
+.engine-notes { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+
+.timeline { list-style: none; padding: 0; margin: 0; border-left: 2px solid var(--border); }
+.timeline li { padding: 8px 0 8px 18px; position: relative; }
+.timeline li::before { content: ''; position: absolute; left: -7px; top: 14px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.t-date { display: inline-block; min-width: 72px; color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; }
+.t-label { color: var(--ink); }
+
+.safety-panel { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--risk); border-radius: 12px; padding: 18px; }
+.safety-rate { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.safety-rate .big { font-size: 40px; font-weight: 700; color: var(--risk); font-variant-numeric: tabular-nums; }
+.safety-rate .small { color: var(--muted); font-size: 13px; }
+.safety-notes { color: var(--ink); }
+.safety-sources { color: var(--muted); font-size: 12px; font-style: italic; }

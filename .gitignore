@@ -1,0 +1,11 @@
+node_modules
+dist
+.DS_Store
+*.local
+.env
+.env.*
+.vite
+
+# Blender working files (keep exported glTF in public/models, not source .blend)
+*.blend1
+*.blend2
