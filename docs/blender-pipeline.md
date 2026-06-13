@@ -38,7 +38,7 @@ mode, with the airframe collection selected):
 ```python
 import bpy
 bpy.ops.export_scene.gltf(
-    filepath="/Users/sinhaankur/aircraft-engine-design/public/models/a320.glb",
+    filepath="/Users/sinhaankur/AirbusEngine3D/public/models/a320.glb",
     export_format='GLB',
     use_selection=True,
     export_apply=True,        # apply modifiers
