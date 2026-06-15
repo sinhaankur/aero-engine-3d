@@ -7,7 +7,11 @@ export default function App() {
         <Link to="/" className="brand">
           ✈ Aircraft Design Archive
         </Link>
-        <span className="brand-sub">3D · blueprints · engines · timelines · safety</span>
+        <nav className="topnav">
+          <Link to="/">Families</Link>
+          <Link to="/systems">Systems</Link>
+        </nav>
+        <span className="brand-sub">3D · blueprints · engines · systems · safety</span>
       </header>
       <main className="content">
         <Outlet />

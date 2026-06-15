@@ -14,6 +14,19 @@ export default function Home() {
         </p>
       </section>
 
+      <Link to="/systems" className="systems-banner">
+        <div>
+          <span className="badge badge-live">New</span>
+          <h3>How aircraft systems work</h3>
+          <p>
+            Electrical, hydraulics, fly-by-wire, fuel, bleed air and landing gear —
+            interactive schematics that show how each system works internally and
+            how it stays safe through redundancy.
+          </p>
+        </div>
+        <span className="systems-banner-cta">Explore systems →</span>
+      </Link>
+
       <h2 className="section-title">Families</h2>
       <div className="family-grid">
         {FAMILIES.map((f) => {
