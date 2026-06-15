@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import EngineViewer from '../three/EngineViewer.jsx'
+import EngineBlueprint from '../three/EngineBlueprint.jsx'
 import {
   ENGINE_MODELS,
   ENGINE_PARTS_BY_MODEL,
   TURBOFAN_CYCLE,
+  ENGINE_BLUEPRINT_CALLOUTS,
 } from '../data/engineParts.js'
 
 /**
@@ -18,7 +20,7 @@ import {
 export default function EngineExplorer({ engineId }) {
   const model = ENGINE_MODELS[engineId]
   const parts = ENGINE_PARTS_BY_MODEL[engineId]
-  const [mode, setMode] = useState('how') // 'how' | 'parts'
+  const [mode, setMode] = useState('how') // 'how' | 'parts' | 'blueprint'
   const [exploded, setExploded] = useState(false)
   const [stageIdx, setStageIdx] = useState(0)
   const [selectedPart, setSelectedPart] = useState(null)
@@ -58,23 +60,49 @@ export default function EngineExplorer({ engineId }) {
             <button className={mode === 'parts' ? 'on' : ''} onClick={() => setMode('parts')}>
               Explore parts
             </button>
+            <button className={mode === 'blueprint' ? 'on' : ''} onClick={() => setMode('blueprint')}>
+              Blueprint
+            </button>
           </div>
-          <label className="ee-toggle">
-            <input type="checkbox" checked={exploded} onChange={(e) => setExploded(e.target.checked)} />
-            Exploded
-          </label>
+          {mode !== 'blueprint' && (
+            <label className="ee-toggle">
+              <input type="checkbox" checked={exploded} onChange={(e) => setExploded(e.target.checked)} />
+              Exploded
+            </label>
+          )}
         </div>
       </div>
 
       <div className="ee-body">
-        <EngineViewer
-          url={model.model}
-          parts={parts}
-          exploded={exploded}
-          highlightNodes={highlightNodes}
-        />
+        {mode === 'blueprint' ? (
+          <EngineBlueprint url={model.model} callouts={ENGINE_BLUEPRINT_CALLOUTS} />
+        ) : (
+          <EngineViewer
+            url={model.model}
+            parts={parts}
+            exploded={exploded}
+            highlightNodes={highlightNodes}
+          />
+        )}
 
-        {mode === 'how' ? (
+        {mode === 'blueprint' ? (
+          <div className="ee-parts">
+            <p className="ee-hint" style={{ marginTop: 0 }}>
+              A live technical blueprint: the engine is drawn as cream line-art on
+              graph paper, with the gas path labelled front to back. Orbit to read
+              the cutaway from any angle.
+            </p>
+            <ol>
+              {parts.map((p, i) => (
+                <li key={p.node}>
+                  <span className="ee-num">{i + 1}</span>
+                  <span className="ee-name">{p.name}</span>
+                  <span className="ee-stage">{p.stage}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : mode === 'how' ? (
           <div className="ee-cycle">
             <div className="ee-cycle-steps">
               {cycle.map((s, i) => (

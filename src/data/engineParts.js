@@ -232,6 +232,23 @@ export const ENGINE_PARTS_BY_MODEL = {
 export const LEAP_1A_PARTS = ENGINE_PARTS_BY_MODEL['leap-1a']
 
 /**
+ * Callouts for the line-art "Blueprint" view — the labels and leader offsets
+ * that float next to each major stage, mirroring a hand-drawn engine cutaway.
+ * `node` is the glTF node the label anchors to; dx/dy/dz nudge the label off the
+ * geometry so it sits in clear space. Air flows front (+X) to back (-X).
+ */
+export const ENGINE_BLUEPRINT_CALLOUTS = [
+  { node: '01b_Inlet_Lip', label: 'air inlet', dx: 1.4, dy: 0.2, dz: 0.2 },
+  { node: '04_Fan_Blades', label: 'fan', dx: 0.2, dy: 1.6, dz: 0.2 },
+  { node: '05_Core_Casing', label: 'low pressure compressor', dx: -0.2, dy: -1.4, dz: 0.2 },
+  { node: '06_Combustor', label: 'high pressure compressor', dx: -0.2, dy: 1.3, dz: 0.2 },
+  { node: '06_Combustor', label: 'combustor', dx: -0.4, dy: -1.2, dz: 0.2 },
+  { node: '07_Turbine', label: 'high pressure turbine', dx: -0.2, dy: 1.3, dz: 0.2 },
+  { node: '07_Turbine', label: 'low pressure turbine', dx: -0.6, dy: -1.2, dz: 0.2 },
+  { node: '08_Exhaust_Nozzle', label: 'exhaust', dx: -1.4, dy: 0.6, dz: 0.2 },
+]
+
+/**
  * How a turbofan actually works — the Brayton cycle, in order. Each stage names
  * the part nodes it involves so the "How it works" walkthrough can highlight the
  * right geometry in 3D as the user steps through Suck → Squeeze → Bang → Blow.
