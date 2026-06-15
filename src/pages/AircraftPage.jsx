@@ -54,7 +54,7 @@ export default function AircraftPage() {
       {view === '3d' ? (
         <AircraftViewer modelUrl={modelUrl} dimensions={d} engineCount={2} />
       ) : (
-        <Blueprint dimensions={d} engineCount={2} />
+        <Blueprint dimensions={d} engineCount={2} aircraft={a} />
       )}
       {!a.model && (
         <p className="model-note">

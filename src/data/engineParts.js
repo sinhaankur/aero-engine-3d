@@ -194,7 +194,7 @@ const pw1100g = partsTemplate({
 
 export const ENGINE_MODELS = {
   'leap-1a': {
-    id: 'leap-1a', name: 'CFM LEAP-1A', model: '/models/engine-leap-1a.glb',
+    id: 'leap-1a', name: 'CFM LEAP-1A', model: '/models/engine-leap-1a-hd.glb',
     overview:
       'A high-bypass-ratio (≈11:1) turbofan. Most thrust comes from the big fan ' +
       'pushing cold bypass air around the core; the core is a compact gas ' +
