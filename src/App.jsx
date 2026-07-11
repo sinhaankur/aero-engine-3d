@@ -5,13 +5,13 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <Link to="/" className="brand">
-          <span className="brand-mark">✈</span> Aircraft Design Archive
+          <span className="brand-mark">✈</span> ADA / Aircraft Design Archive
         </Link>
         <nav className="topnav">
-          <Link to="/">Families</Link>
+          <Link to="/">Index</Link>
           <Link to="/systems">Systems</Link>
         </nav>
-        <Link to="/systems" className="btn btn-primary btn-sm nav-cta">Explore →</Link>
+        <Link to="/" className="btn btn-primary btn-sm nav-cta">Index →</Link>
       </header>
       <main className="content">
         <Outlet />

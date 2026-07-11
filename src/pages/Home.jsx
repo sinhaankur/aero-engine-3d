@@ -1,200 +1,210 @@
 import { Link } from 'react-router-dom'
 import { FAMILIES, getAircraftForFamily } from '../data/index.js'
 import { ENGINES } from '../data/engines.js'
+import { ENGINE_MODELS } from '../data/engineParts.js'
+import { SYSTEMS } from '../data/systems.js'
 import HeroPlane from '../three/HeroPlane.jsx'
 
-// Live counts so the marketing numbers can never drift from the actual archive.
-function useArchiveStats() {
-  const families = FAMILIES.length
-  const aircraft = FAMILIES.reduce((n, f) => n + getAircraftForFamily(f.id).length, 0)
-  const engines = Object.keys(ENGINES).length
-  return { families, aircraft, engines }
+const pad = (n) => String(n).padStart(2, '0')
+
+// Flatten every aircraft across families, so the catalog can list them all.
+function allAircraft() {
+  return FAMILIES.flatMap((f) =>
+    getAircraftForFamily(f.id).map((a) => ({ ...a, familyName: f.name })),
+  )
 }
 
-function Feature({ icon, title, children }) {
+// One row in a numbered index. `to` may be null → a "dead"/unlinked entry that
+// still shows in the catalog (the tol.is "awaiting_prompt" energy), elevated
+// here into an honest "not yet wired" marker.
+function Row({ n, name, desc, meta, tag, to }) {
+  const inner = (
+    <>
+      <span className="idx-num">{pad(n)}</span>
+      <span className="idx-main">
+        <span className="idx-name">{name}</span>
+        {desc && <span className="idx-desc">{desc}</span>}
+      </span>
+      <span className="idx-meta">
+        {meta && <span>{meta}</span>}
+        {tag && <span className={`idx-tag ${tag.kind || ''}`}>{tag.label}</span>}
+        {to && <span className="idx-arrow">→</span>}
+      </span>
+    </>
+  )
+  if (!to) return <div className="idx-row is-dead" title="Not wired yet">{inner}</div>
+  return <Link to={to} className="idx-row">{inner}</Link>
+}
+
+function Section({ hash, title, count, children }) {
   return (
-    <div className="feature">
-      <div className="feature-icon">{icon}</div>
-      <h3>{title}</h3>
-      <p>{children}</p>
-    </div>
+    <>
+      <div className="idx-head">
+        <span className="hash">{hash}</span>
+        <span className="title">{title}</span>
+        {count != null && <span className="count">{count} {count === 1 ? 'entry' : 'entries'}</span>}
+      </div>
+      <div className="idx-list">{children}</div>
+    </>
   )
 }
 
 export default function Home() {
-  const stats = useArchiveStats()
+  const aircraft = allAircraft()
+  const engines = Object.values(ENGINES)
+  const stats = {
+    families: FAMILIES.length,
+    aircraft: aircraft.length,
+    engines: engines.length,
+    systems: SYSTEMS.length,
+  }
+
+  // For each engine, find the first aircraft that offers it, to give a live link.
+  const engineHome = {}
+  for (const f of FAMILIES) {
+    for (const a of getAircraftForFamily(f.id)) {
+      for (const e of a.engines) {
+        if (!engineHome[e.id]) engineHome[e.id] = `/family/${f.id}/${a.id}`
+      }
+    }
+  }
+
+  let i = 0 // running index across the whole catalog
 
   return (
     <div>
-      {/* ---------------------------------------------------------------- */}
-      {/* HERO — animated airframe backdrop with headline + CTAs overlaid   */}
-      {/* ---------------------------------------------------------------- */}
-      <section className="hero-stage">
-        <div className="hero-stage-bg">
-          <HeroPlane url="/models/a320.glb" height={520} />
-        </div>
-        <div className="hero-stage-copy">
-          <span className="eyebrow">Interactive aircraft encyclopedia</span>
-          <h1>
-            See how airliners are<br />designed — inside and out.
-          </h1>
-          <p>
-            Explore every Airbus family from the engine up to the full airframe:
-            interactive 3D models, technical blueprints, production timelines and
-            attributed safety records — all in one place.
-          </p>
-          <div className="hero-cta">
-            <a href="#families" className="btn btn-primary">Explore aircraft →</a>
-            <Link to="/systems" className="btn btn-ghost">How systems work</Link>
-          </div>
-        </div>
-      </section>
+      {/* ---- STATUS BANNER ---- */}
+      <div className="status-banner">
+        <span className="dot" />
+        <span className="k">Status</span>
+        <span className="v">ONLINE</span>
+        <span className="sep">/</span>
+        <span className="k">Archive</span>
+        <span className="v">{stats.families} families · {stats.aircraft} aircraft</span>
+        <span className="spacer" />
+        <Link to="/systems">SYSTEMS →</Link>
+      </div>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* STATS BAR                                                         */}
-      {/* ---------------------------------------------------------------- */}
-      <section className="stats-bar">
-        <div className="stat">
-          <span className="stat-num">{stats.families}</span>
-          <span className="stat-label">Aircraft families</span>
-        </div>
-        <div className="stat">
-          <span className="stat-num">{stats.aircraft}</span>
-          <span className="stat-label">Variants in 3D</span>
-        </div>
-        <div className="stat">
-          <span className="stat-num">{stats.engines}</span>
-          <span className="stat-label">Engine types</span>
-        </div>
-        <div className="stat">
-          <span className="stat-num">6</span>
-          <span className="stat-label">Systems explained</span>
-        </div>
-      </section>
+      {/* ---- MASTHEAD ---- */}
+      <div className="masthead">
+        <h1>
+          Aircraft Design <span className="accent">Archive</span>
+          <span className="cursor">_</span>
+        </h1>
+        <p>
+          An interactive, engineering-grade catalog of aircraft families — every
+          variant in 3D, dimensioned blueprints, exploded engines, and the systems
+          that keep them flying. Pick an index entry below.
+        </p>
+      </div>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* FEATURES — what you get                                           */}
-      {/* ---------------------------------------------------------------- */}
-      <section className="features">
-        <Feature icon="🛩" title="Interactive 3D models">
-          Rotate every variant in real time — authored airframes at a consistent,
-          true-to-scale standard, from the A220 to the double-deck A380.
-        </Feature>
-        <Feature icon="📐" title="Engineering blueprints">
-          A live general-arrangement drawing for each type, generated from its real
-          dimensions with dimensioned views and a numbered component key.
-        </Feature>
-        <Feature icon="⚙️" title="Engines, exploded">
-          Break a turbofan into its parts and watch the working cycle stage by
-          stage — intake, compression, combustion, exhaust.
-        </Feature>
-      </section>
+      {/* ---- ANIMATED MODEL VIEWPORT ---- */}
+      <div className="hero-viewport">
+        <span className="tag-corner">MODEL // <b>A320</b> · LIVE RENDER</span>
+        <HeroPlane url="/models/a320.glb" height={340} />
+      </div>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* SYSTEMS BANNER                                                    */}
-      {/* ---------------------------------------------------------------- */}
-      <Link to="/systems" className="systems-banner">
-        <div>
-          <span className="badge badge-live">New</span>
-          <h3>How aircraft systems work</h3>
-          <p>
-            Electrical, hydraulics, fly-by-wire, fuel, bleed air and landing gear —
-            interactive schematics that show how each system works internally and
-            how it stays safe through redundancy.
-          </p>
-        </div>
-        <span className="systems-banner-cta">Explore systems →</span>
-      </Link>
+      {/* ---- LIVE COUNTS ---- */}
+      <div className="count-strip">
+        <div className="count-cell"><span className="n">{pad(stats.families)}</span><span className="l">Families</span></div>
+        <div className="count-cell"><span className="n">{pad(stats.aircraft)}</span><span className="l">Aircraft</span></div>
+        <div className="count-cell"><span className="n">{pad(stats.engines)}</span><span className="l">Engines</span></div>
+        <div className="count-cell"><span className="n">{pad(stats.systems)}</span><span className="l">Systems</span></div>
+      </div>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* FAMILIES                                                          */}
-      {/* ---------------------------------------------------------------- */}
-      <h2 className="section-title" id="families">Browse the families</h2>
-      <div className="family-grid">
+      {/* ---- FAMILIES ---- */}
+      <Section hash="//" title="Families" count={FAMILIES.length}>
         {FAMILIES.map((f) => {
           const count = getAircraftForFamily(f.id).length
+          i += 1
           return (
-            <Link
+            <Row
               key={f.id}
+              n={i}
+              name={f.name}
+              desc={f.tagline}
+              meta={`${count} variants`}
+              tag={{ label: 'Live', kind: 'live' }}
               to={`/family/${f.id}`}
-              className={`family-card ${f.stub ? 'is-stub' : ''}`}
-            >
-              <div className="family-card-head">
-                <span className="maker">{f.manufacturer}</span>
-                {f.stub ? (
-                  <span className="badge badge-soon">Coming soon</span>
-                ) : (
-                  <span className="badge badge-live">{count} variants</span>
-                )}
-              </div>
-              <h3>{f.name}</h3>
-              <p>{f.tagline}</p>
-              <span className="family-card-cta">View family →</span>
-            </Link>
+            />
           )
         })}
-      </div>
+      </Section>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* HOW IT WORKS — three simple steps                                 */}
-      {/* ---------------------------------------------------------------- */}
-      <h2 className="section-title">How it works</h2>
-      <div className="steps">
-        <Step n="1" title="Pick a family">
-          Start with any Airbus family and walk its variants in chronological
-          order — the "family journey" that shows how each type grew from the last.
-        </Step>
-        <Step n="2" title="Open a variant">
-          Rotate the 3D model, flip to the blueprint, and read its real dimensions,
-          engine options, timeline and attributed safety record.
-        </Step>
-        <Step n="3" title="Go deeper">
-          Explode the engine to see how a turbofan works, or jump to Systems to
-          learn how hydraulics, fly-by-wire and fuel keep the aircraft flying.
-        </Step>
-      </div>
+      {/* ---- ALL AIRCRAFT ---- */}
+      <Section hash="//" title="Aircraft" count={aircraft.length}>
+        {aircraft.map((a) => {
+          i += 1
+          return (
+            <Row
+              key={a.id}
+              n={i}
+              name={a.name.replace(/^Airbus /, '')}
+              desc={`${a.dimensions.lengthM.toFixed(1)} m · ${a.dimensions.paxTypical} seats`}
+              meta={a.status.replace('-', ' ')}
+              tag={{ label: '3D', kind: 'live' }}
+              to={`/family/${a.familyId}/${a.id}`}
+            />
+          )
+        })}
+      </Section>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* WHY IT MATTERS — value points                                     */}
-      {/* ---------------------------------------------------------------- */}
-      <section className="why">
-        <div className="why-copy">
-          <h2>Real numbers. Honest sources.</h2>
-          <p>
-            Every figure — dimensions, thrust, range, safety — is a nominal public
-            specification, and each aircraft's safety record is attributed to the
-            public database it came from. No marketing gloss on the data itself.
-          </p>
-        </div>
-        <ul className="why-list">
-          <li><strong>True-to-scale models</strong> generated from each type's real dimensions.</li>
-          <li><strong>Dimensioned blueprints</strong> that redraw themselves from the same numbers.</li>
-          <li><strong>Attributed safety figures</strong> sourced from public aviation-safety records.</li>
-          <li><strong>Consistent across the family</strong> — the A220 to the double-deck A380.</li>
-        </ul>
-      </section>
+      {/* ---- ENGINES ---- */}
+      <Section hash="//" title="Engines" count={engines.length}>
+        {engines.map((e) => {
+          i += 1
+          const hasModel = !!ENGINE_MODELS[e.id]
+          return (
+            <Row
+              key={e.id}
+              n={i}
+              name={e.name}
+              desc={`${e.thrustKn} kN · BPR ${e.bypassRatio} · Ø${e.fanDiameterM} m`}
+              meta={e.manufacturer}
+              tag={hasModel ? { label: 'Exploded 3D', kind: 'live' } : { label: 'Spec', kind: 'soon' }}
+              to={engineHome[e.id] || null}
+            />
+          )
+        })}
+      </Section>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* CLOSING CTA                                                       */}
-      {/* ---------------------------------------------------------------- */}
-      <section className="cta-band">
-        <h2>Start exploring</h2>
-        <p>Six families, {stats.aircraft} variants, in 3D — pick one and dive in.</p>
-        <div className="hero-cta">
-          <a href="#families" className="btn btn-primary">Browse aircraft →</a>
-          <Link to="/systems" className="btn btn-ghost">How systems work</Link>
-        </div>
-      </section>
-    </div>
-  )
-}
+      {/* ---- SYSTEMS ---- */}
+      <Section hash="//" title="Systems" count={SYSTEMS.length}>
+        {SYSTEMS.map((s) => {
+          i += 1
+          return (
+            <Row
+              key={s.id}
+              n={i}
+              name={s.name}
+              desc={s.summary?.slice(0, 68) + (s.summary && s.summary.length > 68 ? '…' : '')}
+              meta={`${s.components?.length ?? 0} components`}
+              tag={{ label: 'Schematic', kind: 'live' }}
+              to="/systems"
+            />
+          )
+        })}
+      </Section>
 
-function Step({ n, title, children }) {
-  return (
-    <div className="step">
-      <span className="step-num">{n}</span>
-      <h3>{title}</h3>
-      <p>{children}</p>
+      {/* ---- REFERENCE / ROADMAP (surfacing the currently-unlinked doc) ---- */}
+      <Section hash="//" title="Reference" count={2}>
+        <Row
+          n={(i += 1)}
+          name="Roadmap"
+          desc="Where this is going: open aviation knowledge base + LLM"
+          meta="docs/ROADMAP.md"
+          tag={{ label: 'Doc', kind: 'soon' }}
+          to={null}
+        />
+        <Row
+          n={(i += 1)}
+          name="Data sources"
+          desc="Nominal public specs; safety figures attributed per aircraft"
+          meta="public records"
+          tag={{ label: 'Note', kind: 'soon' }}
+          to={null}
+        />
+      </Section>
     </div>
   )
 }
