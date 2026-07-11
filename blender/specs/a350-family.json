@@ -1,0 +1,28 @@
+[
+  {
+    "id": "a350-900",
+    "length": 66.8,
+    "fuse_dia": 5.96,
+    "wingspan": 64.75,
+    "height": 17.05,
+    "sweep_deg": 32,
+    "engine_count": 2,
+    "fan_dia": 3.0,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#0e2f63"
+  },
+  {
+    "id": "a350-1000",
+    "length": 73.78,
+    "fuse_dia": 5.96,
+    "wingspan": 64.75,
+    "height": 17.08,
+    "sweep_deg": 32,
+    "engine_count": 2,
+    "fan_dia": 3.0,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#0e2f63"
+  }
+]

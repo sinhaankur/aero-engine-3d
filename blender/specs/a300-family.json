@@ -1,0 +1,54 @@
+[
+  {
+    "id": "a300b4",
+    "length": 53.62,
+    "fuse_dia": 5.64,
+    "wingspan": 44.84,
+    "height": 16.53,
+    "sweep_deg": 28,
+    "engine_count": 2,
+    "fan_dia": 2.36,
+    "sharklet": false,
+    "decks": 1,
+    "tail_color": "#14396b"
+  },
+  {
+    "id": "a300-600",
+    "length": 54.08,
+    "fuse_dia": 5.64,
+    "wingspan": 44.84,
+    "height": 16.62,
+    "sweep_deg": 28,
+    "engine_count": 2,
+    "fan_dia": 2.36,
+    "sharklet": false,
+    "decks": 1,
+    "tail_color": "#14396b"
+  },
+  {
+    "id": "a310-200",
+    "length": 46.66,
+    "fuse_dia": 5.64,
+    "wingspan": 43.89,
+    "height": 15.8,
+    "sweep_deg": 28,
+    "engine_count": 2,
+    "fan_dia": 2.36,
+    "sharklet": false,
+    "decks": 1,
+    "tail_color": "#14396b"
+  },
+  {
+    "id": "a310-300",
+    "length": 46.66,
+    "fuse_dia": 5.64,
+    "wingspan": 43.89,
+    "height": 15.8,
+    "sweep_deg": 28,
+    "engine_count": 2,
+    "fan_dia": 2.36,
+    "sharklet": false,
+    "decks": 1,
+    "tail_color": "#14396b"
+  }
+]

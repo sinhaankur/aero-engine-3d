@@ -1,0 +1,28 @@
+[
+  {
+    "id": "a220-100",
+    "length": 35.0,
+    "fuse_dia": 3.7,
+    "wingspan": 35.1,
+    "height": 11.5,
+    "sweep_deg": 24,
+    "engine_count": 2,
+    "fan_dia": 1.85,
+    "sharklet": false,
+    "decks": 1,
+    "tail_color": "#12467f"
+  },
+  {
+    "id": "a220-300",
+    "length": 38.7,
+    "fuse_dia": 3.7,
+    "wingspan": 35.1,
+    "height": 11.5,
+    "sweep_deg": 24,
+    "engine_count": 2,
+    "fan_dia": 1.85,
+    "sharklet": false,
+    "decks": 1,
+    "tail_color": "#12467f"
+  }
+]

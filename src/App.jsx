@@ -5,20 +5,44 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <Link to="/" className="brand">
-          ✈ Aircraft Design Archive
+          <span className="brand-mark">✈</span> Aircraft Design Archive
         </Link>
         <nav className="topnav">
           <Link to="/">Families</Link>
           <Link to="/systems">Systems</Link>
         </nav>
-        <span className="brand-sub">3D · blueprints · engines · systems · safety</span>
+        <Link to="/systems" className="btn btn-primary btn-sm nav-cta">Explore →</Link>
       </header>
       <main className="content">
         <Outlet />
       </main>
       <footer className="footer">
-        Data-driven archive. Specs are nominal public figures; safety figures are
-        attributed per aircraft and sourced from public aviation-safety records.
+        <div className="footer-cols">
+          <div className="footer-brand">
+            <span className="brand"><span className="brand-mark">✈</span> Aircraft Design Archive</span>
+            <p>
+              An interactive encyclopedia of aircraft families — 3D models,
+              blueprints, engines, systems and attributed safety records.
+            </p>
+          </div>
+          <div className="footer-col">
+            <h4>Explore</h4>
+            <Link to="/">Families</Link>
+            <Link to="/systems">Systems</Link>
+            <a href="/#families">All aircraft</a>
+          </div>
+          <div className="footer-col">
+            <h4>Families</h4>
+            <Link to="/family/a320">A320</Link>
+            <Link to="/family/a350">A350</Link>
+            <Link to="/family/a380">A380</Link>
+          </div>
+        </div>
+        <div className="footer-fine">
+          Specs are nominal public figures; safety figures are attributed per
+          aircraft and sourced from public aviation-safety records. Not affiliated
+          with Airbus.
+        </div>
       </footer>
     </div>
   )

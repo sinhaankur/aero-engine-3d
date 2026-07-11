@@ -1,0 +1,15 @@
+[
+  {
+    "id": "a380-800",
+    "length": 72.72,
+    "fuse_dia": 7.14,
+    "wingspan": 79.75,
+    "height": 24.09,
+    "sweep_deg": 33,
+    "engine_count": 4,
+    "fan_dia": 2.95,
+    "sharklet": false,
+    "decks": 2,
+    "tail_color": "#0c2a5c"
+  }
+]

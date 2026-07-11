@@ -27,6 +27,12 @@ export default function AircraftPage() {
   const d = a.dimensions
   const risk = RISK_LEVELS[a.safety.risk]
   const modelUrl = a.model || undefined
+  // The A380 is the only four-engine Airbus; everything else in the archive is a
+  // twinjet. Drive both the 3D viewer and the blueprint from this.
+  const engineCount = a.familyId === 'a380' ? 4 : 2
+  // Double-deck (A380) and twin-aisle widebodies read differently on the sheet.
+  const isDoubleDeck = a.familyId === 'a380'
+  const isWidebody = d.fuselageDiaM >= 5.0
 
   // Engines that have a built 3D model, surfaced via a tab selector below.
   const modelledEngines = a.engines.filter((e) => ENGINE_MODELS[e.id])
@@ -52,9 +58,16 @@ export default function AircraftPage() {
         <button className={view === 'blueprint' ? 'on' : ''} onClick={() => setView('blueprint')}>Blueprint</button>
       </div>
       {view === '3d' ? (
-        <AircraftViewer modelUrl={modelUrl} dimensions={d} engineCount={2} />
+        <AircraftViewer modelUrl={modelUrl} dimensions={d} engineCount={engineCount} />
       ) : (
-        <Blueprint dimensions={d} engineCount={2} aircraft={a} />
+        <Blueprint
+          dimensions={d}
+          engineCount={engineCount}
+          aircraft={a}
+          subtitle={family?.tagline}
+          doubleDeck={isDoubleDeck}
+          wideBody={isWidebody}
+        />
       )}
       {!a.model && (
         <p className="model-note">

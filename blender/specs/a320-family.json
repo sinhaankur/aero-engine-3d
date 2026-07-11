@@ -1,0 +1,67 @@
+[
+  {
+    "id": "a318",
+    "length": 31.44,
+    "fuse_dia": 3.95,
+    "wingspan": 34.10,
+    "height": 12.51,
+    "sweep_deg": 25,
+    "engine_count": 2,
+    "fan_dia": 1.73,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#1f4fb0"
+  },
+  {
+    "id": "a319",
+    "length": 33.84,
+    "fuse_dia": 3.95,
+    "wingspan": 35.80,
+    "height": 11.76,
+    "sweep_deg": 25,
+    "engine_count": 2,
+    "fan_dia": 1.73,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#1f4fb0"
+  },
+  {
+    "id": "a320",
+    "length": 37.57,
+    "fuse_dia": 3.95,
+    "wingspan": 35.80,
+    "height": 11.76,
+    "sweep_deg": 25,
+    "engine_count": 2,
+    "fan_dia": 1.75,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#1f4fb0"
+  },
+  {
+    "id": "a321",
+    "length": 44.51,
+    "fuse_dia": 3.95,
+    "wingspan": 35.80,
+    "height": 11.76,
+    "sweep_deg": 25,
+    "engine_count": 2,
+    "fan_dia": 1.90,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#1f4fb0"
+  },
+  {
+    "id": "a321xlr",
+    "length": 44.51,
+    "fuse_dia": 3.95,
+    "wingspan": 35.80,
+    "height": 11.76,
+    "sweep_deg": 25,
+    "engine_count": 2,
+    "fan_dia": 1.98,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#1f4fb0"
+  }
+]

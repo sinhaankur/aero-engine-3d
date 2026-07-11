@@ -1,0 +1,54 @@
+[
+  {
+    "id": "a330-300",
+    "length": 63.66,
+    "fuse_dia": 5.64,
+    "wingspan": 60.3,
+    "height": 16.83,
+    "sweep_deg": 30,
+    "engine_count": 2,
+    "fan_dia": 2.47,
+    "sharklet": false,
+    "decks": 1,
+    "tail_color": "#123a75"
+  },
+  {
+    "id": "a330-200",
+    "length": 58.82,
+    "fuse_dia": 5.64,
+    "wingspan": 60.3,
+    "height": 17.39,
+    "sweep_deg": 30,
+    "engine_count": 2,
+    "fan_dia": 2.47,
+    "sharklet": false,
+    "decks": 1,
+    "tail_color": "#123a75"
+  },
+  {
+    "id": "a330-900",
+    "length": 63.66,
+    "fuse_dia": 5.64,
+    "wingspan": 64.0,
+    "height": 16.79,
+    "sweep_deg": 30,
+    "engine_count": 2,
+    "fan_dia": 2.85,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#123a75"
+  },
+  {
+    "id": "a330-800",
+    "length": 58.82,
+    "fuse_dia": 5.64,
+    "wingspan": 64.0,
+    "height": 17.39,
+    "sweep_deg": 30,
+    "engine_count": 2,
+    "fan_dia": 2.85,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#123a75"
+  }
+]

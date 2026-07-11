@@ -2,6 +2,7 @@ import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Stage, useGLTF, Html } from '@react-three/drei'
 import * as THREE from 'three'
+import CanvasFallback from './CanvasFallback.jsx'
 
 function withBase(path) {
   if (!path) return path
@@ -78,14 +79,16 @@ function Loader() {
 export default function EngineViewer({ url, parts, exploded, highlightNodes, height = 400 }) {
   return (
     <div style={{ height, width: '100%', background: '#0d1117', borderRadius: 12 }}>
-      <Canvas shadows camera={{ position: [4, 2.4, 5.5], fov: 40 }}>
-        <Suspense fallback={<Loader />}>
-          <Stage intensity={0.5} environment="warehouse" adjustCamera={exploded ? 1.6 : 1.1}>
-            <EngineModel url={url} parts={parts} exploded={exploded} highlightNodes={highlightNodes} />
-          </Stage>
-        </Suspense>
-        <OrbitControls enablePan makeDefault />
-      </Canvas>
+      <CanvasFallback label="3D preview unavailable on this device">
+        <Canvas shadows camera={{ position: [4, 2.4, 5.5], fov: 40 }}>
+          <Suspense fallback={<Loader />}>
+            <Stage intensity={0.5} environment="warehouse" adjustCamera={exploded ? 1.6 : 1.1}>
+              <EngineModel url={url} parts={parts} exploded={exploded} highlightNodes={highlightNodes} />
+            </Stage>
+          </Suspense>
+          <OrbitControls enablePan makeDefault />
+        </Canvas>
+      </CanvasFallback>
     </div>
   )
 }

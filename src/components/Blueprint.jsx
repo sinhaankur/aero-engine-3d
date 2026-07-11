@@ -1,437 +1,716 @@
 /**
- * A data-driven engineering general-arrangement (GA) drawing. Renders three
- * orthographic views — plan (top), profile (side) and front — scaled directly
- * from the aircraft's `dimensions`, with full dimension callouts (extension
- * lines + arrowheads), structural detail (doors, windows, control surfaces,
- * sharklets, landing gear, pylons) and a titled spec data block in the corner.
+ * A detailed engineering general-arrangement (GA) drawing of the aircraft —
+ * bright cyanotype-blue sheet, white line art, in the style of a real printed
+ * technical sheet rather than a decorative poster.
  *
- * Outlines are derived parametrically from the four core dimensions using
- * realistic A320-family proportions, so every variant renders an exact-looking
- * sheet straight from its numbers. Pure SVG — fast, printable, no 3D.
+ * Sheet zones:
+ *   • Title + SPECIFICATIONS list ............... top-left
+ *   • PLAN (top) view + numbered callouts ....... top-right
+ *   • PROFILE (side) view + callouts ............ middle band, full width
+ *   • FRONT view + callouts ..................... bottom-left
+ *   • COMPONENT SCHEDULE (numbered key) ......... right column
+ *   • POWERPLANT / DIMENSION DATA tables ........ right column
+ *   • Formal TITLE BLOCK (drawing no., scale,
+ *     projection symbol, revision, units) ....... bottom strip
+ *
+ * Every outline AND every callout/leader is derived parametrically from the
+ * aircraft's dimensions + engine data, so each variant renders an exact-looking,
+ * fully annotated sheet straight from its numbers. Pure SVG — fast, printable.
  */
 
 // Realistic narrowbody proportions, expressed as fractions of a core dimension.
 const RATIO = {
-  noseFrac: 0.11, // nose taper length / fuselage length
-  tailFrac: 0.16, // tail upsweep length / fuselage length
-  wingRootFrac: 0.16, // wing root chord / length
-  wingTipFrac: 0.06, // wing tip chord / length
-  wingLEFrac: 0.30, // wing leading-edge root x (from nose) / length
-  wingSweep: 0.13, // tip is swept back by sweep*length
-  htRootFrac: 0.10, // h-stab root chord / length
-  htTipFrac: 0.045,
-  htSpanFrac: 0.38, // h-stab span / wingspan
-  vtChordFrac: 0.14, // fin root chord / length
+  noseFrac: 0.10, // nose taper length / fuselage length
+  tailFrac: 0.20, // tail upsweep length / fuselage length
+  wingRootFrac: 0.17, // wing root chord / length
+  wingTipFrac: 0.05, // wing tip chord / length
+  wingLEFrac: 0.40, // wing leading-edge root x (from nose) / length
+  wingSweep: 0.16, // tip is swept back by sweep*length
+  htRootFrac: 0.11, // h-stab root chord / length
+  htTipFrac: 0.04,
+  htSpanFrac: 0.36, // h-stab span / wingspan
+  vtChordFrac: 0.16, // fin root chord / length
   finLEFrac: 0.80, // fin LE x (from nose) / length
   gearTrackFrac: 0.21, // main gear track / wingspan
-  enginePosFrac: 0.40, // engine spanwise pos / half-span
+  wheelbaseFrac: 0.38, // nose-to-main-gear / length
+  enginePosFrac: 0.34, // engine spanwise pos / half-span
 }
 
-export default function Blueprint({ dimensions, engineCount = 2, aircraft }) {
-  const { lengthM, wingspanM, heightM, fuselageDiaM } = dimensions
-
-  // ----- layout / scale -----------------------------------------------------
-  // A tall sheet: plan on top, side in the middle, front bottom-right, data
-  // block bottom-left. Drawn in a 200×260 user-unit viewBox.
-  const VB_W = 200
-  const VB_H = 268
-  const margin = 12
-  // Scale so the longest dimension fits the drawing column width.
-  const drawW = VB_W - margin * 2
-  const scale = drawW / Math.max(lengthM, wingspanM)
-
-  const L = lengthM * scale
-  const W = wingspanM * scale
-  const H = heightM * scale
-  const FD = fuselageDiaM * scale
-
-  // Colours (engineering-drawing palette on a dark sheet).
-  const C = {
-    sheet: '#0d1117',
-    grid: '#16202c',
-    gridMaj: '#1e2c3b',
-    ink: '#58a6ff', // primary outline
-    inkSoft: '#3d6ea5', // secondary / hidden-ish detail
-    dim: '#8b98a6', // dimension lines & text
-    accent: '#f0a020', // sharklets / fin / highlights
-    glass: '#274463', // window fill
-    fill: 'rgba(40,80,130,0.10)',
-  }
-
-  // View origins (x = nose at left of each band; centreline y).
-  const nose = margin
-  const planCY = 44
-  const sideCY = 128
-  const frontCX = 150
-  const frontCY = 210
-
-  // ----- shared geometry helpers -------------------------------------------
-  const noseLen = L * RATIO.noseFrac
-  const tailLen = L * RATIO.tailFrac
-  const bodyR = FD / 2
-
-  // Fuselage plan/elevation outline as a smooth capsule with pointed nose and
-  // upswept tail (returned as an SVG path, centred on cy).
-  function fuselagePath(cy, upsweep = 0) {
-    const x0 = nose
-    const x1 = nose + L
-    const noseX = x0 + noseLen
-    const tailX = x1 - tailLen
-    const r = bodyR
-    // top edge L→R then bottom edge R→L
-    return [
-      `M ${x0} ${cy}`,
-      `C ${x0} ${cy - r * 0.7} ${noseX - r} ${cy - r} ${noseX} ${cy - r}`,
-      `L ${tailX} ${cy - r}`,
-      // tail upsweep: top stays, bottom rises
-      `Q ${x1 - tailLen * 0.3} ${cy - r} ${x1} ${cy - r * 0.35 - upsweep}`,
-      `L ${x1} ${cy + r * 0.35 - upsweep}`,
-      `Q ${x1 - tailLen * 0.3} ${cy + r} ${tailX} ${cy + r}`,
-      `L ${noseX} ${cy + r}`,
-      `C ${noseX - r} ${cy + r} ${x0} ${cy + r * 0.7} ${x0} ${cy}`,
-      'Z',
-    ].join(' ')
-  }
-
-  // Wing half-planform (top view), one side. dir = +1 (down) / -1 (up) in SVG.
-  function wingPath(cy, dir) {
-    const leRoot = nose + L * RATIO.wingLEFrac
-    const rootChord = L * RATIO.wingRootFrac
-    const tipChord = L * RATIO.wingTipFrac
-    const sweep = L * RATIO.wingSweep
-    const tipY = cy + dir * (W / 2)
-    const rootInner = cy + dir * bodyR * 0.8
-    const leTip = leRoot + sweep
-    return [
-      `M ${leRoot} ${rootInner}`,
-      `L ${leTip} ${tipY}`,
-      `L ${leTip + tipChord} ${tipY}`,
-      `L ${leRoot + rootChord} ${rootInner}`,
-      'Z',
-    ].join(' ')
-  }
-
-  // Horizontal stabiliser half (top view).
-  function htPath(cy, dir) {
-    const leRoot = nose + L * RATIO.finLEFrac
-    const rootChord = L * RATIO.htRootFrac
-    const tipChord = L * RATIO.htTipFrac
-    const sweep = L * 0.06
-    const span = (W * RATIO.htSpanFrac) / 2
-    const tipY = cy + dir * span
-    const rootInner = cy + dir * bodyR * 0.6
-    return [
-      `M ${leRoot} ${rootInner}`,
-      `L ${leRoot + sweep} ${tipY}`,
-      `L ${leRoot + sweep + tipChord} ${tipY}`,
-      `L ${leRoot + rootChord} ${rootInner}`,
-      'Z',
-    ].join(' ')
-  }
-
-  // ----- dimension-callout primitives --------------------------------------
-  function HDim({ x1, x2, y, label, off = 0 }) {
-    const yl = y + off
-    return (
-      <g stroke={C.dim} strokeWidth="0.35" fill={C.dim}>
-        <line x1={x1} y1={y} x2={x1} y2={yl} />
-        <line x1={x2} y1={y} x2={x2} y2={yl} />
-        <line x1={x1} y1={yl} x2={x2} y2={yl} />
-        <Arrow x={x1} y={yl} dir="left" />
-        <Arrow x={x2} y={yl} dir="right" />
-        <text x={(x1 + x2) / 2} y={yl - 1.4} fontSize="3.2" textAnchor="middle" stroke="none">
-          {label}
-        </text>
-      </g>
-    )
-  }
-  function VDim({ y1, y2, x, label, off = 0 }) {
-    const xl = x + off
-    return (
-      <g stroke={C.dim} strokeWidth="0.35" fill={C.dim}>
-        <line x1={x} y1={y1} x2={xl} y2={y1} />
-        <line x1={x} y1={y2} x2={xl} y2={y2} />
-        <line x1={xl} y1={y1} x2={xl} y2={y2} />
-        <Arrow x={xl} y={y1} dir="up" />
-        <Arrow x={xl} y={y2} dir="down" />
-        <text
-          x={xl - 1.6}
-          y={(y1 + y2) / 2}
-          fontSize="3.2"
-          textAnchor="middle"
-          stroke="none"
-          transform={`rotate(-90 ${xl - 1.6} ${(y1 + y2) / 2})`}
-        >
-          {label}
-        </text>
-      </g>
-    )
-  }
-  function Arrow({ x, y, dir }) {
-    const s = 1.3
-    const pts = {
-      left: `${x},${y} ${x + s},${y - s} ${x + s},${y + s}`,
-      right: `${x},${y} ${x - s},${y - s} ${x - s},${y + s}`,
-      up: `${x},${y} ${x - s},${y + s} ${x + s},${y + s}`,
-      down: `${x},${y} ${x - s},${y - s} ${x + s},${y - s}`,
-    }[dir]
-    return <polygon points={pts} stroke="none" />
-  }
-
-  // ----- engine spanwise placement (shared by plan + front) -----------------
-  const perSide = Math.max(1, Math.round(engineCount / 2))
-  const engineYs = []
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < perSide; i++) {
-      const frac = perSide === 1 ? RATIO.enginePosFrac : 0.3 + (i / Math.max(1, perSide - 1)) * 0.2
-      engineYs.push(side * (W / 2) * frac)
-    }
-  }
-  const engineLen = FD * 1.6
-  const engineR = FD * 0.42
-  const engineX = nose + L * (RATIO.wingLEFrac - 0.06)
-
-  // Window band (side view): evenly spaced portholes along the cabin.
-  const winCount = Math.max(6, Math.round(lengthM * 0.9))
-  const winStart = nose + noseLen + 2
-  const winEnd = nose + L - tailLen - 2
-  const windows = Array.from({ length: winCount }, (_, i) => winStart + ((winEnd - winStart) * i) / (winCount - 1))
-
-  // Cabin doors (side view): 4 main doors at realistic stations.
-  const doors = [0.16, 0.34, 0.62, 0.86].map((f) => nose + noseLen + (winEnd - winStart) * f)
-
-  // ----- spec data-block rows ----------------------------------------------
+export default function Blueprint({ dimensions, engineCount = 2, aircraft, subtitle, doubleDeck = false, wideBody = false }) {
   const d = dimensions
-  const specRows = [
-    ['LENGTH', `${lengthM.toFixed(2)} m`],
-    ['WINGSPAN', `${wingspanM.toFixed(2)} m`],
-    ['HEIGHT', `${heightM.toFixed(2)} m`],
-    ['FUSELAGE Ø', `${fuselageDiaM.toFixed(2)} m`],
-    ['MTOW', `${d.mtowKg.toLocaleString()} kg`],
-    ['RANGE', `${d.rangeKm.toLocaleString()} km`],
-    ['CRUISE', `Mach ${d.cruiseMach}`],
-    ['CEILING', `${d.ceilingM.toLocaleString()} m`],
-    ['SEATS', `${d.paxTypical}–${d.paxMax}`],
-  ]
+
+  // Cyanotype palette — bright blue sheet, white ink.
+  const C = {
+    sheet: '#0a4dab',
+    sheet2: '#0846a0',
+    grid: 'rgba(255,255,255,0.055)',
+    gridMaj: 'rgba(255,255,255,0.1)',
+    ink: '#eaf2ff', // primary white outline
+    inkSoft: 'rgba(234,242,255,0.55)', // secondary detail
+    inkFaint: 'rgba(234,242,255,0.28)',
+    dim: 'rgba(234,242,255,0.88)', // dimension lines & text
+    fill: 'rgba(255,255,255,0.04)',
+    glass: 'rgba(255,255,255,0.22)',
+  }
+
+  // ----- sheet layout -------------------------------------------------------
+  const VB_W = 240
+  const VB_H = 268
+  const margin = 10
+  const colX = 168 // left edge of the right-hand annotation/schedule column
+
+  // Component schedule is built up by each view via this shared registry so the
+  // numbered tags on the drawing and the key on the right stay in lock-step.
+  const schedule = buildSchedule(aircraft, engineCount)
 
   return (
     <svg
       viewBox={`0 0 ${VB_W} ${VB_H}`}
       role="img"
-      aria-label={`${aircraft?.name ?? 'Aircraft'} general-arrangement blueprint`}
+      aria-label={`${aircraft?.name ?? 'Aircraft'} general-arrangement engineering drawing`}
       style={{ width: '100%', background: C.sheet, borderRadius: 12 }}
+      fontFamily="'Courier New', ui-monospace, monospace"
     >
-      {/* ---- grid ---- */}
+      <defs>
+        <radialGradient id="bpVignette" cx="46%" cy="36%" r="82%">
+          <stop offset="0%" stopColor={C.sheet} />
+          <stop offset="100%" stopColor={C.sheet2} />
+        </radialGradient>
+      </defs>
+
+      {/* ---- sheet + grid ---- */}
+      <rect x="0" y="0" width={VB_W} height={VB_H} fill="url(#bpVignette)" />
       <g>
-        {Array.from({ length: Math.ceil(VB_W / 10) + 1 }).map((_, i) => (
-          <line key={`v${i}`} x1={i * 10} y1="0" x2={i * 10} y2={VB_H} stroke={i % 5 ? C.grid : C.gridMaj} strokeWidth="0.25" />
+        {Array.from({ length: Math.ceil(VB_W / 6) + 1 }).map((_, i) => (
+          <line key={`v${i}`} x1={i * 6} y1="0" x2={i * 6} y2={VB_H} stroke={i % 5 ? C.grid : C.gridMaj} strokeWidth="0.25" />
         ))}
-        {Array.from({ length: Math.ceil(VB_H / 10) + 1 }).map((_, i) => (
-          <line key={`h${i}`} x1="0" y1={i * 10} x2={VB_W} y2={i * 10} stroke={i % 5 ? C.grid : C.gridMaj} strokeWidth="0.25" />
+        {Array.from({ length: Math.ceil(VB_H / 6) + 1 }).map((_, i) => (
+          <line key={`h${i}`} x1="0" y1={i * 6} x2={VB_W} y2={i * 6} stroke={i % 5 ? C.grid : C.gridMaj} strokeWidth="0.25" />
         ))}
       </g>
+      {/* sheet border (double rule) + drawing-frame zone letters/numbers */}
+      <rect x="3" y="3" width={VB_W - 6} height={VB_H - 6} fill="none" stroke={C.inkSoft} strokeWidth="0.5" />
+      <rect x="5" y="5" width={VB_W - 10} height={VB_H - 10} fill="none" stroke={C.inkFaint} strokeWidth="0.3" />
+      <FrameZones C={C} VB_W={VB_W} VB_H={VB_H} />
 
-      {/* sheet border */}
-      <rect x="2" y="2" width={VB_W - 4} height={VB_H - 4} fill="none" stroke={C.inkSoft} strokeWidth="0.5" />
+      {/* column separator */}
+      <line x1={colX - 4} y1={36} x2={colX - 4} y2={VB_H - 40} stroke={C.inkFaint} strokeWidth="0.3" strokeDasharray="1.5 1.5" />
 
-      {/* ============================ PLAN (TOP) ============================ */}
-      <g>
-        <text x={nose} y={planCY - W / 2 - 4} fontSize="3.4" fill={C.dim}>PLAN VIEW</text>
-        {/* wings */}
-        <path d={wingPath(planCY, 1)} fill={C.fill} stroke={C.ink} strokeWidth="0.5" />
-        <path d={wingPath(planCY, -1)} fill={C.fill} stroke={C.ink} strokeWidth="0.5" />
-        {/* aileron hint (trailing-edge break near tips) */}
-        {[1, -1].map((dir) => {
-          const leRoot = nose + L * RATIO.wingLEFrac
-          const sweep = L * RATIO.wingSweep
-          const tipY = planCY + dir * (W / 2)
-          const x = leRoot + sweep + L * RATIO.wingTipFrac * 0.2
-          return <line key={`ail${dir}`} x1={x} y1={tipY} x2={x - L * 0.02} y2={planCY + dir * (W * 0.34)} stroke={C.inkSoft} strokeWidth="0.3" />
-        })}
-        {/* horizontal stabiliser */}
-        <path d={htPath(planCY, 1)} fill={C.fill} stroke={C.ink} strokeWidth="0.45" />
-        <path d={htPath(planCY, -1)} fill={C.fill} stroke={C.ink} strokeWidth="0.45" />
-        {/* fuselage */}
-        <path d={fuselagePath(planCY)} fill={C.fill} stroke={C.ink} strokeWidth="0.6" />
-        {/* centreline */}
-        <line x1={nose - 4} y1={planCY} x2={nose + L + 4} y2={planCY} stroke={C.inkSoft} strokeWidth="0.3" strokeDasharray="3 1.5 0.6 1.5" />
-        {/* engines (nacelles) */}
-        {engineYs.map((ey, i) => (
-          <g key={`pe${i}`}>
-            <rect
-              x={engineX}
-              y={planCY + ey - engineR}
-              width={engineLen}
-              height={engineR * 2}
-              rx={engineR}
-              fill={C.fill}
-              stroke={C.ink}
-              strokeWidth="0.45"
-            />
-            {/* pylon to fuselage/wing */}
-            <line x1={engineX + engineLen * 0.6} y1={planCY + ey} x2={engineX + engineLen * 0.6} y2={planCY + ey * 0.2} stroke={C.inkSoft} strokeWidth="0.4" />
-          </g>
-        ))}
+      {/* ============================ TITLE + SPECS ======================= */}
+      <TitleBlock C={C} aircraft={aircraft} d={d} margin={margin} subtitle={subtitle} />
 
-        {/* ---- callouts: wingspan + length ---- */}
-        <VDim y1={planCY - W / 2} y2={planCY + W / 2} x={nose - 4} off={-3} label={`${wingspanM.toFixed(1)} m`} />
-        <HDim x1={nose} x2={nose + L} y={planCY + W / 2 + 2} off={5} label={`${lengthM.toFixed(1)} m`} />
-      </g>
+      {/* ============================ DRAWING VIEWS ======================= */}
+      <PlanView C={C} dims={d} engineCount={engineCount} colX={colX} />
+      <ProfileView C={C} dims={d} engineCount={engineCount} colX={colX} doubleDeck={doubleDeck} />
+      <FrontView C={C} dims={d} engineCount={engineCount} doubleDeck={doubleDeck} />
 
-      {/* ============================ PROFILE (SIDE) ======================== */}
-      <g>
-        <text x={nose} y={sideCY - bodyR - 5} fontSize="3.4" fill={C.dim}>PROFILE VIEW</text>
-        {/* fuselage with upswept tail */}
-        <path d={fuselagePath(sideCY, FD * 0.35)} fill={C.fill} stroke={C.ink} strokeWidth="0.6" />
-        {/* flight-deck windows */}
-        <path
-          d={`M ${nose + noseLen * 0.2} ${sideCY - bodyR * 0.45} q ${noseLen * 0.4} ${-bodyR * 0.25} ${noseLen * 0.7} 0`}
-          fill="none"
-          stroke={C.glass}
-          strokeWidth="1.1"
-        />
-        {/* cabin windows */}
-        {windows.map((wx, i) => (
-          <circle key={`w${i}`} cx={wx} cy={sideCY - bodyR * 0.15} r="0.7" fill={C.glass} />
-        ))}
-        {/* doors */}
-        {doors.map((dx, i) => (
-          <rect key={`d${i}`} x={dx - 0.9} y={sideCY - bodyR * 0.55} width="1.8" height={bodyR * 1.0} rx="0.4" fill="none" stroke={C.inkSoft} strokeWidth="0.4" />
-        ))}
-        {/* wing root (seen edge-on, lower fuselage) */}
-        <path
-          d={`M ${nose + L * RATIO.wingLEFrac} ${sideCY + bodyR * 0.5} l ${L * 0.1} ${bodyR * 0.5} l ${L * 0.06} 0 l ${-L * 0.05} ${-bodyR * 0.5} Z`}
-          fill={C.fill}
-          stroke={C.ink}
-          strokeWidth="0.45"
-        />
-        {/* vertical tail fin + rudder split */}
-        <path
-          d={`M ${nose + L * RATIO.finLEFrac} ${sideCY - bodyR}
-             L ${nose + L * 0.94} ${sideCY - H + bodyR}
-             L ${nose + L * 0.985} ${sideCY - H + bodyR}
-             L ${nose + L * 0.9} ${sideCY - bodyR} Z`}
-          fill={C.fill}
-          stroke={C.ink}
-          strokeWidth="0.5"
-        />
-        <line
-          x1={nose + L * 0.935}
-          y1={sideCY - H + bodyR + 1}
-          x2={nose + L * 0.965}
-          y2={sideCY - bodyR}
-          stroke={C.accent}
-          strokeWidth="0.4"
-          strokeDasharray="1.5 1"
-        />
-        {/* horizontal stabiliser (edge-on) */}
-        <path
-          d={`M ${nose + L * RATIO.finLEFrac} ${sideCY - bodyR * 0.2} l ${L * RATIO.htRootFrac} ${-bodyR * 0.1} l 0 ${bodyR * 0.3} l ${-L * RATIO.htRootFrac} ${bodyR * 0.1} Z`}
-          fill={C.fill}
-          stroke={C.ink}
-          strokeWidth="0.4"
-        />
-        {/* engine nacelle (side) under wing */}
-        <ellipse cx={engineX + engineLen / 2} cy={sideCY + bodyR * 1.0} rx={engineLen / 2} ry={engineR} fill={C.fill} stroke={C.ink} strokeWidth="0.45" />
-        <line x1={engineX + engineLen * 0.55} y1={sideCY + bodyR * 1.0 - engineR} x2={engineX + engineLen * 0.55} y2={sideCY + bodyR * 0.55} stroke={C.inkSoft} strokeWidth="0.4" />
-        {/* nose & main landing gear (deployed) */}
-        <Gear x={nose + noseLen + 1} groundY={sideCY + bodyR + H * 0.16} topY={sideCY + bodyR} color={C.ink} soft={C.inkSoft} />
-        <Gear x={nose + L * (RATIO.wingLEFrac + RATIO.wingRootFrac * 0.5)} groundY={sideCY + bodyR + H * 0.16} topY={sideCY + bodyR} color={C.ink} soft={C.inkSoft} />
-        {/* ground line */}
-        <line x1={nose - 4} y1={sideCY + bodyR + H * 0.16} x2={nose + L + 4} y2={sideCY + bodyR + H * 0.16} stroke={C.inkSoft} strokeWidth="0.4" strokeDasharray="2 1.5" />
+      {/* ============================ RIGHT COLUMN ======================== */}
+      <ComponentSchedule C={C} x={colX} y={40} schedule={schedule} />
+      <DataTables C={C} x={colX} y={40 + 7 + schedule.length * 4.65 + 5} d={d} aircraft={aircraft} engineCount={engineCount} />
 
-        {/* ---- callouts: height ---- */}
-        <VDim y1={sideCY - H + bodyR} y2={sideCY + bodyR + H * 0.16} x={nose + L + 4} off={4} label={`${heightM.toFixed(1)} m`} />
-      </g>
-
-      {/* ============================ FRONT VIEW =========================== */}
-      <g>
-        <text x={frontCX - W / 2} y={frontCY - H * 0.7} fontSize="3.4" fill={C.dim}>FRONT VIEW</text>
-        {/* full-span wing (head-on, slight dihedral) */}
-        <path
-          d={`M ${frontCX} ${frontCY - bodyR * 0.2}
-             L ${frontCX - W / 2} ${frontCY - bodyR * 0.2 - W * 0.03}
-             L ${frontCX - W / 2} ${frontCY - bodyR * 0.05 - W * 0.03}
-             L ${frontCX} ${frontCY + bodyR * 0.1}
-             L ${frontCX + W / 2} ${frontCY - bodyR * 0.05 - W * 0.03}
-             L ${frontCX + W / 2} ${frontCY - bodyR * 0.2 - W * 0.03} Z`}
-          fill={C.fill}
-          stroke={C.ink}
-          strokeWidth="0.45"
-        />
-        {/* sharklets (upturned wingtips) */}
-        {[-1, 1].map((s) => (
-          <line
-            key={`sk${s}`}
-            x1={frontCX + s * (W / 2)}
-            y1={frontCY - bodyR * 0.2 - W * 0.03}
-            x2={frontCX + s * (W / 2 - 1)}
-            y2={frontCY - bodyR * 0.2 - W * 0.03 - H * 0.16}
-            stroke={C.accent}
-            strokeWidth="0.8"
-          />
-        ))}
-        {/* fuselage circle */}
-        <circle cx={frontCX} cy={frontCY} r={bodyR} fill={C.fill} stroke={C.ink} strokeWidth="0.6" />
-        {/* vertical fin */}
-        <rect x={frontCX - 0.7} y={frontCY - H + bodyR} width="1.4" height={H - bodyR * 2} fill={C.fill} stroke={C.ink} strokeWidth="0.4" />
-        {/* engines head-on (fan disks) */}
-        {engineYs.map((ey, i) => (
-          <g key={`fe${i}`}>
-            <circle cx={frontCX + ey} cy={frontCY + bodyR * 0.9} r={engineR} fill={C.fill} stroke={C.ink} strokeWidth="0.5" />
-            <circle cx={frontCX + ey} cy={frontCY + bodyR * 0.9} r={engineR * 0.32} fill="none" stroke={C.inkSoft} strokeWidth="0.4" />
-          </g>
-        ))}
-        {/* gear track */}
-        <line x1={frontCX - (W * RATIO.gearTrackFrac) / 2} y1={frontCY + bodyR + H * 0.16} x2={frontCX + (W * RATIO.gearTrackFrac) / 2} y2={frontCY + bodyR + H * 0.16} stroke={C.inkSoft} strokeWidth="0.4" />
-        {[-1, 1].map((s) => (
-          <line key={`gl${s}`} x1={frontCX + s * (W * RATIO.gearTrackFrac) / 2} y1={frontCY + bodyR} x2={frontCX + s * (W * RATIO.gearTrackFrac) / 2} y2={frontCY + bodyR + H * 0.16} stroke={C.ink} strokeWidth="0.5" />
-        ))}
-        {/* callout: gear track */}
-        <HDim x1={frontCX - (W * RATIO.gearTrackFrac) / 2} x2={frontCX + (W * RATIO.gearTrackFrac) / 2} y={frontCY + bodyR + H * 0.16} off={6} label="track" />
-      </g>
-
-      {/* ============================ DATA BLOCK =========================== */}
-      <g>
-        <rect x={margin} y={VB_H - 58} width="92" height="52" fill="rgba(10,18,28,0.85)" stroke={C.ink} strokeWidth="0.5" />
-        <rect x={margin} y={VB_H - 58} width="92" height="9" fill="rgba(40,80,130,0.25)" stroke={C.ink} strokeWidth="0.5" />
-        <text x={margin + 3} y={VB_H - 51.5} fontSize="4" fill={C.ink} fontWeight="700">
-          {(aircraft?.name ?? 'AIRCRAFT').toUpperCase()}
-        </text>
-        <text x={margin + 89} y={VB_H - 51.5} fontSize="2.6" fill={C.dim} textAnchor="end">
-          GA DRAWING
-        </text>
-        {specRows.map(([k, v], i) => {
-          const col = i < 5 ? 0 : 1
-          const row = i % 5
-          const x = margin + 3 + col * 46
-          const y = VB_H - 45 + row * 7.4
-          return (
-            <g key={k}>
-              <text x={x} y={y} fontSize="2.7" fill={C.dim}>{k}</text>
-              <text x={x + 43} y={y} fontSize="2.7" fill="#cdd9e5" textAnchor="end">{v}</text>
-            </g>
-          )
-        })}
-      </g>
-
-      {/* scale + note */}
-      <text x={VB_W - margin} y={VB_H - 9} fontSize="2.6" fill={C.dim} textAnchor="end">
-        DIMENSIONS NOMINAL · DERIVED FROM TYPE DATA
-      </text>
+      {/* ============================ TITLE BLOCK ======================== */}
+      <DrawingTitleBlock C={C} aircraft={aircraft} d={d} VB_W={VB_W} VB_H={VB_H} margin={margin} />
     </svg>
   )
 }
 
-/** Deployed landing-gear strut + wheels (side view). */
-function Gear({ x, groundY, topY, color, soft }) {
-  const len = groundY - topY
+/* =====================================================================
+ * Component schedule (numbered key). Built once and shared between the
+ * leader tags on the drawing and the legend on the right so numbers match.
+ * ===================================================================== */
+function buildSchedule(aircraft, engineCount) {
+  const eng = aircraft?.engines?.[0]
+  const engName = eng ? eng.name : 'TURBOFAN'
+  return [
+    { n: 1, label: 'RADOME / WX RADAR' },
+    { n: 2, label: 'FLIGHT DECK' },
+    { n: 3, label: 'FWD PRESSURE BULKHEAD' },
+    { n: 4, label: 'PASSENGER / SERVICE DOOR' },
+    { n: 5, label: 'CABIN WINDOW BELT' },
+    { n: 6, label: 'CENTRE WING BOX' },
+    { n: 7, label: 'LE SLATS' },
+    { n: 8, label: 'TE FLAPS' },
+    { n: 9, label: 'AILERON' },
+    { n: 10, label: 'WINGTIP DEVICE / WINGLET' },
+    { n: 11, label: `${engineCount}× ${engName}` },
+    { n: 12, label: 'ENGINE PYLON' },
+    { n: 13, label: 'MAIN LANDING GEAR' },
+    { n: 14, label: 'NOSE LANDING GEAR' },
+    { n: 15, label: 'HORIZONTAL STABILISER' },
+    { n: 16, label: 'ELEVATOR' },
+    { n: 17, label: 'VERTICAL STABILISER' },
+    { n: 18, label: 'RUDDER' },
+    { n: 19, label: 'APU EXHAUST' },
+    { n: 20, label: 'AFT PRESSURE BULKHEAD' },
+  ]
+}
+
+/* =====================================================================
+ * Parametric airframe geometry (shared by the views)
+ * ===================================================================== */
+function fuselagePath(x0, L, cy, r, upsweep = 0) {
+  const noseLen = L * RATIO.noseFrac
+  const tailLen = L * RATIO.tailFrac
+  const noseX = x0 + noseLen
+  const tailX = x0 + L - tailLen
+  const tipX = x0 + L
+  return [
+    `M ${x0} ${cy}`,
+    `C ${x0 + noseLen * 0.05} ${cy - r * 0.78} ${noseX - r * 0.9} ${cy - r} ${noseX} ${cy - r}`,
+    `L ${tailX} ${cy - r}`,
+    `Q ${tailX + tailLen * 0.55} ${cy - r * 0.95} ${tipX} ${cy - r * 0.18 - upsweep}`,
+    `L ${tipX} ${cy + r * 0.06 - upsweep}`,
+    `Q ${tailX + tailLen * 0.4} ${cy + r} ${tailX} ${cy + r}`,
+    `L ${noseX} ${cy + r}`,
+    `C ${noseX - r * 0.9} ${cy + r} ${x0 + noseLen * 0.05} ${cy + r * 0.78} ${x0} ${cy}`,
+    'Z',
+  ].join(' ')
+}
+
+function wingPath(x0, L, cy, r, span, dir) {
+  const leRoot = x0 + L * RATIO.wingLEFrac
+  const rootChord = L * RATIO.wingRootFrac
+  const tipChord = L * RATIO.wingTipFrac
+  const sweep = L * RATIO.wingSweep
+  const tipY = cy + dir * (span / 2)
+  const rootInner = cy + dir * r * 0.85
+  const leTip = leRoot + sweep
+  const teRoot = leRoot + rootChord
+  return [
+    `M ${leRoot} ${rootInner}`,
+    `L ${leTip} ${tipY}`,
+    `L ${leTip + tipChord} ${tipY}`,
+    `Q ${teRoot + sweep * 0.3} ${cy + dir * span * 0.32} ${teRoot} ${rootInner}`,
+    'Z',
+  ].join(' ')
+}
+
+function htPath(x0, L, cy, r, span, dir) {
+  const leRoot = x0 + L * RATIO.finLEFrac
+  const rootChord = L * RATIO.htRootFrac
+  const tipChord = L * RATIO.htTipFrac
+  const sweep = L * 0.05
+  const tipY = cy + dir * (span * RATIO.htSpanFrac) / 2
+  const rootInner = cy + dir * r * 0.55
+  return [
+    `M ${leRoot} ${rootInner}`,
+    `L ${leRoot + sweep} ${tipY}`,
+    `L ${leRoot + sweep + tipChord} ${tipY}`,
+    `L ${leRoot + rootChord} ${rootInner}`,
+    'Z',
+  ].join(' ')
+}
+
+function engineOffsets(engineCount, span) {
+  const perSide = Math.max(1, Math.round(engineCount / 2))
+  const ys = []
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < perSide; i++) {
+      const frac = perSide === 1 ? RATIO.enginePosFrac : 0.28 + (i / Math.max(1, perSide - 1)) * 0.22
+      ys.push(side * (span / 2) * frac)
+    }
+  }
+  return ys
+}
+
+/* =====================================================================
+ * Annotation primitives: dimensions + numbered leader callouts
+ * ===================================================================== */
+function Arrow({ x, y, dir, C, s = 1.4 }) {
+  const pts = {
+    left: `${x},${y} ${x + s},${y - s} ${x + s},${y + s}`,
+    right: `${x},${y} ${x - s},${y - s} ${x - s},${y + s}`,
+    up: `${x},${y} ${x - s},${y + s} ${x + s},${y + s}`,
+    down: `${x},${y} ${x - s},${y - s} ${x + s},${y - s}`,
+  }[dir]
+  return <polygon points={pts} fill={C.dim} stroke="none" />
+}
+
+function HDim({ x1, x2, y, label, ext = 0, C, size = 3.2 }) {
   return (
-    <g stroke={color} strokeWidth="0.5" fill="none">
+    <g stroke={C.dim} strokeWidth="0.3">
+      {ext !== 0 && <line x1={x1} y1={y - ext} x2={x1} y2={y} />}
+      {ext !== 0 && <line x1={x2} y1={y - ext} x2={x2} y2={y} />}
+      <line x1={x1} y1={y} x2={x2} y2={y} />
+      <Arrow x={x1} y={y} dir="left" C={C} />
+      <Arrow x={x2} y={y} dir="right" C={C} />
+      <text x={(x1 + x2) / 2} y={y - 1.5} fontSize={size} textAnchor="middle" stroke="none" fill={C.dim} letterSpacing="0.3">{label}</text>
+    </g>
+  )
+}
+
+function VDim({ y1, y2, x, label, ext = 0, C, size = 3.2 }) {
+  return (
+    <g stroke={C.dim} strokeWidth="0.3">
+      {ext !== 0 && <line x1={x + ext} y1={y1} x2={x} y2={y1} />}
+      {ext !== 0 && <line x1={x + ext} y1={y2} x2={x} y2={y2} />}
+      <line x1={x} y1={y1} x2={x} y2={y2} />
+      <Arrow x={x} y={y1} dir="up" C={C} />
+      <Arrow x={x} y={y2} dir="down" C={C} />
+      <text x={x - 1.8} y={(y1 + y2) / 2} fontSize={size} textAnchor="middle" stroke="none" fill={C.dim} letterSpacing="0.3"
+        transform={`rotate(-90 ${x - 1.8} ${(y1 + y2) / 2})`}>{label}</text>
+    </g>
+  )
+}
+
+// Numbered leader: a dot on the component, an elbow leader to a tag bubble.
+// `tx,ty` is the tag centre; `px,py` the point being indicated.
+function Leader({ n, px, py, tx, ty, C, elbow }) {
+  // elbow point: go vertical first from the tag, then to the target (cleaner).
+  const ex = elbow ?? tx
+  const ey = py
+  return (
+    <g>
+      <polyline points={`${tx},${ty} ${ex},${ey} ${px},${py}`} fill="none" stroke={C.inkSoft} strokeWidth="0.3" />
+      <circle cx={px} cy={py} r="0.8" fill={C.ink} stroke="none" />
+      <circle cx={tx} cy={ty} r="2.4" fill={C.sheet2} stroke={C.ink} strokeWidth="0.4" />
+      <text x={tx} y={ty + 1.1} fontSize="2.9" textAnchor="middle" fill={C.ink} stroke="none" fontWeight="700">{n}</text>
+    </g>
+  )
+}
+
+/* =====================================================================
+ * Title + SPECIFICATIONS block (top-left)
+ * ===================================================================== */
+function TitleBlock({ C, aircraft, d, margin, subtitle }) {
+  const name = (aircraft?.name ?? 'AIRCRAFT').toUpperCase()
+  const tagline = (subtitle ?? aircraft?.tagline ?? 'NARROW BODY AIRLINER').toUpperCase()
+  const rows = [
+    ['LENGTH', `${d.lengthM.toFixed(2)} m`],
+    ['WINGSPAN', `${d.wingspanM.toFixed(2)} m`],
+    ['HEIGHT', `${d.heightM.toFixed(2)} m`],
+    ['FUSELAGE Ø', `${d.fuselageDiaM.toFixed(2)} m`],
+    ['PASSENGERS', `${d.paxTypical} – ${d.paxMax}`],
+    ['RANGE', `${d.rangeKm.toLocaleString()} km`],
+    ['MAX TAKEOFF', `${d.mtowKg.toLocaleString()} kg`],
+    ['CRUISE', `MACH ${d.cruiseMach}`],
+    ['CEILING', `${d.ceilingM.toLocaleString()} m`],
+  ]
+  const x = margin + 2
+  const size = name.length > 14 ? 9 : 11
+  return (
+    <g>
+      <text x={x} y={20} fontSize={size} fill={C.ink} fontWeight="700" letterSpacing="0.5">{name}</text>
+      <text x={x} y={26} fontSize="3.3" fill={C.dim} letterSpacing="1">{tagline}</text>
+      <line x1={x} y1={30} x2={x + 84} y2={30} stroke={C.inkSoft} strokeWidth="0.4" />
+
+      <text x={x} y={40} fontSize="4.4" fill={C.ink} fontWeight="700" letterSpacing="1.3">SPECIFICATIONS</text>
+      {rows.map(([k, v], i) => {
+        const ry = 47 + i * 5.6
+        return (
+          <g key={k}>
+            <text x={x} y={ry} fontSize="3" fill={C.dim} letterSpacing="0.3">{k}</text>
+            <text x={x + 38} y={ry} fontSize="3" fill={C.ink} textAnchor="start">{v}</text>
+            <line x1={x} y1={ry + 1.6} x2={x + 84} y2={ry + 1.6} stroke={C.inkFaint} strokeWidth="0.15" />
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
+/* =====================================================================
+ * PLAN (top) view — top-right, with numbered leaders
+ * ===================================================================== */
+function PlanView({ C, dims, colX }) {
+  const { lengthM, wingspanM, fuselageDiaM } = dims
+  const boxX = 78, boxW = colX - boxX - 10, cx = boxX + boxW / 2
+  const cy = 64
+  // fit within both the column width and the available top-band height
+  const maxSpanH = 50
+  const scale = Math.min((boxW - 6) / wingspanM, maxSpanH / wingspanM)
+  const L = lengthM * scale, W = wingspanM * scale, r = (fuselageDiaM * scale) / 2
+  const x0 = cx - L / 2
+  const engineX = x0 + L * (RATIO.wingLEFrac - 0.04)
+  const engineLen = r * 3.4, engineR = r * 0.85
+  const ey1 = (W / 2) * RATIO.enginePosFrac
+  const leRoot = x0 + L * RATIO.wingLEFrac
+
+  return (
+    <g>
+      <text x={boxX} y={cy - W / 2 - 5} fontSize="3.4" fill={C.dim} letterSpacing="0.6">PLAN VIEW</text>
+      {[1, -1].map((dir) => (
+        <path key={`w${dir}`} d={wingPath(x0, L, cy, r, W, dir)} fill={C.fill} stroke={C.ink} strokeWidth="0.5" />
+      ))}
+      {/* slats (LE) + flaps/aileron (TE) breaks */}
+      {[1, -1].map((dir) => (
+        <g key={`ctl${dir}`} stroke={C.inkFaint} strokeWidth="0.3">
+          <line x1={leRoot + L * 0.01} y1={cy + dir * r * 0.9} x2={leRoot + L * RATIO.wingSweep * 0.9} y2={cy + dir * (W * 0.47)} />
+          <line x1={leRoot + L * RATIO.wingRootFrac * 0.6} y1={cy + dir * r} x2={leRoot + L * (RATIO.wingSweep + RATIO.wingTipFrac * 0.4)} y2={cy + dir * (W * 0.45)} strokeDasharray="1.2 1" />
+        </g>
+      ))}
+      {[1, -1].map((dir) => (
+        <path key={`h${dir}`} d={htPath(x0, L, cy, r, W, dir)} fill={C.fill} stroke={C.ink} strokeWidth="0.45" />
+      ))}
+      <path d={fuselagePath(x0, L, cy, r)} fill={C.fill} stroke={C.ink} strokeWidth="0.6" />
+      <line x1={x0 - 4} y1={cy} x2={x0 + L + 4} y2={cy} stroke={C.inkFaint} strokeWidth="0.3" strokeDasharray="3 1.4 0.6 1.4" />
+      {/* engines */}
+      {[ey1, -ey1].map((ey, i) => (
+        <g key={`pe${i}`}>
+          <rect x={engineX} y={cy + ey - engineR} width={engineLen} height={engineR * 2} rx={engineR} fill={C.fill} stroke={C.ink} strokeWidth="0.45" />
+          <line x1={engineX} y1={cy + ey} x2={engineX + engineLen} y2={cy + ey} stroke={C.inkFaint} strokeWidth="0.3" />
+          <line x1={engineX + engineLen * 0.55} y1={cy + ey} x2={engineX + engineLen * 0.55} y2={cy + ey * 0.25} stroke={C.inkSoft} strokeWidth="0.4" />
+        </g>
+      ))}
+
+      {/* wingspan + centre-wing-box dimensions */}
+      <HDim x1={cx - W / 2} x2={cx + W / 2} y={cy - W / 2 - 5} ext={-(W / 2 - r) + 2} label={`${wingspanM.toFixed(2)} m`} C={C} />
+
+      {/* numbered leaders — point up into clear space above the wing */}
+      <Leader n={6} px={leRoot + L * RATIO.wingRootFrac * 0.5} py={cy} tx={cx - 2} ty={cy - W / 2 + 4} C={C} />
+      <Leader n={7} px={leRoot + L * 0.03} py={cy - (W / 2) * 0.6} tx={cx - 20} ty={cy - W / 2 + 4} C={C} />
+      <Leader n={8} px={leRoot + L * RATIO.wingRootFrac * 0.75} py={cy - (W / 2) * 0.55} tx={cx + 12} ty={cy - W / 2 + 4} C={C} />
+      <Leader n={9} px={leRoot + L * (RATIO.wingSweep + RATIO.wingTipFrac * 0.4)} py={cy - (W / 2) * 0.78} tx={cx + 28} ty={cy - W / 2 + 4} C={C} />
+      <Leader n={11} px={engineX + engineLen / 2} py={cy + ey1} tx={cx + 4} ty={cy + W / 2 - 3} C={C} />
+      <Leader n={15} px={x0 + L * (RATIO.finLEFrac + 0.04)} py={cy + (W * RATIO.htSpanFrac) / 2 * 0.7} tx={x0 + L + 1} ty={cy + 8} C={C} />
+    </g>
+  )
+}
+
+/* =====================================================================
+ * PROFILE (side) view — middle band, full width, heavily annotated
+ * ===================================================================== */
+function ProfileView({ C, dims, colX, doubleDeck = false }) {
+  const { lengthM, heightM, fuselageDiaM } = dims
+  const boxX = 12, boxW = colX - boxX - 8
+  const cx = boxX + boxW / 2
+  const scale = (boxW - 14) / lengthM
+  const L = lengthM * scale, H = heightM * scale, r = (fuselageDiaM * scale) / 2
+  const x0 = cx - L / 2
+  const cy = 138
+  const groundY = cy + r + H * 0.16
+  const upsweep = r * 0.45
+  const finTopY = cy - H + r * 0.6
+
+  const winCount = Math.max(8, Math.round(lengthM * 0.95))
+  const winStart = x0 + L * RATIO.noseFrac + 3
+  const winEnd = x0 + L * (1 - RATIO.tailFrac) - 1
+  const windows = Array.from({ length: winCount }, (_, i) => winStart + ((winEnd - winStart) * i) / (winCount - 1))
+  const doors = [0.05, 0.3, 0.66, 0.94].map((f) => winStart + (winEnd - winStart) * f)
+
+  const engineX = x0 + L * (RATIO.wingLEFrac - 0.02)
+  const engineLen = r * 3.4, engineR = r * 0.82
+  const noseGearX = x0 + L * RATIO.noseFrac + 2
+  const mainGearX = x0 + L * RATIO.wheelbaseFrac
+
+  return (
+    <g>
+      <text x={x0 + L - 2} y={finTopY - 3} fontSize="3.4" fill={C.dim} letterSpacing="0.6" textAnchor="end">PROFILE VIEW · STBD ELEVATION</text>
+      <path d={fuselagePath(x0, L, cy, r, upsweep)} fill={C.fill} stroke={C.ink} strokeWidth="0.6" />
+      {/* flight-deck windows */}
+      <path d={`M ${x0 + L * RATIO.noseFrac * 0.2} ${cy - r * 0.4} q ${L * RATIO.noseFrac * 0.5} ${-r * 0.4} ${L * RATIO.noseFrac * 0.95} -0.2`} fill="none" stroke={C.glass} strokeWidth="1.2" />
+      {/* fwd/aft pressure bulkhead station lines */}
+      <line x1={x0 + L * RATIO.noseFrac} y1={cy - r} x2={x0 + L * RATIO.noseFrac} y2={cy + r} stroke={C.inkFaint} strokeWidth="0.3" strokeDasharray="1.5 1.2" />
+      <line x1={winEnd + 1} y1={cy - r} x2={winEnd + 1} y2={cy + r} stroke={C.inkFaint} strokeWidth="0.3" strokeDasharray="1.5 1.2" />
+      {/* cabin window belt — lower/main deck (or single deck) */}
+      <line x1={winStart} y1={cy + (doubleDeck ? r * 0.32 : -r * 0.12)} x2={winEnd} y2={cy + (doubleDeck ? r * 0.32 : -r * 0.12)} stroke={C.inkFaint} strokeWidth="0.25" />
+      {windows.map((wx, i) => (
+        <rect key={`w${i}`} x={wx - 0.55} y={cy + (doubleDeck ? r * 0.32 : -r * 0.12) - 0.55} width="1.1" height="1.1" rx="0.4" fill={C.glass} />
+      ))}
+      {/* upper-deck window belt (double-deck types like the A380) */}
+      {doubleDeck && windows.map((wx, i) => (
+        <rect key={`wu${i}`} x={wx - 0.55} y={cy - r * 0.42 - 0.55} width="1.1" height="1.1" rx="0.4" fill={C.glass} />
+      ))}
+      {doubleDeck && (
+        <line x1={winStart} y1={cy - r * 0.42} x2={winEnd} y2={cy - r * 0.42} stroke={C.inkFaint} strokeWidth="0.25" />
+      )}
+      {doors.map((dx, i) => (
+        <rect key={`d${i}`} x={dx - 0.9} y={cy - r * 0.5} width="1.8" height={r * 0.95} rx="0.4" fill="none" stroke={C.inkSoft} strokeWidth="0.4" />
+      ))}
+      {/* fin + rudder */}
+      <path d={`M ${x0 + L * RATIO.finLEFrac} ${cy - r} L ${x0 + L * 0.95} ${finTopY} L ${x0 + L * 0.995} ${finTopY} L ${x0 + L * 0.93} ${cy - r} Z`} fill={C.fill} stroke={C.ink} strokeWidth="0.5" />
+      <line x1={x0 + L * 0.955} y1={finTopY + 1.5} x2={x0 + L * 0.97} y2={cy - r} stroke={C.inkSoft} strokeWidth="0.35" strokeDasharray="1.4 1" />
+      {/* h-stab + elevator */}
+      <path d={`M ${x0 + L * RATIO.finLEFrac} ${cy - r * 0.65} l ${L * RATIO.htRootFrac * 1.1} ${-r * 0.15} l 0 ${r * 0.3} l ${-L * RATIO.htRootFrac * 1.1} ${r * 0.05} Z`} fill={C.fill} stroke={C.ink} strokeWidth="0.4" />
+      {/* wing edge-on */}
+      <path d={`M ${x0 + L * RATIO.wingLEFrac} ${cy + r * 0.45} l ${L * 0.12} ${r * 0.55} l ${L * 0.07} 0 l ${-L * 0.06} ${-r * 0.55} Z`} fill={C.fill} stroke={C.ink} strokeWidth="0.45" />
+      {/* nacelle + pylon */}
+      <g>
+        <ellipse cx={engineX + engineLen / 2} cy={cy + r * 1.05} rx={engineLen / 2} ry={engineR} fill={C.fill} stroke={C.ink} strokeWidth="0.45" />
+        <ellipse cx={engineX + engineLen * 0.12} cy={cy + r * 1.05} rx={engineLen * 0.1} ry={engineR * 0.85} fill="none" stroke={C.inkSoft} strokeWidth="0.35" />
+        <line x1={engineX + engineLen * 0.55} y1={cy + r * 1.05 - engineR} x2={engineX + engineLen * 0.5} y2={cy + r * 0.6} stroke={C.inkSoft} strokeWidth="0.4" />
+      </g>
+      {/* APU exhaust at tail cone */}
+      <circle cx={x0 + L - 0.5} cy={cy - r * 0.06 - upsweep} r="0.9" fill="none" stroke={C.inkSoft} strokeWidth="0.4" />
+      {/* gear */}
+      <Gear x={noseGearX} groundY={groundY} topY={cy + r} C={C} />
+      <Gear x={mainGearX} groundY={groundY} topY={cy + r} C={C} dual />
+      <line x1={x0 - 6} y1={groundY} x2={x0 + L + 6} y2={groundY} stroke={C.inkSoft} strokeWidth="0.4" strokeDasharray="2 1.4" />
+
+      {/* ---- engineering dimensions ---- */}
+      {/* cabin length, above the crown (clear of nacelle + gear below) */}
+      <HDim x1={winStart} x2={winEnd} y={cy - r - 5} ext={-4} label={`CABIN ${((winEnd - winStart) / scale).toFixed(1)} m`} C={C} size={2.8} />
+      {/* wheelbase, below ground line */}
+      <HDim x1={noseGearX} x2={mainGearX} y={groundY + 7} ext={-5} label={`WHEELBASE ${((mainGearX - noseGearX) / scale).toFixed(2)} m`} C={C} size={2.8} />
+      {/* overall length, bottom-most */}
+      <HDim x1={x0} x2={x0 + L} y={groundY + 15} ext={-(groundY + 15 - groundY)} label={`OVERALL LENGTH ${lengthM.toFixed(2)} m`} C={C} size={3} />
+      {/* overall height, right */}
+      <VDim y1={finTopY} y2={groundY} x={x0 + L + 9} ext={-5} label={`${heightM.toFixed(2)} m`} C={C} />
+      {/* fuselage diameter, left of nose */}
+      <VDim y1={cy - r} y2={cy + r} x={x0 - 6} ext={6} label={`Ø ${fuselageDiaM.toFixed(2)}`} C={C} size={2.6} />
+
+      {/* ---- numbered leaders ---- */}
+      <Leader n={1} px={x0 + 1} py={cy} tx={x0 - 4} ty={cy - r - 8} C={C} />
+      <Leader n={2} px={x0 + L * RATIO.noseFrac * 0.6} py={cy - r * 0.45} tx={x0 + L * 0.06} ty={finTopY + 6} C={C} />
+      <Leader n={3} px={x0 + L * RATIO.noseFrac} py={cy + r * 0.4} tx={x0 + L * RATIO.noseFrac} ty={groundY - 4} C={C} />
+      <Leader n={4} px={doors[1]} py={cy - r * 0.2} tx={doors[1]} ty={finTopY + 6} C={C} />
+      <Leader n={5} px={windows[Math.floor(winCount / 2)]} py={cy - r * 0.12} tx={cx} ty={finTopY + 6} C={C} />
+      <Leader n={12} px={engineX + engineLen * 0.55} py={cy + r * 0.75} tx={engineX + engineLen * 0.55} ty={groundY - 3} C={C} />
+      <Leader n={13} px={mainGearX} py={groundY - 2} tx={mainGearX + 8} ty={groundY - 2} C={C} elbow={mainGearX + 8} />
+      <Leader n={14} px={noseGearX} py={groundY - 2} tx={noseGearX - 8} ty={groundY - 2} C={C} elbow={noseGearX - 8} />
+      <Leader n={16} px={x0 + L * RATIO.finLEFrac + L * RATIO.htRootFrac} py={cy - r * 0.6} tx={x0 + L + 1} ty={finTopY + 14} C={C} />
+      <Leader n={17} px={x0 + L * 0.93} py={finTopY + (cy - r - finTopY) * 0.4} tx={x0 + L * 0.86} ty={finTopY - 1} C={C} />
+      <Leader n={18} px={x0 + L * 0.965} py={finTopY + (cy - r - finTopY) * 0.55} tx={x0 + L + 1} ty={finTopY + 1} C={C} />
+      <Leader n={19} px={x0 + L - 0.5} py={cy - r * 0.06 - upsweep} tx={x0 + L + 1} ty={finTopY + 8} C={C} />
+      <Leader n={20} px={winEnd + 1} py={cy + r * 0.4} tx={winEnd + 1} ty={groundY - 4} C={C} />
+    </g>
+  )
+}
+
+/* =====================================================================
+ * FRONT view — bottom-left, with track + dihedral callouts
+ * ===================================================================== */
+function FrontView({ C, dims, engineCount = 2, doubleDeck = false }) {
+  const { wingspanM, heightM, fuselageDiaM } = dims
+  const boxX = 12, boxW = 86
+  const cx = boxX + boxW / 2 + 2
+  const scale = (boxW - 4) / wingspanM
+  const W = wingspanM * scale, H = heightM * scale, r = (fuselageDiaM * scale) / 2
+  // double-deck fuselage cross-section is a tall vertical oval, not a circle
+  const ry = doubleDeck ? r * 1.32 : r
+  const cy = 200
+  const groundY = cy + ry + H * 0.18
+  const dih = W * 0.035
+  const offs = engineOffsets(engineCount, W)
+  const engineR = r * 0.82
+  const track = (W * RATIO.gearTrackFrac)
+
+  return (
+    <g>
+      <text x={boxX} y={cy - H * 0.62 - 4} fontSize="3.4" fill={C.dim} letterSpacing="0.6">FRONT VIEW · LOOKING AFT</text>
+      <path d={`M ${cx} ${cy - r * 0.15} L ${cx - W / 2} ${cy - r * 0.15 - dih} L ${cx - W / 2} ${cy - dih} L ${cx} ${cy + r * 0.1} L ${cx + W / 2} ${cy - dih} L ${cx + W / 2} ${cy - r * 0.15 - dih} Z`} fill={C.fill} stroke={C.ink} strokeWidth="0.45" />
+      {[-1, 1].map((s) => (
+        <line key={`sk${s}`} x1={cx + s * (W / 2)} y1={cy - r * 0.15 - dih} x2={cx + s * (W / 2 - 1.2)} y2={cy - r * 0.15 - dih - H * 0.14} stroke={C.ink} strokeWidth="0.7" />
+      ))}
+      <ellipse cx={cx} cy={cy} rx={r} ry={ry} fill={C.fill} stroke={C.ink} strokeWidth="0.6" />
+      {/* upper-deck floor line for double-deck types */}
+      {doubleDeck && <line x1={cx - r * 0.92} y1={cy - ry * 0.02} x2={cx + r * 0.92} y2={cy - ry * 0.02} stroke={C.inkFaint} strokeWidth="0.25" />}
+      <line x1={cx} y1={cy - ry} x2={cx} y2={cy + ry} stroke={C.inkFaint} strokeWidth="0.25" strokeDasharray="2 1.4" />
+      <path d={`M ${cx - 0.9} ${cy - ry * 0.6} L ${cx - 0.5} ${cy - H + r * 0.6} L ${cx + 0.5} ${cy - H + r * 0.6} L ${cx + 0.9} ${cy - ry * 0.6} Z`} fill={C.fill} stroke={C.ink} strokeWidth="0.45" />
+      {offs.map((ey, i) => (
+        <g key={`fe${i}`}>
+          <circle cx={cx + ey} cy={cy + ry * 0.82} r={engineR} fill={C.fill} stroke={C.ink} strokeWidth="0.5" />
+          <circle cx={cx + ey} cy={cy + ry * 0.82} r={engineR * 0.34} fill="none" stroke={C.inkSoft} strokeWidth="0.4" />
+        </g>
+      ))}
+      {[-1, 1].map((s) => (
+        <line key={`gl${s}`} x1={cx + s * track / 2} y1={cy + r * 0.8} x2={cx + s * track / 2} y2={groundY} stroke={C.ink} strokeWidth="0.6" />
+      ))}
+      <line x1={cx} y1={cy + ry} x2={cx} y2={groundY} stroke={C.ink} strokeWidth="0.6" />
+      <line x1={cx - W / 2 - 2} y1={groundY} x2={cx + W / 2 + 2} y2={groundY} stroke={C.inkSoft} strokeWidth="0.4" strokeDasharray="2 1.4" />
+
+      {/* wingspan + wheel track dimensions */}
+      <HDim x1={cx - W / 2} x2={cx + W / 2} y={groundY + 7} ext={-6} label={`${wingspanM.toFixed(2)} m`} C={C} />
+      <HDim x1={cx - track / 2} x2={cx + track / 2} y={groundY + 14} ext={-(groundY + 14 - groundY)} label={`TRACK ${(track / scale).toFixed(2)} m`} C={C} size={2.7} />
+
+      {/* leaders: sharklet + nose gear track */}
+      <Leader n={10} px={cx + (W / 2 - 0.6)} py={cy - r * 0.15 - dih - H * 0.07} tx={cx + W / 2 - 2} ty={cy - H * 0.62} C={C} />
+      <Leader n={17} px={cx} py={cy - H * 0.45} tx={cx + 10} ty={cy - H * 0.62} C={C} elbow={cx + 10} />
+    </g>
+  )
+}
+
+/* =====================================================================
+ * COMPONENT SCHEDULE (numbered key) — right column
+ * ===================================================================== */
+const SCHED_PITCH = 4.65 // vertical pitch shared by schedule + data-table rows
+
+function ComponentSchedule({ C, x, y, schedule }) {
+  const colW = 64
+  return (
+    <g>
+      <text x={x} y={y} fontSize="3.8" fill={C.ink} fontWeight="700" letterSpacing="0.9">COMPONENT SCHEDULE</text>
+      <line x1={x} y1={y + 2.3} x2={x + colW} y2={y + 2.3} stroke={C.inkSoft} strokeWidth="0.4" />
+      {schedule.map((it, i) => {
+        const ry = y + 7 + i * SCHED_PITCH
+        return (
+          <g key={it.n}>
+            <circle cx={x + 2.2} cy={ry - 0.9} r="1.9" fill={C.sheet2} stroke={C.ink} strokeWidth="0.35" />
+            <text x={x + 2.2} y={ry - 0.1} fontSize="2.4" textAnchor="middle" fill={C.ink} stroke="none" fontWeight="700">{it.n}</text>
+            <text x={x + 6.4} y={ry} fontSize="2.7" fill={C.dim} letterSpacing="0.1">{it.label}</text>
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
+/* =====================================================================
+ * POWERPLANT + DIMENSION DATA tables — right column, under the schedule
+ * ===================================================================== */
+function DataTables({ C, x, y, d, aircraft, engineCount }) {
+  const colW = 64
+  const eng = aircraft?.engines?.[0]
+  const power = eng
+    ? [
+        ['DESIGNATION', eng.name],
+        ['TYPE', (eng.type || 'turbofan').toUpperCase()],
+        ['THRUST', `${eng.thrustKn} kN`],
+        ['BYPASS', `${eng.bypassRatio}:1`],
+        ['FAN Ø', `${eng.fanDiameterM?.toFixed(2)} m`],
+        ['COUNT', `${engineCount}`],
+      ]
+    : []
+  // Total installed thrust + thrust-to-weight give the table a derived figure
+  // beyond the raw specs, so it reads like real performance data.
+  const totalThrustKn = eng ? eng.thrustKn * engineCount : null
+  const twRatio = eng ? ((totalThrustKn * 1000) / (d.mtowKg * 9.80665)) : null
+  const perf = [
+    ['MAX TAKEOFF', `${d.mtowKg.toLocaleString()} kg`],
+    ['RANGE', `${d.rangeKm.toLocaleString()} km`],
+    ['CRUISE', `MACH ${d.cruiseMach}`],
+    ['CEILING', `${d.ceilingM.toLocaleString()} m`],
+    ['SEATING', `${d.paxTypical} / ${d.paxMax}`],
+    ...(totalThrustKn ? [['TOTAL THRUST', `${totalThrustKn} kN`]] : []),
+    ...(twRatio ? [['THRUST/WT', `${twRatio.toFixed(2)}`]] : []),
+  ]
+  const Section = ({ title, rows, oy }) => (
+    <g>
+      <text x={x} y={oy} fontSize="3.5" fill={C.ink} fontWeight="700" letterSpacing="0.6">{title}</text>
+      <line x1={x} y1={oy + 2.2} x2={x + colW} y2={oy + 2.2} stroke={C.inkSoft} strokeWidth="0.4" />
+      {rows.map(([k, v], i) => {
+        const ry = oy + 6.6 + i * SCHED_PITCH
+        return (
+          <g key={k}>
+            <text x={x} y={ry} fontSize="2.6" fill={C.dim}>{k}</text>
+            <text x={x + colW} y={ry} fontSize="2.6" fill={C.ink} textAnchor="end">{v}</text>
+            <line x1={x} y1={ry + 1.3} x2={x + colW} y2={ry + 1.3} stroke={C.inkFaint} strokeWidth="0.15" />
+          </g>
+        )
+      })}
+    </g>
+  )
+  const perfOy = y + (power.length > 0 ? 6.6 + power.length * SCHED_PITCH + 6 : 0)
+  return (
+    <g>
+      {power.length > 0 && <Section title="POWERPLANT" rows={power} oy={y} />}
+      <Section title="PERFORMANCE & WEIGHTS" rows={perf} oy={perfOy} />
+    </g>
+  )
+}
+
+/* =====================================================================
+ * Formal title block (bottom strip): drawing no., scale, projection,
+ * revision, units, date, sheet.
+ * ===================================================================== */
+function DrawingTitleBlock({ C, aircraft, d, VB_W, VB_H, margin }) {
+  const x = margin
+  const y = VB_H - 30
+  const w = VB_W - margin * 2
+  const h = 22
+  // Derived drawing number from the id + a deterministic suffix.
+  const id = (aircraft?.id ?? 'ac').toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const dwgNo = `GA-${id}-001`
+  const date = new Date().toISOString().slice(0, 10)
+  // approximate human-friendly scale ratio from on-sheet length vs real length
+  const onSheetM = (VB_W - 28) // ~ profile drawing width in user units
+  const scaleStr = `1 : ${Math.round(d.lengthM * 1000 / onSheetM) * 10}`
+
+  const cells = [
+    { label: 'DRAWING TITLE', value: `${(aircraft?.name ?? 'AIRCRAFT').toUpperCase()} — GENERAL ARRANGEMENT`, wfrac: 0.4 },
+    { label: 'DRAWING No.', value: dwgNo, wfrac: 0.18 },
+    { label: 'SCALE', value: scaleStr, wfrac: 0.12 },
+    { label: 'UNITS', value: 'SI / metres', wfrac: 0.14 },
+    { label: 'SHEET', value: '1 OF 1', wfrac: 0.16 },
+  ]
+  // second row
+  const cells2 = [
+    { label: 'PROJECTION', value: 'FIRST ANGLE', wfrac: 0.22 },
+    { label: 'REV', value: 'A', wfrac: 0.08 },
+    { label: 'DATE', value: date, wfrac: 0.2 },
+    { label: 'STATUS', value: (aircraft?.status ?? 'reference').toUpperCase().replace('-', ' '), wfrac: 0.24 },
+    { label: 'SOURCE', value: 'DERIVED FROM TYPE DATA', wfrac: 0.26 },
+  ]
+
+  function Row({ cells, ry, rh }) {
+    let cxp = x
+    return cells.map((c, i) => {
+      const cw = w * c.wfrac
+      const el = (
+        <g key={i}>
+          <rect x={cxp} y={ry} width={cw} height={rh} fill="none" stroke={C.inkSoft} strokeWidth="0.3" />
+          <text x={cxp + 2} y={ry + 3.4} fontSize="2.2" fill={C.inkSoft} letterSpacing="0.3">{c.label}</text>
+          <text x={cxp + 2} y={ry + rh - 1.8} fontSize="2.9" fill={C.ink} fontWeight="700">{c.value}</text>
+        </g>
+      )
+      cxp += cw
+      return el
+    })
+  }
+
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} fill="rgba(8,40,96,0.6)" stroke={C.ink} strokeWidth="0.5" />
+      <Row cells={cells} ry={y} rh={h / 2} />
+      <Row cells={cells2} ry={y + h / 2} rh={h / 2} />
+      {/* first-angle projection symbol, drawn over the title cell's right side */}
+      <ProjectionSymbol C={C} cx={x + w * 0.36} cy={y + h / 2} />
+    </g>
+  )
+}
+
+// First-angle projection symbol: a truncated cone + its two views.
+function ProjectionSymbol({ C, cx, cy }) {
+  return (
+    <g stroke={C.ink} strokeWidth="0.35" fill="none">
+      {/* side view of cone */}
+      <path d={`M ${cx - 7} ${cy - 2.4} L ${cx - 1} ${cy - 1.4} L ${cx - 1} ${cy + 1.4} L ${cx - 7} ${cy + 2.4} Z`} />
+      {/* two concentric circles (end view) */}
+      <circle cx={cx + 4} cy={cy} r="2.6" />
+      <circle cx={cx + 4} cy={cy} r="1.2" />
+      {/* centre cross */}
+      <line x1={cx + 4} y1={cy - 3.4} x2={cx + 4} y2={cy + 3.4} strokeWidth="0.25" />
+      <line x1={cx} y1={cy} x2={cx + 8} y2={cy} strokeWidth="0.25" />
+    </g>
+  )
+}
+
+// Drawing-frame zone markers (A–D rows, 1–4 cols) around the border.
+function FrameZones({ C, VB_W, VB_H }) {
+  const cols = ['1', '2', '3', '4', '5', '6']
+  const rows = ['A', 'B', 'C', 'D']
+  return (
+    <g fill={C.inkFaint} stroke="none" fontSize="2.4" textAnchor="middle">
+      {cols.map((c, i) => {
+        const cx = (VB_W / cols.length) * (i + 0.5)
+        return (
+          <g key={`c${c}`}>
+            <text x={cx} y={4.4}>{c}</text>
+            <text x={cx} y={VB_H - 1.6}>{c}</text>
+          </g>
+        )
+      })}
+      {rows.map((rw, i) => {
+        const cy = (VB_H / rows.length) * (i + 0.5)
+        return (
+          <g key={`r${rw}`}>
+            <text x={4} y={cy + 0.8}>{rw}</text>
+            <text x={VB_W - 4} y={cy + 0.8}>{rw}</text>
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
+/** Deployed landing-gear strut + wheels (side view). */
+function Gear({ x, groundY, topY, C, dual = false }) {
+  return (
+    <g stroke={C.ink} strokeWidth="0.5" fill="none">
       <line x1={x} y1={topY} x2={x} y2={groundY - 1.2} />
-      <circle cx={x} cy={groundY - 0.9} r="1.1" fill={soft} stroke={color} strokeWidth="0.4" />
-      <circle cx={x + 1.6} cy={groundY - 0.9} r="1.1" fill={soft} stroke={color} strokeWidth="0.4" />
-      <line x1={x} y1={topY + len * 0.3} x2={x + 1.6} y2={groundY - 0.9} stroke={soft} strokeWidth="0.35" />
+      <circle cx={x} cy={groundY - 0.9} r="1.1" fill={C.inkSoft} stroke={C.ink} strokeWidth="0.4" />
+      {dual && <circle cx={x + 2} cy={groundY - 0.9} r="1.1" fill={C.inkSoft} stroke={C.ink} strokeWidth="0.4" />}
+      {dual && <line x1={x} y1={groundY - 0.9} x2={x + 2} y2={groundY - 0.9} stroke={C.ink} strokeWidth="0.4" />}
     </g>
   )
 }

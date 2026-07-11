@@ -1,26 +1,32 @@
 import { a320Family, a320Aircraft } from './families/a320.js'
+import { a220Family, a220Aircraft } from './families/a220.js'
+import { a330Family, a330Aircraft } from './families/a330.js'
+import { a350Family, a350Aircraft } from './families/a350.js'
+import { a380Family, a380Aircraft } from './families/a380.js'
+import { a300Family, a300Aircraft } from './families/a300.js'
 
 /**
- * Central registry. Add new families here as they're built out. The A320 family
- * is fully populated; the others are declared as stubs so the family-journey
- * landing page can show the full Airbus roadmap with "coming soon" markers.
+ * Central registry. Every Airbus family is fully built out with data + authored
+ * 3D models. Families are listed newest-programme-relevant first; the A300/A310
+ * (the original Airbus widebody) closes the list as the historical root.
  */
-
-const STUB_FAMILIES = [
-  { id: 'a220', manufacturer: 'Airbus', name: 'A220 Family', tagline: 'The 100–150 seat clean-sheet narrowbody (ex-Bombardier CSeries).', intro: '', stub: true },
-  { id: 'a330', manufacturer: 'Airbus', name: 'A330 Family', tagline: 'Twin-aisle medium/long-haul workhorse, including the A330neo.', intro: '', stub: true },
-  { id: 'a350', manufacturer: 'Airbus', name: 'A350 Family', tagline: 'Carbon-fibre long-haul widebody (A350-900 / -1000).', intro: '', stub: true },
-  { id: 'a380', manufacturer: 'Airbus', name: 'A380', tagline: "The world's largest passenger airliner — full-length double deck.", intro: '', stub: true },
-  { id: 'a300', manufacturer: 'Airbus', name: 'A300 / A310', tagline: "Airbus's first aircraft — the original wide-body twinjet.", intro: '', stub: true },
-]
 
 export const FAMILIES = [
   { ...a320Family, stub: false },
-  ...STUB_FAMILIES,
+  { ...a220Family, stub: false },
+  { ...a330Family, stub: false },
+  { ...a350Family, stub: false },
+  { ...a380Family, stub: false },
+  { ...a300Family, stub: false },
 ]
 
 export const AIRCRAFT_BY_FAMILY = {
   a320: a320Aircraft,
+  a220: a220Aircraft,
+  a330: a330Aircraft,
+  a350: a350Aircraft,
+  a380: a380Aircraft,
+  a300: a300Aircraft,
 }
 
 export function getFamily(id) {

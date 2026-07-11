@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Stage, useGLTF, Html } from '@react-three/drei'
 import ProceduralAircraft from './ProceduralAircraft.jsx'
+import CanvasFallback from './CanvasFallback.jsx'
 
 /**
  * Resolve a model path against Vite's deploy base so it works both locally
@@ -39,18 +40,20 @@ function Loader() {
 export default function AircraftViewer({ modelUrl, dimensions, engineCount = 2, height = 420 }) {
   return (
     <div style={{ height, width: '100%', background: '#0d1117', borderRadius: 12 }}>
-      <Canvas shadows camera={{ position: [40, 22, 40], fov: 35 }}>
-        <Suspense fallback={<Loader />}>
-          <Stage intensity={0.5} environment="city" adjustCamera={1.1}>
-            {modelUrl ? (
-              <GltfModel url={modelUrl} />
-            ) : (
-              <ProceduralAircraft dimensions={dimensions} engineCount={engineCount} />
-            )}
-          </Stage>
-        </Suspense>
-        <OrbitControls enablePan makeDefault />
-      </Canvas>
+      <CanvasFallback label="3D preview unavailable on this device">
+        <Canvas shadows camera={{ position: [40, 22, 40], fov: 35 }}>
+          <Suspense fallback={<Loader />}>
+            <Stage intensity={0.5} environment="city" adjustCamera={1.1}>
+              {modelUrl ? (
+                <GltfModel url={modelUrl} />
+              ) : (
+                <ProceduralAircraft dimensions={dimensions} engineCount={engineCount} />
+              )}
+            </Stage>
+          </Suspense>
+          <OrbitControls enablePan makeDefault />
+        </Canvas>
+      </CanvasFallback>
     </div>
   )
 }
