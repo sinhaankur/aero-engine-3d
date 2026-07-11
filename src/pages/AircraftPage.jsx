@@ -96,7 +96,7 @@ export default function AircraftPage() {
       <h2 className="section-title">Engine options</h2>
       <div className="engine-grid">
         {a.engines.map((e) => (
-          <div key={e.id} className="engine-card">
+          <Link key={e.id} to={`/engine/${e.id}`} className="engine-card">
             <div className="engine-head">
               <h3>{e.name}</h3>
               <span className="maker">{e.manufacturer}</span>
@@ -108,8 +108,10 @@ export default function AircraftPage() {
               <Spec label="Type" value={e.type} />
             </dl>
             <p className="engine-notes">{e.notes}</p>
-            {ENGINE_MODELS[e.id] && <span className="badge badge-live">3D parts breakdown ↓</span>}
-          </div>
+            <span className="family-card-cta">
+              {ENGINE_MODELS[e.id] ? 'Exploded 3D →' : 'View engine →'}
+            </span>
+          </Link>
         ))}
       </div>
 

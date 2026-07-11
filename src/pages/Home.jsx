@@ -59,16 +59,6 @@ export default function Home() {
     systems: SYSTEMS.length,
   }
 
-  // For each engine, find the first aircraft that offers it, to give a live link.
-  const engineHome = {}
-  for (const f of FAMILIES) {
-    for (const a of getAircraftForFamily(f.id)) {
-      for (const e of a.engines) {
-        if (!engineHome[e.id]) engineHome[e.id] = `/family/${f.id}/${a.id}`
-      }
-    }
-  }
-
   let i = 0 // running index across the whole catalog
 
   return (
@@ -161,8 +151,8 @@ export default function Home() {
               name={e.name}
               desc={`${e.thrustKn} kN · BPR ${e.bypassRatio} · Ø${e.fanDiameterM} m`}
               meta={e.manufacturer}
-              tag={hasModel ? { label: 'Exploded 3D', kind: 'live' } : { label: 'Spec', kind: 'soon' }}
-              to={engineHome[e.id] || null}
+              tag={hasModel ? { label: 'Exploded 3D', kind: 'live' } : { label: 'Schematic', kind: 'soon' }}
+              to={`/engine/${e.id}`}
             />
           )
         })}

@@ -5,6 +5,7 @@ import App from './App.jsx'
 import Home from './pages/Home.jsx'
 import FamilyPage from './pages/FamilyPage.jsx'
 import AircraftPage from './pages/AircraftPage.jsx'
+import EnginePage from './pages/EnginePage.jsx'
 import SystemsPage from './pages/SystemsPage.jsx'
 import './styles/global.css'
 
@@ -15,6 +16,7 @@ const router = createHashRouter([
     children: [
       { index: true, element: <Home /> },
       { path: 'systems', element: <SystemsPage /> },
+      { path: 'engine/:engineId', element: <EnginePage /> },
       { path: 'family/:familyId', element: <FamilyPage /> },
       { path: 'family/:familyId/:aircraftId', element: <AircraftPage /> },
     ],
