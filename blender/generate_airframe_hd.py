@@ -167,10 +167,18 @@ def build_fuselage(spec, materials):
     R = spec["fuse_dia"] / 2.0
     decks = spec.get("decks", 1)
 
-    nose = L * 0.115
+    # The A380 (double-deck) has a distinctly short, blunt, drooped nose — the
+    # full-height cabin starts almost immediately — versus the longer tapered
+    # ogive of a single-deck jet. Shape the nose accordingly.
+    double_deck = decks == 2
+    nose = L * (0.085 if double_deck else 0.115)
     tail = L * 0.235
     x_nose_end = -L / 2 + nose
     x_tail_start = L / 2 - tail
+
+    # blunter growth + more droop for the double-deck nose
+    nose_pow = 0.42 if double_deck else 0.62
+    droop_amt = 0.24 if double_deck else 0.10
 
     stations = []  # (x, radius_scale, vertical_center_offset, vertical_scale)
     # nose: rounded ogive growing from a near-point, drooped slightly down
@@ -178,8 +186,8 @@ def build_fuselage(spec, materials):
     for i in range(NN):
         t = i / (NN - 1)
         x = -L / 2 + nose * t
-        rs = math.sin(t * math.pi / 2) ** 0.62
-        droop = -R * 0.10 * (1 - t) ** 2   # nose tip sits a touch low
+        rs = math.sin(t * math.pi / 2) ** nose_pow
+        droop = -R * droop_amt * (1 - t) ** 2   # nose tip sits low
         stations.append((x, rs, droop, 1.0))
     # cabin: constant, finely sampled so window/door cuts land cleanly later
     NC = 16
@@ -197,7 +205,8 @@ def build_fuselage(spec, materials):
         stations.append((x, max(rs, 0.015), up, 1.0 - 0.12 * t))
 
     seg = 64
-    v_scale_deck = 1.34 if decks == 2 else 1.0
+    # real A380 section is ~8.4 m tall × 7.1 m wide -> ~1.18× taller than wide
+    v_scale_deck = 1.20 if decks == 2 else 1.0
     bm = bmesh.new()
     rings = []
     for (x, rs, up, vs) in stations:
