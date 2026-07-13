@@ -9,9 +9,9 @@ export default function App() {
         </Link>
         <nav className="topnav">
           <Link to="/">Index</Link>
+          <Link to="/live">Live</Link>
           <Link to="/systems">Systems</Link>
         </nav>
-        <Link to="/" className="btn btn-primary btn-sm nav-cta">Index →</Link>
       </header>
       <main className="content">
         <Outlet />

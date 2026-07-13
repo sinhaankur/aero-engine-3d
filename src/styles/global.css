@@ -376,3 +376,37 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .sys-card { padding: 18px; background: var(--panel); border: 1px solid var(--border); border-radius: 3px; }
 .sys-card h3 { margin: 0 0 8px; font-size: 15px; }
 .sys-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+/* ================================================================== */
+/* LIVE TRAFFIC — global flight globe                                  */
+/* ================================================================== */
+.live-status { display: inline-flex; align-items: center; gap: 7px; }
+.live-status .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1.8s ease-in-out infinite; }
+.live-status-live { color: var(--accent); border-color: var(--accent-dim); }
+.live-status-partial { color: var(--info); border-color: var(--info-dim); }
+.live-status-loading { color: var(--info); border-color: var(--info-dim); }
+.live-status-error { color: #ff9d4d; border-color: #5e401f; }
+
+.live-counts { margin: 18px 0 4px; }
+
+.live-body { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; margin-top: 12px; }
+@media (max-width: 860px) { .live-body { grid-template-columns: 1fr; } }
+
+.live-globe { position: relative; border: 1px solid var(--border); overflow: hidden; }
+.live-attrib {
+  position: absolute; bottom: 8px; left: 12px; z-index: 2;
+  font-size: 11px; color: var(--muted); letter-spacing: 0.04em;
+  text-transform: uppercase; pointer-events: none;
+}
+
+.live-detail { border: 1px solid var(--border); background: var(--panel); border-radius: 3px; padding: 16px; position: sticky; top: 76px; }
+.live-detail.is-empty { color: var(--muted); font-size: 13px; line-height: 1.55; }
+.live-detail-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.live-detail-head h3 { margin: 0; font-size: 17px; text-transform: uppercase; letter-spacing: 0.02em; color: var(--accent); }
+.live-close { background: none; border: 1px solid var(--border); color: var(--muted); width: 26px; height: 26px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+.live-close:hover { border-color: var(--accent); color: var(--ink); }
+.live-rows { margin: 0; display: flex; flex-direction: column; }
+.live-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.live-row:last-child { border-bottom: none; }
+.live-row dt { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; }
+.live-row dd { margin: 0; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }

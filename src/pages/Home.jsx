@@ -76,7 +76,7 @@ export default function Home() {
         <span className="k">Archive</span>
         <span className="v">{stats.families} families · {stats.aircraft} aircraft</span>
         <span className="spacer" />
-        <Link to="/systems">SYSTEMS →</Link>
+        <Link to="/live">LIVE TRAFFIC →</Link>
       </div>
 
       {/* ---- MASTHEAD ---- */}
