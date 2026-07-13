@@ -10,6 +10,7 @@ export default function App() {
         <nav className="topnav">
           <Link to="/">Index</Link>
           <Link to="/live">Live</Link>
+          <Link to="/simulate">Simulate</Link>
           <Link to="/systems">Systems</Link>
         </nav>
       </header>
