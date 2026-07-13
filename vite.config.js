@@ -27,4 +27,20 @@ function spaFallback() {
 export default defineConfig({
   plugins: [react(), spaFallback()],
   base: '/AirbusEngine3D/',
+  build: {
+    rollupOptions: {
+      output: {
+        // Split the Three.js stack into its own long-lived chunk. It's large and
+        // changes rarely, so isolating it lets the browser cache it across app
+        // deploys and lets the lazy viewer routes share one copy.
+        manualChunks: {
+          three: ['three', '@react-three/fiber', '@react-three/drei'],
+        },
+      },
+    },
+    // The isolated three chunk is ~1.1 MB — that's just how big Three.js is, and
+    // it's lazy-loaded + cached separately, so keep the threshold above it to
+    // stay quiet rather than chase an un-splittable dependency.
+    chunkSizeWarningLimit: 1200,
+  },
 })

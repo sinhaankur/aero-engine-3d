@@ -1,9 +1,12 @@
+import { lazy, Suspense } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getEngine, getAircraftUsingEngine } from '../data/index.js'
 import { ENGINES } from '../data/engines.js'
 import { ENGINE_MODELS } from '../data/engineParts.js'
-import EngineExplorer from '../components/EngineExplorer.jsx'
 import EngineDiagram from '../components/EngineDiagram.jsx'
+
+// EngineExplorer drags in the WebGL viewer + blueprint; load it on demand.
+const EngineExplorer = lazy(() => import('../components/EngineExplorer.jsx'))
 
 function Spec({ label, value, unit }) {
   return (
@@ -55,7 +58,9 @@ export default function EnginePage() {
 
       {/* ---- GRAPHIC: exploded 3D if modelled, else procedural diagram ---- */}
       {modelled ? (
-        <EngineExplorer engineId={engineId} />
+        <Suspense fallback={<div className="viewport-loading">Loading engine…</div>}>
+          <EngineExplorer engineId={engineId} />
+        </Suspense>
       ) : (
         <>
           <EngineDiagram engine={e} />

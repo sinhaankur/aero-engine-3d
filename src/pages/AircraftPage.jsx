@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getFamily, getAircraft } from '../data/index.js'
 import { RISK_LEVELS } from '../data/schema.js'
-import AircraftViewer from '../three/AircraftViewer.jsx'
 import Blueprint from '../components/Blueprint.jsx'
-import EngineExplorer from '../components/EngineExplorer.jsx'
 import { ENGINE_MODELS } from '../data/engineParts.js'
+
+// Defer the WebGL-backed viewers so Three.js loads on demand, not up front.
+const AircraftViewer = lazy(() => import('../three/AircraftViewer.jsx'))
+const EngineExplorer = lazy(() => import('../components/EngineExplorer.jsx'))
 
 function Spec({ label, value, unit }) {
   return (
@@ -58,7 +60,9 @@ export default function AircraftPage() {
         <button className={view === 'blueprint' ? 'on' : ''} onClick={() => setView('blueprint')}>Blueprint</button>
       </div>
       {view === '3d' ? (
-        <AircraftViewer modelUrl={modelUrl} dimensions={d} engineCount={engineCount} />
+        <Suspense fallback={<div className="viewport-loading">Loading 3D model…</div>}>
+          <AircraftViewer modelUrl={modelUrl} dimensions={d} engineCount={engineCount} />
+        </Suspense>
       ) : (
         <Blueprint
           dimensions={d}
@@ -131,7 +135,9 @@ export default function AircraftPage() {
               ))}
             </div>
           )}
-          <EngineExplorer key={resolvedEngine} engineId={resolvedEngine} />
+          <Suspense fallback={<div className="viewport-loading">Loading engine…</div>}>
+            <EngineExplorer key={resolvedEngine} engineId={resolvedEngine} />
+          </Suspense>
         </div>
       )}
 

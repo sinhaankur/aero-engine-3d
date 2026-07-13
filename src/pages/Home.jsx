@@ -1,9 +1,13 @@
+import { lazy, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import { FAMILIES, getAircraftForFamily } from '../data/index.js'
 import { ENGINES } from '../data/engines.js'
 import { ENGINE_MODELS } from '../data/engineParts.js'
 import { SYSTEMS } from '../data/systems.js'
-import HeroPlane from '../three/HeroPlane.jsx'
+
+// Three.js is heavy — load the live viewport only when Home actually renders,
+// keeping it out of the initial bundle shared with every other route.
+const HeroPlane = lazy(() => import('../three/HeroPlane.jsx'))
 
 const pad = (n) => String(n).padStart(2, '0')
 
@@ -91,7 +95,9 @@ export default function Home() {
       {/* ---- ANIMATED MODEL VIEWPORT ---- */}
       <div className="hero-viewport">
         <span className="tag-corner">MODEL // <b>A320</b> · LIVE RENDER</span>
-        <HeroPlane url="/models/a320.glb" height={340} />
+        <Suspense fallback={<div className="viewport-loading" style={{ height: 340 }}>Loading model…</div>}>
+          <HeroPlane url="/models/a320.glb" height={340} />
+        </Suspense>
       </div>
 
       {/* ---- LIVE COUNTS ---- */}

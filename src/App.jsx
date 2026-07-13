@@ -28,8 +28,8 @@ export default function App() {
           <div className="footer-col">
             <h4>Explore</h4>
             <Link to="/">Families</Link>
+            <Link to="/">All aircraft</Link>
             <Link to="/systems">Systems</Link>
-            <a href="/#families">All aircraft</a>
           </div>
           <div className="footer-col">
             <h4>Families</h4>
