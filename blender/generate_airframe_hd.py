@@ -568,6 +568,9 @@ def build_windows_doors(spec, materials, fuse):
     L = spec["length"]
     R = fuse["R"]
     decks = spec.get("decks", 1)
+    # The fuselage cross-section is vertically stretched for double-deck aircraft;
+    # window/door panels must follow the same stretch or they sink into the skin.
+    vsd = fuse["v_scale_deck"]
     objs = []
     x0 = fuse["x_nose_end"] + R * 0.6
     x1 = fuse["x_tail_start"] - R * 0.4
@@ -578,7 +581,8 @@ def build_windows_doors(spec, materials, fuse):
 
     belts = [math.radians(70)]
     if decks == 2:
-        belts = [math.radians(52), math.radians(88)]
+        # upper + lower deck belts, angles chosen for the taller oval section
+        belts = [math.radians(58), math.radians(86)]
 
     win_mat = materials["window"]
     for a_mid in belts:
@@ -592,7 +596,7 @@ def build_windows_doors(spec, materials, fuse):
                 for (da, dx) in ((-half_a, -half_x), (half_a, -half_x),
                                  (half_a, half_x), (-half_a, half_x)):
                     aa = a_mid + da          # belt is mirrored to each side via zside
-                    y = math.cos(aa) * R * 1.004
+                    y = math.cos(aa) * R * vsd * 1.004
                     z = math.sin(aa) * R * 1.004 * zside
                     corners.append(bm.verts.new((xx + dx, y, z)))
                 bm.faces.new(corners)
@@ -610,7 +614,7 @@ def build_windows_doors(spec, materials, fuse):
             for (da, dx) in ((-half_a, -0.34), (half_a, -0.30),
                              (half_a, 0.30), (-half_a, 0.34)):
                 aa = a_mid + da
-                y = math.cos(aa) * R * 1.005 + R * 0.12
+                y = math.cos(aa) * R * vsd * 1.005 + R * 0.12
                 z = math.sin(aa) * R * 1.0 * zside
                 corners.append(bm.verts.new((ck_x + dx, y, z)))
             bm.faces.new(corners)
@@ -630,7 +634,7 @@ def build_windows_doors(spec, materials, fuse):
             for (da, dx) in ((-half_a, -half_x), (half_a, -half_x),
                              (half_a, half_x), (-half_a, half_x)):
                 aa = a_mid + da
-                y = math.cos(aa) * R * 1.003
+                y = math.cos(aa) * R * vsd * 1.003
                 z = math.sin(aa) * R * 1.003 * zside
                 corners.append(bm.verts.new((xx + dx, y, z)))
             bm.faces.new(corners)
@@ -645,8 +649,10 @@ def build_windows_doors(spec, materials, fuse):
 def build_gear_and_details(spec, materials, fuse):
     L = spec["length"]
     R = fuse["R"]
+    vsd = fuse["v_scale_deck"]
+    Rv = R * vsd                  # vertical half-height of the (possibly oval) section
     objs = []
-    ground_y = -R - R * 0.62      # wheels sit here below the belly
+    ground_y = -Rv - R * 0.62     # wheels sit here below the belly
 
     def strut(x, z, top_y, bot_y, r):
         bpy.ops.mesh.primitive_cylinder_add(
@@ -669,7 +675,7 @@ def build_gear_and_details(spec, materials, fuse):
     # nose gear
     nx = fuse["x_nose_end"] + R * 0.2
     nr = R * 0.16
-    objs.append(strut(nx, 0, -R * 0.55, ground_y + nr, R * 0.05))
+    objs.append(strut(nx, 0, -Rv * 0.55, ground_y + nr, R * 0.05))
     for dz in (-nr * 0.9, nr * 0.9):
         objs.append(wheel(nx, dz, ground_y + nr, nr))
 
@@ -678,7 +684,7 @@ def build_gear_and_details(spec, materials, fuse):
     mr = R * 0.20
     for side in (-1, 1):
         mz = R * 0.55 * side
-        objs.append(strut(mx, mz, -R * 0.30, ground_y + mr, R * 0.07))
+        objs.append(strut(mx, mz, -Rv * 0.30, ground_y + mr, R * 0.07))
         # 2-wheel bogie
         for dx in (-mr * 0.9, mr * 0.9):
             objs.append(wheel(mx + dx, mz, ground_y + mr, mr))
@@ -686,7 +692,7 @@ def build_gear_and_details(spec, materials, fuse):
     # belly / wing-root fairing (smooth blister under the wing box) — a low,
     # elongated blister that hugs the belly rather than a big hanging pod.
     bpy.ops.mesh.primitive_uv_sphere_add(
-        radius=R * 0.5, location=(-L * 0.02, -R * 0.78, 0))
+        radius=R * 0.5, location=(-L * 0.02, -Rv * 0.78, 0))
     belly = bpy.context.active_object
     belly.scale = (3.0, 0.42, 1.35)
     belly.name = "BellyFairing"
@@ -694,10 +700,10 @@ def build_gear_and_details(spec, materials, fuse):
     shade_smooth(belly, True)
     objs.append(belly)
 
-    # blade antennas: dorsal + ventral
-    for (ax, ay, sc, nm) in ((L * 0.06, R * 1.0, 1.0, "AntTop"),
-                             (-L * 0.12, R * 1.0, 0.8, "AntTop2"),
-                             (L * 0.10, -R * 1.0, 0.7, "AntBot")):
+    # blade antennas: dorsal + ventral (follow the stretched section top/bottom)
+    for (ax, ay, sc, nm) in ((L * 0.06, Rv * 1.0, 1.0, "AntTop"),
+                             (-L * 0.12, Rv * 1.0, 0.8, "AntTop2"),
+                             (L * 0.10, -Rv * 1.0, 0.7, "AntBot")):
         bm = bmesh.new()
         s = 0.5 * sc
         base_y = ay
