@@ -1,0 +1,10 @@
+# Cloudflare Worker config for the OpenSky CORS proxy.
+# Deploy with:  npx wrangler deploy   (from this worker/ directory)
+name = "ada-flight-proxy"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+
+# No bindings required for anonymous OpenSky access. To use an OpenSky account
+# for higher rate limits, set secrets instead of putting them here:
+#   npx wrangler secret put OPENSKY_USER
+#   npx wrangler secret put OPENSKY_PASS

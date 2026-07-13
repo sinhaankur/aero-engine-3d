@@ -9,3 +9,7 @@ dist
 # Blender working files (keep exported glTF in public/models, not source .blend)
 *.blend1
 *.blend2
+
+# local env (e.g. VITE_FLIGHT_API pointing at a dev worker)
+.env.local
+.env

@@ -383,9 +383,16 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .live-status { display: inline-flex; align-items: center; gap: 7px; }
 .live-status .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1.8s ease-in-out infinite; }
 .live-status-live { color: var(--accent); border-color: var(--accent-dim); }
-.live-status-partial { color: var(--info); border-color: var(--info-dim); }
 .live-status-loading { color: var(--info); border-color: var(--info-dim); }
+.live-status-unconfigured { color: var(--muted); border-color: var(--border-2); }
 .live-status-error { color: #ff9d4d; border-color: #5e401f; }
+
+.live-setup {
+  margin: 14px 0 4px; padding: 14px 16px; font-size: 13px; line-height: 1.6;
+  color: var(--muted); background: var(--panel);
+  border: 1px solid var(--border); border-left: 2px solid var(--info);
+}
+.live-setup b { color: var(--ink); font-weight: 500; }
 
 .live-counts { margin: 18px 0 4px; }
 
