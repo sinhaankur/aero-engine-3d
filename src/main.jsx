@@ -9,6 +9,7 @@ import EnginePage from './pages/EnginePage.jsx'
 import SystemsPage from './pages/SystemsPage.jsx'
 import LiveMapPage from './pages/LiveMapPage.jsx'
 import SimulatePage from './pages/SimulatePage.jsx'
+import ProjectorPage from './pages/ProjectorPage.jsx'
 import './styles/global.css'
 
 const router = createHashRouter([
@@ -20,6 +21,7 @@ const router = createHashRouter([
       { path: 'live', element: <LiveMapPage /> },
       { path: 'simulate', element: <SimulatePage /> },
       { path: 'systems', element: <SystemsPage /> },
+      { path: 'projector', element: <ProjectorPage /> },
       { path: 'engine/:engineId', element: <EnginePage /> },
       { path: 'family/:familyId', element: <FamilyPage /> },
       { path: 'family/:familyId/:aircraftId', element: <AircraftPage /> },

@@ -27,6 +27,14 @@ function spaFallback() {
 export default defineConfig({
   plugins: [react(), spaFallback()],
   base: '/AirbusEngine3D/',
+  // Listen on all interfaces so other devices on the LAN (projector,
+  // phone, tablet) can open the site via this machine's IP.
+  server: {
+    host: true,
+  },
+  preview: {
+    host: true,
+  },
   build: {
     rollupOptions: {
       output: {

@@ -470,3 +470,25 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .fuel-buttons button:hover { border-color: var(--accent); color: var(--ink); }
 .fuel-buttons button.on { border-color: var(--accent); color: var(--ink); background: var(--accent-wash); }
 .fuel-buttons button.on.warn { border-color: #f85149; color: #ff9d8a; background: #2a1414; }
+
+/* ---- Projector apps page ---- */
+.proj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 26px 0 40px; }
+@media (max-width: 720px) { .proj-grid { grid-template-columns: 1fr; } }
+.proj-card { background: var(--bg-2); border: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.proj-card-head { display: flex; align-items: center; justify-content: space-between; }
+.proj-name { font-size: 16px; text-transform: uppercase; letter-spacing: 0.03em; }
+.proj-desc { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.proj-meta { display: flex; gap: 10px; font-size: 12px; }
+.proj-meta .k { color: var(--faint); text-transform: uppercase; letter-spacing: 0.06em; min-width: 64px; }
+.proj-meta .v { color: var(--ink); word-break: break-all; }
+.proj-download {
+  margin-top: auto; padding: 10px 14px; border: 1px solid var(--accent-dim); color: var(--accent);
+  font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; text-align: center;
+  transition: background .12s, border-color .12s;
+}
+.proj-download:hover { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
+.proj-install h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 14px; }
+.proj-install ol { margin: 0; padding-left: 22px; color: var(--muted); font-size: 13px; line-height: 1.7; max-width: 68ch; }
+.proj-install li { margin-bottom: 8px; }
+.proj-install em { color: var(--ink); font-style: normal; }
+.proj-fine { margin-top: 18px; color: var(--faint); font-size: 12px; line-height: 1.6; max-width: 68ch; }

@@ -1,0 +1,57 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.sinhaankur.projector'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    // One codebase, two sideloadable apps for the HY300: each flavor gets its
+    // own applicationId so both can be installed side by side on the projector.
+    flavorDimensions = ['experience']
+    productFlavors {
+        aviation {
+            dimension 'experience'
+            applicationId 'com.sinhaankur.aviation'
+            resValue 'string', 'app_name', 'Live Aviation'
+            buildConfigField 'String', 'LAUNCH_URL', '"https://sinhaankur.github.io/AirbusEngine3D/#/live"'
+        }
+        universe {
+            dimension 'experience'
+            applicationId 'com.sinhaankur.universe'
+            resValue 'string', 'app_name', 'Universe Engine'
+            buildConfigField 'String', 'LAUNCH_URL', '"https://www.sinhaankur.com/tv/"'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // Debug-signed on purpose: these APKs are sideloaded from a USB
+            // stick, never published, and a stable local key means updates
+            // install over the old version without uninstalling.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// Framework WebView only — no dependencies keeps the APK tiny and avoids any
+// androidx bytecode the HY300's Android 11 could trip on.
+dependencies {
+}

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Ringed planet, centered in the adaptive-icon safe zone. -->
+    <path
+        android:fillColor="#F5C36B"
+        android:pathData="M54,54 m-17,0 a17,17 0 1,0 34,0 a17,17 0 1,0 -34,0" />
+    <group
+        android:rotation="-20"
+        android:pivotX="54"
+        android:pivotY="54">
+        <path
+            android:strokeColor="#E8E3D8"
+            android:strokeWidth="3"
+            android:fillColor="#00000000"
+            android:pathData="M24,54 a30,10 0 1,0 60,0 a30,10 0 1,0 -60,0" />
+    </group>
+</vector>

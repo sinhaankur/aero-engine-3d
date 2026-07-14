@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Top-view airliner silhouette, centered in the adaptive-icon safe zone. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,24 C56,24 58,30 58,38 L58,46 L86,60 L86,66 L58,58 L58,72 L68,80 L68,84 L54,80 L40,84 L40,80 L50,72 L50,58 L22,66 L22,60 L50,46 L50,38 C50,30 52,24 54,24 Z" />
+</vector>

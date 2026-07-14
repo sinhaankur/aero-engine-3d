@@ -12,6 +12,7 @@ export default function App() {
           <Link to="/live">Live</Link>
           <Link to="/simulate">Simulate</Link>
           <Link to="/systems">Systems</Link>
+          <Link to="/projector">Projector</Link>
         </nav>
       </header>
       <main className="content">
