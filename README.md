@@ -33,6 +33,25 @@ npm run build    # production build into dist/
 npm run preview  # preview the production build
 ```
 
+## Projector apps (sideload APKs)
+
+The archive doubles as a **big-screen appliance**: `projector/` builds two tiny
+(~11 KB) Android WebView kiosk apps for HY300-class Android 11 projectors. Each
+boots fullscreen over WiFi and auto-retries until the network is up.
+
+| App | Loads | Download |
+| --- | --- | --- |
+| **Live Aviation** | the [live flight tracker](https://sinhaankur.github.io/AirbusEngine3D/#/live) — 3D globe of aircraft currently in the air | [live-aviation.apk](https://sinhaankur.github.io/AirbusEngine3D/apk/live-aviation.apk) |
+| **Universe Engine** | [sinhaankur.com/tv](https://www.sinhaankur.com/tv/) — planets, the Sun, constellations, TV-first navigation | [universe-engine.apk](https://sinhaankur.github.io/AirbusEngine3D/apk/universe-engine.apk) |
+
+**Install from a pendrive:** copy both APKs to a USB stick (FAT32), plug it into
+the projector, open the file manager, tap each APK and allow *Install from
+unknown sources*. Full steps live on the site's
+[Projector tab](https://sinhaankur.github.io/AirbusEngine3D/#/projector).
+
+**Rebuild:** `cd projector && ./gradlew assembleRelease` (needs JDK 17 +
+Android SDK 34; outputs land in `projector/app/build/outputs/apk/`).
+
 ## Project structure
 
 ```
@@ -52,6 +71,8 @@ src/
     FamilyPage.jsx         # the "family journey" timeline
     AircraftPage.jsx       # 3D + blueprint + engines + specs + safety
 public/models/             # authored .glb models (see docs/blender-pipeline.md)
+public/apk/                # built projector APKs, served by GitHub Pages
+projector/                 # Android WebView kiosk apps (two flavors, see above)
 blender/                   # source .blend files
 docs/blender-pipeline.md   # Blender → glTF export workflow
 ```
@@ -80,4 +101,3 @@ types with little service history are shown as "—" rather than a misleading ra
 - [ ] Phase 2 — author real Blender glTF airframes + standalone engine models.
 - [ ] Phase 3 — comparison view (overlay variants), per-component exploded views.
 - [ ] Phase 4 — Boeing / Embraer / other manufacturers.
-```
