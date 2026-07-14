@@ -24,6 +24,8 @@ aircraft program survives:
   consistent airframe from a spec dict — the seed of "buildable" tooling.
 - **Interactive engine explorer** — exploded turbofan + working-cycle walkthrough.
 - **Systems explainers** — electrical, hydraulics, fly-by-wire, fuel, bleed, gear.
+- **A real CFD wind tunnel** (`cfd/`, [pipeline docs](cfd-pipeline.md)) — FluidX3D
+  lattice-Boltzmann runs over our generated A320, shown on `/simulate`.
 - A **marketing site** and public deploy on GitHub Pages.
 
 ## Guiding principles

@@ -447,6 +447,14 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .sim-lift.is-stall + .sim-liftbar .sim-liftbar-fill { background: #ff9d4d; }
 .sim-stall-tag { color: #ff9d4d; font-size: 11px; letter-spacing: 0.08em; margin-top: 2px; }
 
+/* wind tunnel (precomputed FluidX3D CFD) */
+.sim-cfd-video { width: 100%; display: block; aspect-ratio: 16 / 9; background: #000; }
+.sim-cfd-v { font-size: 13px; color: var(--ink); }
+.sim-cfd-view { background: var(--panel); border: 1px solid var(--border); color: var(--muted); font: inherit; font-size: 13px; padding: 7px 14px; cursor: pointer; }
+.sim-cfd-view:hover { color: var(--ink); border-color: var(--ink); }
+.sim-cfd-view.on { color: var(--accent); border-color: var(--accent); }
+.sim-note a { color: var(--info); }
+
 /* fuel */
 .fuel-svg { width: 100%; background: var(--bg); border: 1px solid var(--border); aspect-ratio: 100 / 62; }
 .fuel-readout { display: flex; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-top: 12px; }
