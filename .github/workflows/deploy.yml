@@ -26,6 +26,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # public by design — this URL ships in the client bundle anyway
+          VITE_FLIGHT_API: https://ada-flight-proxy.sinhaankur827-f9c.workers.dev
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

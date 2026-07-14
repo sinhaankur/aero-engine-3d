@@ -72,8 +72,8 @@ export default function LiveMapPage() {
         </span>
       </div>
       <p className="lede">
-        Every dot is a real aircraft, right now, from the OpenSky Network's live
-        ADS-B feed — plotted on the globe at its true position and altitude.
+        Every dot is a real aircraft, right now, from the airplanes.live ADS-B
+        network — plotted on the globe at its true position and altitude.
         Colour runs from amber on the ground through green and cyan to white at
         cruise. Drag to orbit, scroll to zoom, click a target to read its telemetry.
       </p>
@@ -101,14 +101,15 @@ export default function LiveMapPage() {
           <Suspense fallback={<div className="viewport-loading" style={{ height: 560 }}>Loading globe…</div>}>
             <FlightGlobe flights={flights} selected={selected} onSelect={setSelected} height={560} />
           </Suspense>
-          <span className="live-attrib">Data · OpenSky Network · ADS-B · via CORS proxy · refreshed every 15s</span>
+          <span className="live-attrib">Data · airplanes.live · ADS-B · via CORS proxy · refreshed every 15s</span>
         </div>
         <DetailPanel flight={selected} onClose={() => setSelected(null)} />
       </div>
 
       <p className="model-note">
-        OpenSky coverage is best over Europe and North America and thinner over
-        open ocean. The proxy caches for ~10s and the page holds the last good
+        The proxy sweeps ~30 regions covering the world's busiest airspace, so
+        coverage is dense over Europe, the Americas and Asia and thinner over
+        open ocean. It caches for ~15s and the page holds the last good
         snapshot if a refresh fails, so the globe stays populated.
       </p>
     </div>

@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 
-// The live feed is OpenSky, reached through a small CORS-adding proxy (a
-// Cloudflare Worker — see /worker). OpenSky itself sends no CORS header, so a
-// browser on the static site can't call it directly; the Worker fetches it
-// server-side and re-serves with CORS. Configure the proxy URL via env:
+// The live feed is airplanes.live ADS-B data, reached through a small
+// CORS-adding proxy (a Cloudflare Worker — see /worker) that sweeps the
+// world's busy airspace, merges the tiles and re-serves OpenSky-shaped states
+// with CORS. Configure the proxy URL via env:
 //   VITE_FLIGHT_API=https://your-worker.workers.dev
 const PROXY = import.meta.env.VITE_FLIGHT_API || ''
 
-// OpenSky /states/all returns a flat array per aircraft; these are the indices
-// we use (see OpenSky docs). Mapping once here keeps the rest typed.
+// states rows are OpenSky /states/all index-compatible; 17-19 are proxy
+// extensions (registration, ICAO type, Mach) from airplanes.live.
 function mapState(s) {
   const lon = s[5]
   const lat = s[6]
@@ -25,9 +25,9 @@ function mapState(s) {
     heading: s[10] ?? 0,             // true track, deg
     vertRate: s[11],                 // m/s
     geoAlt: s[13],                   // geometric altitude (m)
-    reg: '',
-    type: '',
-    mach: null,
+    reg: s[17] || '',
+    type: s[18] || '',
+    mach: s[19] ?? null,
   }
 }
 

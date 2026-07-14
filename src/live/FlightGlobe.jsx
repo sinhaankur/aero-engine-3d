@@ -3,6 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import CanvasFallback from '../three/CanvasFallback.jsx'
+import COASTLINES from './coastlines.json'
 
 const GLOBE_R = 2                        // globe radius in scene units
 const ALT_SCALE = 0.06                   // how far altitude lifts a plane off the surface
@@ -31,8 +32,20 @@ function altColor(altM, onGround, out = new THREE.Color()) {
   return out.copy(c)
 }
 
-/** The Earth: a dark sphere with a faint lat/lon graticule and glow rim. */
+/** The Earth: a dark sphere with real coastlines, a faint graticule and glow rim. */
 function Earth() {
+  // slightly above the sphere surface so lines never z-fight the globe
+  const surface = (lat, lon, out) => {
+    const phi = (90 - lat) * (Math.PI / 180)
+    const theta = (lon + 180) * (Math.PI / 180)
+    const r = GLOBE_R * 1.002
+    return out.set(
+      -r * Math.sin(phi) * Math.cos(theta),
+      r * Math.cos(phi),
+      r * Math.sin(phi) * Math.sin(theta),
+    )
+  }
+
   const graticule = useMemo(() => {
     const g = new THREE.BufferGeometry()
     const pts = []
@@ -40,15 +53,32 @@ function Earth() {
     // parallels
     for (let lat = -60; lat <= 60; lat += 30) {
       for (let lon = -180; lon < 180; lon += 3) {
-        toVec3(lat, lon, 0, v); pts.push(v.x, v.y, v.z)
-        toVec3(lat, lon + 3, 0, v); pts.push(v.x, v.y, v.z)
+        surface(lat, lon, v); pts.push(v.x, v.y, v.z)
+        surface(lat, lon + 3, v); pts.push(v.x, v.y, v.z)
       }
     }
     // meridians
     for (let lon = -180; lon < 180; lon += 30) {
       for (let lat = -87; lat < 87; lat += 3) {
-        toVec3(lat, lon, 0, v); pts.push(v.x, v.y, v.z)
-        toVec3(lat + 3, lon, 0, v); pts.push(v.x, v.y, v.z)
+        surface(lat, lon, v); pts.push(v.x, v.y, v.z)
+        surface(lat + 3, lon, v); pts.push(v.x, v.y, v.z)
+      }
+    }
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
+    return g
+  }, [])
+
+  // Natural Earth 110m coastlines (public domain) — what makes it read as Earth
+  const coasts = useMemo(() => {
+    const g = new THREE.BufferGeometry()
+    const pts = []
+    const a = new THREE.Vector3()
+    const b = new THREE.Vector3()
+    for (const line of COASTLINES) {
+      for (let i = 0; i < line.length - 1; i++) {
+        surface(line[i][1], line[i][0], a)
+        surface(line[i + 1][1], line[i + 1][0], b)
+        pts.push(a.x, a.y, a.z, b.x, b.y, b.z)
       }
     }
     g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
@@ -59,15 +89,18 @@ function Earth() {
     <group>
       <mesh>
         <sphereGeometry args={[GLOBE_R, 64, 64]} />
-        <meshStandardMaterial color="#0e141c" roughness={0.9} metalness={0.1} />
+        <meshStandardMaterial color="#16222e" roughness={0.85} metalness={0.1} />
       </mesh>
       {/* atmosphere rim */}
       <mesh scale={1.035}>
         <sphereGeometry args={[GLOBE_R, 48, 48]} />
-        <meshBasicMaterial color="#1e5f8c" transparent opacity={0.12} side={THREE.BackSide} />
+        <meshBasicMaterial color="#1e5f8c" transparent opacity={0.18} side={THREE.BackSide} />
       </mesh>
       <lineSegments geometry={graticule}>
-        <lineBasicMaterial color="#20303f" transparent opacity={0.55} />
+        <lineBasicMaterial color="#2a3d4e" transparent opacity={0.5} />
+      </lineSegments>
+      <lineSegments geometry={coasts}>
+        <lineBasicMaterial color="#5f87a8" transparent opacity={0.9} />
       </lineSegments>
     </group>
   )
@@ -159,8 +192,8 @@ export default function FlightGlobe({ flights, selected, onSelect, height = 560,
     <div style={{ height, width: '100%', background: 'radial-gradient(120% 120% at 50% 30%, #0a1017, #06080b)' }}>
       <CanvasFallback label="Live globe needs WebGL — unavailable on this device">
         <Canvas camera={{ position: [0, 1.6, 6], fov: 42 }} onPointerMissed={() => onSelect(null)}>
-          <ambientLight intensity={0.6} />
-          <directionalLight position={[5, 3, 5]} intensity={1.1} />
+          <ambientLight intensity={0.75} />
+          <directionalLight position={[5, 3, 5]} intensity={1.2} />
           <Stars radius={60} depth={30} count={1200} factor={2} fade speed={0.4} />
           <group rotation={[0, 0, 0]}>
             <Earth />
