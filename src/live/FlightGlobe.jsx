@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react'
+import { useMemo, useRef, useLayoutEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
@@ -7,6 +7,7 @@ import COASTLINES from './coastlines.json'
 
 const GLOBE_R = 2                        // globe radius in scene units
 const ALT_SCALE = 0.06                   // how far altitude lifts a plane off the surface
+const MAX_PLANES = 8192                  // buffer capacity; feed peaks ~3.5k
 
 // lat/lon (deg) + altitude (m) -> point on/above the sphere
 function toVec3(lat, lon, altM = 0, out = new THREE.Vector3()) {
@@ -106,22 +107,44 @@ function Earth() {
   )
 }
 
+// soft round sprite so the glow dots read as lights, not squares
+function makeDotTexture() {
+  const c = document.createElement('canvas')
+  c.width = c.height = 64
+  const g = c.getContext('2d')
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32)
+  grad.addColorStop(0, 'rgba(255,255,255,1)')
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.85)')
+  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 64, 64)
+  return new THREE.CanvasTexture(c)
+}
+
 /**
- * Aircraft as a single InstancedMesh — one small cone per flight, oriented to
- * sit tangent to the globe and coloured by altitude. Instancing keeps thousands
- * of planes at 60fps.
+ * Aircraft rendered twice from one buffer fill:
+ *  - an InstancedMesh of heading-oriented darts (shape + click target up close)
+ *  - a Points layer of fixed-pixel-size glow dots, so traffic stays visible at
+ *    ANY zoom level — the darts alone are sub-pixel when zoomed out.
+ * Buffers are allocated once at MAX_PLANES; only `count` is drawn, so a poll
+ * update never reallocates or recreates GPU objects.
  */
 function Planes({ flights, onSelect }) {
   const meshRef = useRef()
+  const pointsRef = useRef()
+  const dotTex = useMemo(makeDotTexture, [])
+  const positions = useMemo(() => new Float32Array(MAX_PLANES * 3), [])
+  const colors = useMemo(() => new Float32Array(MAX_PLANES * 3), [])
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const color = useMemo(() => new THREE.Color(), [])
   const pos = useMemo(() => new THREE.Vector3(), [])
   const up = useMemo(() => new THREE.Vector3(), [])
-  const count = flights.length
+  const count = Math.min(flights.length, MAX_PLANES)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const mesh = meshRef.current
-    if (!mesh) return
+    const pts = pointsRef.current
+    if (!mesh || !pts) return
     for (let i = 0; i < count; i++) {
       const f = flights[i]
       toVec3(f.lat, f.lon, f.baroAlt || 0, pos)
@@ -137,15 +160,26 @@ function Planes({ flights, onSelect }) {
         .addScaledVector(north, Math.cos(hr))
         .addScaledVector(east, Math.sin(hr))
       dummy.lookAt(pos.clone().add(dir))
-      dummy.scale.setScalar(0.02)
+      dummy.scale.setScalar(0.032)
       dummy.updateMatrix()
       mesh.setMatrixAt(i, dummy.matrix)
-      mesh.setColorAt(i, altColor(f.baroAlt, f.onGround, color))
+      altColor(f.baroAlt, f.onGround, color)
+      mesh.setColorAt(i, color)
+      positions[i * 3] = pos.x
+      positions[i * 3 + 1] = pos.y
+      positions[i * 3 + 2] = pos.z
+      colors[i * 3] = color.r
+      colors[i * 3 + 1] = color.g
+      colors[i * 3 + 2] = color.b
     }
     mesh.count = count
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-  }, [flights, count, dummy, color, pos, up])
+    const pg = pts.geometry
+    pg.attributes.position.needsUpdate = true
+    pg.attributes.color.needsUpdate = true
+    pg.setDrawRange(0, count)
+  }, [flights, count, dummy, color, pos, up, positions, colors])
 
   const handleClick = (e) => {
     e.stopPropagation()
@@ -153,16 +187,34 @@ function Planes({ flights, onSelect }) {
   }
 
   return (
-    <instancedMesh
-      ref={meshRef}
-      args={[undefined, undefined, Math.max(1, count)]}
-      onClick={handleClick}
-      frustumCulled={false}
-    >
-      {/* a stubby cone reads as a little dart/aircraft at scale */}
-      <coneGeometry args={[0.5, 1.4, 5]} />
-      <meshBasicMaterial vertexColors toneMapped={false} />
-    </instancedMesh>
+    <group>
+      <instancedMesh
+        ref={meshRef}
+        args={[undefined, undefined, MAX_PLANES]}
+        onClick={handleClick}
+        frustumCulled={false}
+      >
+        {/* a stubby cone reads as a little dart/aircraft at scale */}
+        <coneGeometry args={[0.5, 1.4, 5]} />
+        <meshBasicMaterial vertexColors toneMapped={false} />
+      </instancedMesh>
+      <points ref={pointsRef} frustumCulled={false}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+          <bufferAttribute attach="attributes-color" args={[colors, 3]} />
+        </bufferGeometry>
+        <pointsMaterial
+          map={dotTex}
+          size={7}
+          sizeAttenuation={false}
+          vertexColors
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
+      </points>
+    </group>
   )
 }
 
