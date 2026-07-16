@@ -30,6 +30,15 @@ const RUNS = {
     playback: '2.3 s of airflow, ~3× slow motion',
     solver: 'Lattice-Boltzmann (D3Q19) + LES',
   },
+  'b737-800': {
+    speed: '77 m/s · 150 kn',
+    aoa: '8° nose-up',
+    grid: '315 × 630 × 158 (31.4M cells)',
+    lift: '≈ 244 kN (CL ≈ 0.54)',
+    drag: '≈ 321 kN (CD ≈ 0.71)',
+    playback: '2.3 s of airflow, ~3× slow motion',
+    solver: 'Lattice-Boltzmann (D3Q19) + LES',
+  },
 }
 
 function PendingRun({ aircraft }) {

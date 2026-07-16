@@ -16,7 +16,7 @@ const TABS = [
 ]
 const TAB_BLURB = {
   fuel: 'Live fuel flow from tanks through pumps to the engines.',
-  cfd: 'A real GPU CFD run over our A320 model — vortices and all.',
+  cfd: 'Real GPU CFD over our own models — pick an aircraft and watch its vortices. A320 vs 737-800 is a head-to-head.',
 }
 
 const shortName = (name) => name.replace(/^(Airbus|Boeing) /, '')
