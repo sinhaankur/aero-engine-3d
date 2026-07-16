@@ -41,6 +41,18 @@ aircraft program survives:
 
 ---
 
+## The 3D-experience track (product phases)
+
+Runs alongside the knowledge-base phases below:
+
+1. ~~Data schema, A320 family, procedural 3D + blueprint, full UI.~~ *(shipped)*
+2. ~~Author real Blender glTF airframes + standalone engine models.~~ *(shipped —
+   18 HD variants + engine models)*
+3. **Comparison view** (overlay variants against each other) and
+   **per-component exploded airframe views**; optional **cockpit rendering**.
+4. **Boeing / Embraer / other manufacturers** — new families through the same
+   spec → generator → GLB pipeline.
+
 ## Phase 1 — Deepen the "how it's designed" layer  *(near term)*
 
 Turn each system/engine page from *description* into *design reasoning*.

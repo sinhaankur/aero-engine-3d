@@ -1,33 +1,41 @@
-import { useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FAMILIES, getAircraftForFamily } from '../data/index.js'
 import AirfoilFlow, { WIND_CONDITIONS } from '../sim/AirfoilFlow.jsx'
 import FuelSystem from '../sim/FuelSystem.jsx'
 import WindTunnel from '../sim/WindTunnel.jsx'
 
+// the showcase model viewer pulls in three.js — keep it lazy like the home hero
+const HeroPlane = lazy(() => import('../three/HeroPlane.jsx'))
+
 const TABS = [
-  { id: 'aero', name: 'Aerodynamics', icon: '🌬', blurb: 'Air flowing over the wing — lift, and how a stall happens. Pick any aircraft and a wind condition.' },
-  { id: 'fuel', name: 'Fuel system', icon: '⛽', blurb: 'Live fuel flow from tanks through pumps to the engines.' },
-  { id: 'cfd', name: 'Wind tunnel', icon: '🌀', blurb: 'A real GPU CFD run over our A320 model — vortices and all.' },
+  { id: 'aero', name: 'Aerodynamics', icon: '🌬' },
+  { id: 'fuel', name: 'Fuel system', icon: '⛽' },
+  { id: 'cfd', name: 'Wind tunnel', icon: '🌀' },
 ]
+const TAB_BLURB = {
+  fuel: 'Live fuel flow from tanks through pumps to the engines.',
+  cfd: 'A real GPU CFD run over our A320 model — vortices and all.',
+}
 
 const shortName = (name) => name.replace(/^Airbus /, '')
 
-/** Compact per-variant performance strip shown under the picker. */
-function SpecStrip({ aircraft }) {
+/** Compact per-variant performance cells for the showcase rail. */
+function SpecMini({ aircraft }) {
   const d = aircraft.dimensions
   const maxThrust = Math.max(...aircraft.engines.map((e) => e.thrustKn))
   const cells = [
     ['MTOW', `${(d.mtowKg / 1000).toFixed(1)} t`],
-    ['Wing area', `${d.wingAreaM2} m²`],
     ['Wing loading', `${Math.round(d.mtowKg / d.wingAreaM2)} kg/m²`],
+    ['Wing area', `${d.wingAreaM2} m²`],
+    ['Wingspan', `${d.wingspanM} m`],
     ['Cruise', `M ${d.cruiseMach}`],
     ['Range', `${d.rangeKm.toLocaleString()} km`],
     ['Ceiling', `${d.ceilingM.toLocaleString()} m`],
-    ['Engine thrust', `up to ${maxThrust} kN`],
+    ['Thrust', `≤ ${maxThrust} kN`],
   ]
   return (
-    <div className="sim-specs">
+    <div className="sim-specs sim-specs-mini">
       {cells.map(([k, v]) => (
         <div key={k} className="sim-spec">
           <span className="v">{v}</span>
@@ -38,11 +46,18 @@ function SpecStrip({ aircraft }) {
   )
 }
 
+/**
+ * Full-screen "flight test" stage: the whole experience fills the viewport.
+ * Left rail showcases the selected aircraft — its actual 3D model, identity
+ * and performance numbers; the flow field fills the rest. Every variant is
+ * selectable and the wind-condition chips drive the physics.
+ */
 export default function SimulatePage() {
   const [tab, setTab] = useState('aero')
   const [familyId, setFamilyId] = useState('a320')
   const [aircraftId, setAircraftId] = useState('a320')
   const [wind, setWind] = useState('calm')
+  const stageRef = useRef(null)
 
   const variants = getAircraftForFamily(familyId)
   const aircraft = variants.find((a) => a.id === aircraftId) || variants[0]
@@ -53,30 +68,30 @@ export default function SimulatePage() {
     setAircraftId(getAircraftForFamily(id)[0]?.id)
   }
 
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen()
+    else stageRef.current?.requestFullscreen?.().catch(() => {})
+  }
+
   return (
-    <div>
-      <Link to="/" className="back">← Home</Link>
-      <div className="ac-head">
+    <div className="sim-stage" ref={stageRef}>
+      <div className="sim-stage-head">
         <h1>Simulate</h1>
-      </div>
-      <p className="lede">
-        Interactive, real-time models of how the aircraft actually behaves — not
-        stock footage, but little physics toys you can drive. Change a control and
-        watch the air, or the fuel, respond.
-      </p>
-
-      <div className="sys-tabs">
-        {TABS.map((t) => (
-          <button key={t.id} className={t.id === tab ? 'on' : ''} onClick={() => setTab(t.id)}>
-            <span className="sys-icon" aria-hidden>{t.icon}</span>
-            {t.name}
-          </button>
-        ))}
+        <div className="sys-tabs">
+          {TABS.map((t) => (
+            <button key={t.id} className={t.id === tab ? 'on' : ''} onClick={() => setTab(t.id)}>
+              <span className="sys-icon" aria-hidden>{t.icon}</span>
+              {t.name}
+            </button>
+          ))}
+        </div>
+        <span className="spacer" />
+        <button className="sim-chip" onClick={toggleFullscreen} title="Toggle fullscreen">
+          ⛶ Fullscreen
+        </button>
       </div>
 
-      <p className="sim-blurb">{TABS.find((t) => t.id === tab)?.blurb}</p>
-
-      {tab === 'aero' && (
+      {tab === 'aero' ? (
         <>
           <div className="sim-picker">
             <div className="sim-picker-row">
@@ -115,17 +130,38 @@ export default function SimulatePage() {
                   {w.name}
                 </button>
               ))}
+              <span className="sim-wind-note">{windDef?.blurb}</span>
             </div>
           </div>
 
-          <SpecStrip aircraft={aircraft} />
-          <p className="sim-blurb">{windDef?.blurb}</p>
-
-          <AirfoilFlow aircraft={aircraft} wind={wind} />
+          <div className="sim-duo">
+            <aside className="sim-showcase">
+              <div className="sim-showcase-model">
+                <span className="tag-corner">MODEL // <b>{shortName(aircraft.name)}</b></span>
+                <Suspense fallback={<div className="viewport-loading" style={{ height: '100%' }}>Loading model…</div>}>
+                  <HeroPlane url={aircraft.model} height="100%" />
+                </Suspense>
+              </div>
+              <div className="sim-showcase-id">
+                <h2>{shortName(aircraft.name)}</h2>
+                <p>{aircraft.summary}</p>
+              </div>
+              <SpecMini aircraft={aircraft} />
+              <Link className="sim-showcase-link" to={`/family/${familyId}/${aircraft.id}`}>
+                Full profile: blueprint · engines · safety →
+              </Link>
+            </aside>
+            <div className="sim-flow">
+              <AirfoilFlow fill aircraft={aircraft} wind={wind} />
+            </div>
+          </div>
         </>
+      ) : (
+        <div className="sim-stage-scroll">
+          <p className="sim-blurb">{TAB_BLURB[tab]}</p>
+          {tab === 'fuel' ? <FuelSystem /> : <WindTunnel />}
+        </div>
       )}
-      {tab === 'fuel' && <FuelSystem />}
-      {tab === 'cfd' && <WindTunnel />}
     </div>
   )
 }

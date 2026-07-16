@@ -80,7 +80,7 @@ function camber(xc, m = 0.02, p = 0.4) {
 
 const FALLBACK_DIMS = { mtowKg: 78000, wingAreaM2: 122.6 }
 
-export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420 }) {
+export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420, fill = false }) {
   const canvasRef = useRef(null)
   const [aoa, setAoa] = useState(6)        // angle of attack, degrees
   const [kt, setKt] = useState(250)        // airspeed, knots
@@ -210,7 +210,7 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420 }) {
       const aoaRad = (st.aoa * Math.PI) / 180 // the wing stays where you set it
       const flowRad = (aoaEff * Math.PI) / 180
       const stall = aoaEff > STALL_DEG
-      const vx = 0.6 + ktEff / 110           // base horizontal speed, canvas units
+      const vx = 0.4 + ktEff / 70            // base horizontal speed, canvas units
 
       // trails: fade the canvas instead of clearing, for streak lines
       ctx.fillStyle = 'rgba(8,9,11,0.28)'
@@ -314,22 +314,37 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420 }) {
   }, [])
 
   const mtowT = stateRef.current.mtowKg / 1000
-  // the weight bar runs 0–160% of MTOW, with a marker at the 100% line
-  const barPct = Math.min(100, (out.pct / 160) * 100)
+  // the weight bar runs 0–300% of MTOW with a marker at the 100% line, so the
+  // airspeed slider keeps visibly moving the bar across its whole range
+  const BAR_MAX = 300
+  const barPct = Math.min(100, (out.pct / BAR_MAX) * 100)
+
+  const note = (
+    <>
+      Blue streaks are air moving <em>faster</em> (lower pressure) over the
+      upper surface — that suction is most of the lift. Raise the angle of
+      attack and lift grows… until about {STALL_DEG}°, where the flow separates
+      into an orange turbulent wake and lift collapses: a stall. The gauge is
+      real physics for the <b>{shortName}</b>: ½·ρ·V²·S·Cₗ with its{' '}
+      {stateRef.current.S} m² wing at sea level, against the{' '}
+      {mtowT.toFixed(0)} t it can weigh at takeoff — past the 100% line this
+      wing could hold the whole aircraft up.
+    </>
+  )
 
   return (
-    <div className="sim-aero">
-      <div className="sim-canvas-wrap" style={{ height }}>
+    <div className={`sim-aero ${fill ? 'is-fill' : ''}`}>
+      <div className="sim-canvas-wrap" style={fill ? undefined : { height }}>
         <canvas ref={canvasRef} className="sim-canvas" />
         <div className="sim-readout">
           <div className={`sim-lift ${out.stalled ? 'is-stall' : ''}`}>
             <span className="k">Lift</span>
             <span className="v">{out.tonnes.toFixed(0)} t</span>
-            <span className="k2">Cₗ {out.cl.toFixed(2)} · {Math.round(out.ktEff)} kt</span>
+            <span className="k2">Cₗ {out.cl.toFixed(2)} · {Math.round(out.ktEff)} kt eff</span>
           </div>
           <div className="sim-liftbar">
             <div className="sim-liftbar-fill" style={{ width: `${barPct}%` }} />
-            <div className="sim-liftbar-mark" style={{ left: `${(100 / 160) * 100}%` }} />
+            <div className="sim-liftbar-mark" style={{ left: `${(100 / BAR_MAX) * 100}%` }} />
           </div>
           <div className="sim-liftbar-cap">
             {out.pct.toFixed(0)}% of the {shortName}'s {mtowT.toFixed(0)} t MTOW
@@ -337,6 +352,7 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420 }) {
           {out.stalled && <div className="sim-stall-tag">STALL · FLOW SEPARATED</div>}
           {out.shear && <div className="sim-stall-tag">WIND SHEAR · AIRSPEED LOST</div>}
         </div>
+        {fill && <p className="sim-note sim-note-hud">{note}</p>}
       </div>
 
       <div className="sim-controls">
@@ -357,17 +373,7 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420 }) {
         </label>
       </div>
 
-      <p className="sim-note">
-        Blue streaks are air moving <em>faster</em> (lower pressure) over the
-        upper surface — that suction is most of the lift. Raise the angle of
-        attack and lift grows… until about {STALL_DEG}°, where the flow can no
-        longer follow the upper surface, separates into an orange turbulent wake,
-        and lift collapses. That's a stall. The gauge is real physics for the{' '}
-        <b>{shortName}</b>: ½·ρ·V²·S·Cₗ with its {stateRef.current.S} m² wing at
-        sea level, measured against the {mtowT.toFixed(0)} t it can weigh at
-        takeoff — cross the 100% line and this wing could hold the whole
-        aircraft up.
-      </p>
+      {!fill && <p className="sim-note">{note}</p>}
     </div>
   )
 }

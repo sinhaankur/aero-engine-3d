@@ -31,10 +31,15 @@ function mapState(s) {
   }
 }
 
+const TRACK_MAX_PTS = 16     // ~4 minutes of history per aircraft at 15 s polls
+const TRACK_STALE_S = 180    // drop tracks for aircraft not seen in 3 minutes
+
 /**
  * Poll the flight proxy for live aircraft.
- * Returns { flights, time, status, error, count, configured }.
+ * Returns { flights, tracks, time, status, error, count, configured }.
  *   status: 'unconfigured' | 'loading' | 'live' | 'error'
+ *   tracks: Map<icao24, [lat, lon, altM][]> — position history accumulated
+ *   across polls this session, for drawing flight paths.
  */
 export function useFlightData({ intervalMs = 15000 } = {}) {
   const [flights, setFlights] = useState([])
@@ -43,6 +48,8 @@ export function useFlightData({ intervalMs = 15000 } = {}) {
   const [error, setError] = useState(null)
   const timer = useRef(null)
   const backoff = useRef(intervalMs)
+  const tracks = useRef(new Map())
+  const trackSeen = useRef(new Map())
 
   useEffect(() => {
     if (!PROXY) {
@@ -60,6 +67,24 @@ export function useFlightData({ intervalMs = 15000 } = {}) {
         const data = await res.json()
         if (cancelled) return
         const list = (data.states || []).map(mapState).filter(Boolean)
+        // extend each aircraft's track with its new position
+        const now = data.time || Date.now() / 1000
+        for (const f of list) {
+          let pts = tracks.current.get(f.id)
+          if (!pts) tracks.current.set(f.id, (pts = []))
+          const prev = pts[pts.length - 1]
+          if (!prev || prev[0] !== f.lat || prev[1] !== f.lon) {
+            pts.push([f.lat, f.lon, f.baroAlt || 0])
+            if (pts.length > TRACK_MAX_PTS) pts.shift()
+          }
+          trackSeen.current.set(f.id, now)
+        }
+        for (const [id, seen] of trackSeen.current) {
+          if (now - seen > TRACK_STALE_S) {
+            trackSeen.current.delete(id)
+            tracks.current.delete(id)
+          }
+        }
         setFlights(list)
         setTime(data.time ? new Date(data.time * 1000) : new Date())
         setStatus('live')
@@ -88,5 +113,5 @@ export function useFlightData({ intervalMs = 15000 } = {}) {
     }
   }, [intervalMs])
 
-  return { flights, time, status, error, count: flights.length, configured: !!PROXY }
+  return { flights, tracks: tracks.current, time, status, error, count: flights.length, configured: !!PROXY }
 }

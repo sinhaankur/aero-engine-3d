@@ -218,6 +218,85 @@ function Planes({ flights, onSelect }) {
   )
 }
 
+const MAX_TRAIL_VERTS = 240000 // 8k aircraft × 15 segments × 2 verts
+
+/**
+ * Flight paths: every aircraft's position history this session, drawn as one
+ * LineSegments buffer, altitude-coloured and faded toward the older end. The
+ * selected aircraft's track is re-drawn on top in accent colour.
+ */
+function Trails({ flights, tracks, selected }) {
+  const ref = useRef()
+  const selRef = useRef()
+  const positions = useMemo(() => new Float32Array(MAX_TRAIL_VERTS * 3), [])
+  const colors = useMemo(() => new Float32Array(MAX_TRAIL_VERTS * 3), [])
+  const selPositions = useMemo(() => new Float32Array(64 * 3), [])
+  const a = useMemo(() => new THREE.Vector3(), [])
+  const color = useMemo(() => new THREE.Color(), [])
+
+  useLayoutEffect(() => {
+    const line = ref.current
+    if (!line || !tracks) return
+    let v = 0
+    for (const f of flights) {
+      const pts = tracks.get(f.id)
+      if (!pts || pts.length < 2) continue
+      for (let i = 1; i < pts.length && v + 2 <= MAX_TRAIL_VERTS; i++) {
+        for (const j of [i - 1, i]) {
+          toVec3(pts[j][0], pts[j][1], pts[j][2], a)
+          positions[v * 3] = a.x
+          positions[v * 3 + 1] = a.y
+          positions[v * 3 + 2] = a.z
+          altColor(pts[j][2], false, color)
+          // fade toward the older end of the trail
+          const fade = 0.2 + 0.8 * (j / (pts.length - 1))
+          colors[v * 3] = color.r * fade
+          colors[v * 3 + 1] = color.g * fade
+          colors[v * 3 + 2] = color.b * fade
+          v++
+        }
+      }
+    }
+    const g = line.geometry
+    g.attributes.position.needsUpdate = true
+    g.attributes.color.needsUpdate = true
+    g.setDrawRange(0, v)
+  }, [flights, tracks, positions, colors, a, color])
+
+  useLayoutEffect(() => {
+    const line = selRef.current
+    if (!line) return
+    const pts = (selected && tracks?.get(selected.id)) || []
+    const n = Math.min(pts.length, 64)
+    for (let i = 0; i < n; i++) {
+      toVec3(pts[i][0], pts[i][1], pts[i][2], a)
+      selPositions[i * 3] = a.x
+      selPositions[i * 3 + 1] = a.y
+      selPositions[i * 3 + 2] = a.z
+    }
+    line.geometry.attributes.position.needsUpdate = true
+    line.geometry.setDrawRange(0, n)
+  }, [selected, flights, tracks, selPositions, a])
+
+  return (
+    <group>
+      <lineSegments ref={ref} frustumCulled={false}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+          <bufferAttribute attach="attributes-color" args={[colors, 3]} />
+        </bufferGeometry>
+        <lineBasicMaterial vertexColors transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </lineSegments>
+      <line ref={selRef} frustumCulled={false}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[selPositions, 3]} />
+        </bufferGeometry>
+        <lineBasicMaterial color="#d8ff3e" transparent opacity={0.95} depthWrite={false} toneMapped={false} />
+      </line>
+    </group>
+  )
+}
+
 /** Highlight ring around the selected flight. */
 function SelectionMarker({ flight }) {
   const ref = useRef()
@@ -239,7 +318,7 @@ function SelectionMarker({ flight }) {
   )
 }
 
-export default function FlightGlobe({ flights, selected, onSelect, height = 560, autoSpin = true }) {
+export default function FlightGlobe({ flights, tracks, selected, onSelect, height = 560, autoSpin = true }) {
   return (
     <div style={{ height, width: '100%', background: 'radial-gradient(120% 120% at 50% 30%, #0a1017, #06080b)' }}>
       <CanvasFallback label="Live globe needs WebGL — unavailable on this device">
@@ -249,6 +328,7 @@ export default function FlightGlobe({ flights, selected, onSelect, height = 560,
           <Stars radius={60} depth={30} count={1200} factor={2} fade speed={0.4} />
           <group rotation={[0, 0, 0]}>
             <Earth />
+            <Trails flights={flights} tracks={tracks} selected={selected} />
             <Planes flights={flights} onSelect={onSelect} />
             <SelectionMarker flight={selected} />
           </group>

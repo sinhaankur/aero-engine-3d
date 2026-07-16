@@ -280,6 +280,10 @@ function TitleBlock({ C, aircraft, d, margin, subtitle }) {
     ['WINGSPAN', `${d.wingspanM.toFixed(2)} m`],
     ['HEIGHT', `${d.heightM.toFixed(2)} m`],
     ['FUSELAGE Ø', `${d.fuselageDiaM.toFixed(2)} m`],
+    ...(d.wingAreaM2 ? [
+      ['WING AREA', `${d.wingAreaM2} m²`],
+      ['WING LOADING', `${Math.round(d.mtowKg / d.wingAreaM2)} kg/m²`],
+    ] : []),
     ['PASSENGERS', `${d.paxTypical} – ${d.paxMax}`],
     ['RANGE', `${d.rangeKm.toLocaleString()} km`],
     ['MAX TAKEOFF', `${d.mtowKg.toLocaleString()} kg`],

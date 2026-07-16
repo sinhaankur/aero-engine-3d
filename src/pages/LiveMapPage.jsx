@@ -59,7 +59,7 @@ function DetailPanel({ flight, onClose }) {
 }
 
 export default function LiveMapPage() {
-  const { flights, time, status, count, configured } = useFlightData({ intervalMs: 15000 })
+  const { flights, tracks, time, status, count, configured } = useFlightData({ intervalMs: 15000 })
   const [selected, setSelected] = useState(null)
 
   return (
@@ -99,7 +99,7 @@ export default function LiveMapPage() {
       <div className="live-body">
         <div className="live-globe">
           <Suspense fallback={<div className="viewport-loading" style={{ height: 560 }}>Loading globe…</div>}>
-            <FlightGlobe flights={flights} selected={selected} onSelect={setSelected} height={560} />
+            <FlightGlobe flights={flights} tracks={tracks} selected={selected} onSelect={setSelected} height={560} />
           </Suspense>
           <span className="live-attrib">Data · airplanes.live · ADS-B · via CORS proxy · refreshed every 15s</span>
         </div>

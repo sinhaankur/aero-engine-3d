@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The app is a hash-routed SPA, so only the root document is a crawlable
+     URL; in-app routes (#/live, #/simulate, #/family/…) share this entry. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://sinhaankur.github.io/AirbusEngine3D/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>

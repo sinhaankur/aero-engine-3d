@@ -87,6 +87,7 @@ export default function AircraftPage() {
         <Spec label="Length" value={d.lengthM} unit="m" />
         <Spec label="Wingspan" value={d.wingspanM} unit="m" />
         <Spec label="Wing area" value={d.wingAreaM2} unit="m²" />
+        <Spec label="Wing loading" value={Math.round(d.mtowKg / d.wingAreaM2)} unit="kg/m²" />
         <Spec label="Height" value={d.heightM} unit="m" />
         <Spec label="Fuselage dia." value={d.fuselageDiaM} unit="m" />
         <Spec label="MTOW" value={d.mtowKg.toLocaleString()} unit="kg" />
