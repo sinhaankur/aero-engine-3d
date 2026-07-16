@@ -193,7 +193,41 @@ export default function AirfoilFlow({
       return [g.cx + rx, g.cy + ry]
     }
 
-    function drawAirfoil(g, aoaRad, stalled, spdFrac, buffet, iced) {
+    // small arrow with a filled head, used for pressure and force vectors
+    function arrow(x1, y1, x2, y2, color, w = 1.5) {
+      const dx = x2 - x1, dy = y2 - y1
+      const len = Math.hypot(dx, dy)
+      if (len < 3) return
+      const ux = dx / len, uy = dy / len
+      ctx.strokeStyle = color
+      ctx.fillStyle = color
+      ctx.lineWidth = w
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke()
+      const hs = Math.min(7, 3 + len * 0.08)
+      ctx.beginPath()
+      ctx.moveTo(x2, y2)
+      ctx.lineTo(x2 - ux * hs - uy * hs * 0.55, y2 - uy * hs + ux * hs * 0.55)
+      ctx.lineTo(x2 - ux * hs + uy * hs * 0.55, y2 - uy * hs - ux * hs * 0.55)
+      ctx.closePath(); ctx.fill()
+    }
+
+    // the headline intuition: lift vs weight, drawn as vectors at the
+    // quarter-chord. Weight is the fixed reference; lift grows/shrinks live.
+    function drawForces(g, lw, stalled) {
+      const ox = g.cx, oy = g.cy
+      const wLen = 46
+      ctx.font = '10px ui-monospace, Menlo, monospace'
+      arrow(ox, oy, ox, oy + wLen, 'rgba(232,234,237,0.8)', 2)
+      ctx.fillStyle = 'rgba(232,234,237,0.8)'
+      ctx.fillText('W', ox + 7, oy + wLen + 2)
+      const lLen = Math.max(6, Math.min(118, wLen * lw))
+      const lCol = stalled ? '#ff9d4d' : lw >= 1 ? '#d8ff3e' : 'rgba(216,255,62,0.55)'
+      arrow(ox, oy, ox, oy - lLen, lCol, 2.5)
+      ctx.fillStyle = lCol
+      ctx.fillText(`L ${Math.round(lw * 100)}%`, ox + 7, oy - lLen + 3)
+    }
+
+    function drawAirfoil(g, aoaRad, stalled, spdFrac, buffet, iced, suction) {
       ctx.save()
       // high-speed buffet: the airframe trembles as airspeed nears Vmo
       if (buffet > 0.01) {
@@ -248,6 +282,33 @@ export default function AirfoilFlow({
           ctx.fill()
         }
         ctx.restore()
+
+        // the "how it actually works" arrows: suction pulling the upper
+        // surface up (long, cyan), higher pressure pushing on the lower
+        // surface (short, pale). In a stall, the suction aft of the crest
+        // collapses with the separated flow.
+        const drawPressureArrows = (upper) => {
+          for (let xc = 0.06; xc <= 0.9; xc += upper ? 0.07 : 0.14) {
+            const [ax, ay] = surfacePoint(xc - 0.02, upper, g, aoaRad)
+            const [bx, by] = surfacePoint(xc + 0.02, upper, g, aoaRad)
+            let nx = -(by - ay), ny = bx - ax
+            const nl = Math.hypot(nx, ny) || 1
+            nx /= nl; ny /= nl
+            if ((upper && ny > 0) || (!upper && ny < 0)) { nx = -nx; ny = -ny }
+            const [px, py] = surfacePoint(xc, upper, g, aoaRad)
+            const boost = Math.max(0.12, 1 - Math.abs(xc - 0.25) * 1.5)
+            let mag = (upper ? 8 + 26 * suction : 4 + 9 * suction) * boost
+            if (upper && stalled && xc > 0.45) mag *= 0.25 // separated: suction gone
+            if (upper) {
+              arrow(px, py, px + nx * mag, py + ny * mag, 'rgba(62,200,255,0.85)', 1.3)
+            } else {
+              // pressure pushes INTO the lower surface
+              arrow(px + nx * mag, py + ny * mag, px, py, 'rgba(200,200,190,0.55)', 1.1)
+            }
+          }
+        }
+        drawPressureArrows(true)
+        drawPressureArrows(false)
       }
       ctx.restore()
     }
@@ -404,14 +465,19 @@ export default function AirfoilFlow({
 
       if (env.storm) stepRain(g, vx)
 
-      drawAirfoil(g, aoaRad, stall, spdFrac, buffet, !!env.icing)
+      // live physics for the on-canvas force + pressure arrows
+      const cl = liftCoef(aoaEff, stallDeg, !!env.icing)
+      const v = ktEff * KT
+      const liftN = 0.5 * atmo.rho * v * v * st.S * cl
+      const lw = liftN / (st.mtowKg * G)
+      const suction = Math.min(1.2, Math.max(0.1, (cl / 1.85) * (0.4 + 0.8 * spdFrac)))
+
+      drawAirfoil(g, aoaRad, stall, spdFrac, buffet, !!env.icing, suction)
+      drawForces(g, lw, stall)
 
       // push the physics readout to React, throttled
       if (t - lastOut > 0.12) {
         lastOut = t
-        const cl = liftCoef(aoaEff, stallDeg, !!env.icing)
-        const v = ktEff * KT
-        const liftN = 0.5 * atmo.rho * v * v * st.S * cl
         setOut({
           cl,
           aoaEff,

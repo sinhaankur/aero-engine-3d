@@ -595,6 +595,8 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .sim-stage-head .sys-tabs { margin: 0; }
 .sim-stage-head .spacer { flex: 1; }
 .sim-wind-note { color: var(--muted); font-size: 11.5px; }
+.sim-story-live { color: var(--accent); animation: story-in .4s ease; }
+@keyframes story-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 .sim-duo { display: flex; gap: 14px; flex: 1; min-height: 0; }
 .sim-showcase {
   width: 380px; flex: none; display: flex; flex-direction: column; gap: 10px;

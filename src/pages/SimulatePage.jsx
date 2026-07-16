@@ -21,6 +21,47 @@ const TAB_BLURB = {
 
 const shortName = (name) => name.replace(/^(Airbus|Boeing) /, '')
 
+/**
+ * Guided stories: each scenario drives the actual sliders (you watch them
+ * move) while a caption narrates cause → effect. Steps tween the shared sim
+ * state to `to` over `dur` seconds; touching any control cancels the story.
+ */
+const SCENARIOS = [
+  {
+    id: 'takeoff', name: '🛫 Takeoff',
+    steps: [
+      { dur: 0.1, to: { aoa: 2, kt: 130, alt: 0, isaDev: 0 }, wind: 'calm', say: 'Lined up. At 130 kt the wing makes far less lift than the aircraft weighs — watch L vs W.' },
+      { dur: 3, to: { kt: 170 }, say: 'Accelerating… lift grows with the SQUARE of speed.' },
+      { dur: 2, to: { aoa: 10 }, say: 'Rotate — pitch to 10° and L crosses 100% of W. That moment is flight.' },
+      { dur: 3.5, to: { alt: 2000, kt: 210, aoa: 7 }, say: 'Positive climb — watch the dot rise inside the envelope.' },
+    ],
+  },
+  {
+    id: 'cruise', name: 'Climb to cruise',
+    steps: [
+      { dur: 0.1, to: { aoa: 4, kt: 250, alt: 2000, isaDev: 0 }, wind: 'calm', say: 'Climbing out at 250 kt.' },
+      { dur: 5, to: { alt: 11000, kt: 340 }, say: 'The air thins as we climb — ρ falls — so we hold lift by flying ever faster.' },
+      { dur: 2, to: { aoa: 3 }, say: 'Level at 11 km, near the Mach roof. This is exactly why jets cruise fast and high.' },
+    ],
+  },
+  {
+    id: 'hot', name: 'Hot & high',
+    steps: [
+      { dur: 0.1, to: { alt: 1600, kt: 150, aoa: 8, isaDev: 0 }, wind: 'calm', say: 'A mountain runway, 1.6 km up, 150 kt.' },
+      { dur: 3, to: { isaDev: 30 }, say: 'A +30 °C heatwave rolls in: same speed, same angle — and lift just fell. Density altitude.' },
+      { dur: 2.5, to: { kt: 175 }, say: 'The only fix is more speed — which needs more runway. The hot-and-high problem.' },
+    ],
+  },
+  {
+    id: 'stall', name: 'Stall & recover',
+    steps: [
+      { dur: 0.1, to: { aoa: 6, kt: 180, alt: 1000, isaDev: 0 }, wind: 'calm', say: 'Slow flight at 180 kt.' },
+      { dur: 3.5, to: { aoa: 17 }, say: 'Pulling up… past 15° the flow separates — MORE angle now means LESS lift.' },
+      { dur: 2.5, to: { aoa: 7, kt: 215 }, say: 'Recovery: nose DOWN and speed up. Counter-intuitive — and it saves lives.' },
+    ],
+  },
+]
+
 /** Compact per-variant performance cells for the showcase rail. */
 function SpecMini({ aircraft }) {
   const d = aircraft.dimensions
@@ -70,6 +111,50 @@ export default function SimulatePage() {
   const [alt, setAlt] = useState(0)
   const [isaDev, setIsaDev] = useState(0)
   const stageRef = useRef(null)
+
+  // ---- guided-story runner: tweens the sliders, narrates each step ----
+  const [story, setStory] = useState(null) // { id, say }
+  const simRef = useRef({})
+  simRef.current = { aoa, kt, alt, isaDev }
+  const storyCtl = useRef(null)
+
+  const stopStory = () => {
+    if (storyCtl.current) cancelAnimationFrame(storyCtl.current.raf)
+    storyCtl.current = null
+    setStory(null)
+  }
+
+  const runStory = (sc) => {
+    stopStory()
+    const ctl = { raf: 0 }
+    storyCtl.current = ctl
+    const setters = { aoa: setAoa, kt: setKt, alt: setAlt, isaDev: setIsaDev }
+    let stepIdx = 0
+
+    const startStep = () => {
+      const step = sc.steps[stepIdx]
+      if (!step) { stopStory(); return }
+      if (step.wind) setWind(step.wind)
+      setStory({ id: sc.id, say: step.say })
+      const from = { ...simRef.current }
+      const t0 = performance.now()
+      const tick = () => {
+        if (storyCtl.current !== ctl) return
+        const f = Math.min(1, (performance.now() - t0) / (step.dur * 1000))
+        const e = f * f * (3 - 2 * f) // smoothstep ease
+        for (const k of Object.keys(step.to)) {
+          setters[k](Math.round(from[k] + (step.to[k] - from[k]) * e))
+        }
+        if (f < 1) ctl.raf = requestAnimationFrame(tick)
+        else { stepIdx += 1; startStep() }
+      }
+      ctl.raf = requestAnimationFrame(tick)
+    }
+    startStep()
+  }
+
+  // any manual control input cancels the running story
+  const manual = (setter) => (v) => { stopStory(); setter(v) }
 
   const variants = getAircraftForFamily(familyId)
   const aircraft = variants.find((a) => a.id === aircraftId) || variants[0]
@@ -143,13 +228,31 @@ export default function SimulatePage() {
                 <button
                   key={w.id}
                   className={`sim-chip ${w.id === wind ? 'on' : ''}`}
-                  onClick={() => setWind(w.id)}
+                  onClick={() => { stopStory(); setWind(w.id) }}
                   title={w.blurb}
                 >
                   {w.name}
                 </button>
               ))}
               <span className="sim-wind-note">{windDef?.blurb}</span>
+            </div>
+            <div className="sim-picker-row">
+              <span className="sim-picker-label">Story</span>
+              {SCENARIOS.map((sc) => (
+                <button
+                  key={sc.id}
+                  className={`sim-chip ${story?.id === sc.id ? 'on' : ''}`}
+                  onClick={() => runStory(sc)}
+                >
+                  {sc.name}
+                </button>
+              ))}
+              {story && (
+                <button className="sim-chip" onClick={stopStory}>■ Stop</button>
+              )}
+              <span className={`sim-wind-note ${story ? 'sim-story-live' : ''}`}>
+                {story ? story.say : 'Fly a guided moment — the sliders move themselves, you watch the physics.'}
+              </span>
             </div>
           </div>
 
@@ -177,10 +280,10 @@ export default function SimulatePage() {
                 fill
                 aircraft={aircraft}
                 wind={wind}
-                aoa={aoa} onAoa={setAoa}
-                kt={kt} onKt={setKt}
-                alt={alt} onAlt={setAlt}
-                isaDev={isaDev} onIsaDev={setIsaDev}
+                aoa={aoa} onAoa={manual(setAoa)}
+                kt={kt} onKt={manual(setKt)}
+                alt={alt} onAlt={manual(setAlt)}
+                isaDev={isaDev} onIsaDev={manual(setIsaDev)}
               />
             </div>
           </div>
