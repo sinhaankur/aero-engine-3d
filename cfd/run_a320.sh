@@ -28,6 +28,11 @@ sed -i '' \
 	-e 's|^//#define EQUILIBRIUM_BOUNDARIES|#define EQUILIBRIUM_BOUNDARIES|' \
 	-e 's|^//#define SUBGRID|#define SUBGRID|' \
 	-e 's|^//#define GRAPHICS |#define GRAPHICS |' \
+	-e 's|^#define SURFACE|//#define SURFACE|' \
+	-e 's|^#define TEMPERATURE|//#define TEMPERATURE|' \
+	-e 's|^#define MOVING_BOUNDARIES|//#define MOVING_BOUNDARIES|' \
+	-e 's|^#define PARTICLES|//#define PARTICLES|' \
+	-e 's|^#define INTERACTIVE_GRAPHICS|//#define INTERACTIVE_GRAPHICS|' \
 	"$FX3D/src/defines.hpp"
 
 # 3. build + run (renders PNG frames to bin/export/{hero,side,top});

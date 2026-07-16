@@ -80,6 +80,36 @@ export default function SimulatePage() {
     setAircraftId(getAircraftForFamily(id)[0]?.id)
   }
 
+  // aircraft + variant rows are shared by the aero and wind-tunnel tabs
+  const aircraftPicker = (
+    <>
+      <div className="sim-picker-row">
+        <span className="sim-picker-label">Aircraft</span>
+        {FAMILIES.map((f) => (
+          <button
+            key={f.id}
+            className={`sim-chip ${f.id === familyId ? 'on' : ''}`}
+            onClick={() => pickFamily(f.id)}
+          >
+            {f.name.replace(' Family', '')}
+          </button>
+        ))}
+      </div>
+      <div className="sim-picker-row">
+        <span className="sim-picker-label">Variant</span>
+        {variants.map((a) => (
+          <button
+            key={a.id}
+            className={`sim-chip ${a.id === aircraft.id ? 'on' : ''}`}
+            onClick={() => setAircraftId(a.id)}
+          >
+            {shortName(a.name)}
+          </button>
+        ))}
+      </div>
+    </>
+  )
+
   const toggleFullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen()
     else stageRef.current?.requestFullscreen?.().catch(() => {})
@@ -106,30 +136,7 @@ export default function SimulatePage() {
       {tab === 'aero' ? (
         <>
           <div className="sim-picker">
-            <div className="sim-picker-row">
-              <span className="sim-picker-label">Aircraft</span>
-              {FAMILIES.map((f) => (
-                <button
-                  key={f.id}
-                  className={`sim-chip ${f.id === familyId ? 'on' : ''}`}
-                  onClick={() => pickFamily(f.id)}
-                >
-                  {f.name.replace(' Family', '')}
-                </button>
-              ))}
-            </div>
-            <div className="sim-picker-row">
-              <span className="sim-picker-label">Variant</span>
-              {variants.map((a) => (
-                <button
-                  key={a.id}
-                  className={`sim-chip ${a.id === aircraft.id ? 'on' : ''}`}
-                  onClick={() => setAircraftId(a.id)}
-                >
-                  {shortName(a.name)}
-                </button>
-              ))}
-            </div>
+            {aircraftPicker}
             <div className="sim-picker-row">
               <span className="sim-picker-label">Wind</span>
               {WIND_CONDITIONS.map((w) => (
@@ -178,10 +185,18 @@ export default function SimulatePage() {
             </div>
           </div>
         </>
+      ) : tab === 'cfd' ? (
+        <>
+          <div className="sim-picker">{aircraftPicker}</div>
+          <div className="sim-stage-scroll">
+            <p className="sim-blurb">{TAB_BLURB[tab]}</p>
+            <WindTunnel aircraft={aircraft} />
+          </div>
+        </>
       ) : (
         <div className="sim-stage-scroll">
           <p className="sim-blurb">{TAB_BLURB[tab]}</p>
-          {tab === 'fuel' ? <FuelSystem /> : <WindTunnel />}
+          <FuelSystem />
         </div>
       )}
     </div>

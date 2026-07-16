@@ -10,30 +10,68 @@ const VIEWS = [
   { id: 'top', name: 'Top view' },
 ]
 
-// One precomputed run of cfd/run_a320.sh — see docs/cfd-pipeline.md.
-// Forces are the run's settled averages (t = 15k–20k steps); indicative only.
-const RUN = {
-  aircraft: 'A320 (our parametric model)',
-  speed: '77 m/s · 150 kn',
-  aoa: '8° nose-up',
-  grid: '315 × 630 × 158 (31.4M cells)',
-  lift: '≈ 172 kN (CL ≈ 0.39)',
-  drag: '≈ 170 kN (CD ≈ 0.38)',
-  playback: '2.3 s of airflow, ~3× slow motion',
-  solver: 'Lattice-Boltzmann (D3Q19) + LES',
+const short = (name) => name.replace(/^(Airbus|Boeing) /, '')
+
+/**
+ * Precomputed FluidX3D runs that ship with the site, keyed by variant id.
+ * Every run is a real GPU lattice-Boltzmann simulation over that variant's own
+ * parametric model — each takes a GPU roughly an hour offline, so runs are
+ * baked ahead of time with `cfd/run_variant.sh <id> <length> <wing-area> [aoa]`
+ * and committed as video. Forces are the run's settled averages; indicative
+ * only (voxel walls, no boundary-layer model).
+ */
+const RUNS = {
+  a320: {
+    speed: '77 m/s · 150 kn',
+    aoa: '8° nose-up',
+    grid: '315 × 630 × 158 (31.4M cells)',
+    lift: '≈ 172 kN (CL ≈ 0.39)',
+    drag: '≈ 170 kN (CD ≈ 0.38)',
+    playback: '2.3 s of airflow, ~3× slow motion',
+    solver: 'Lattice-Boltzmann (D3Q19) + LES',
+  },
 }
 
-export default function WindTunnel() {
+function PendingRun({ aircraft }) {
+  const d = aircraft.dimensions
+  return (
+    <div className="sim-cfd-pending">
+      <h3>{short(aircraft.name)} — run not baked yet</h3>
+      <p>
+        The wind tunnel is <b>real GPU CFD</b>, not an animation, so every
+        aircraft's run is computed offline (roughly an hour of GPU time each)
+        and shipped as video. This variant's case is fully wired — its exact
+        length and wing area feed the solver — it just hasn't been baked yet:
+      </p>
+      <code>cfd/run_variant.sh {aircraft.id} {d.lengthM} {d.wingAreaM2} 8</code>
+      <p>
+        A note on <em>environments</em>: in a wind tunnel, changing air density
+        or temperature scales the forces but barely changes the flow picture —
+        what reshapes the vortices is the <b>angle of attack</b> (and Mach). So
+        CFD runs are baked per aircraft and AoA, while the Aerodynamics tab
+        models storms, icing, altitude and temperature live. Pick the A320 to
+        see a finished run.
+      </p>
+    </div>
+  )
+}
+
+export default function WindTunnel({ aircraft }) {
   const [view, setView] = useState('hero')
+  const id = aircraft?.id ?? 'a320'
+  const name = aircraft ? short(aircraft.name) : 'A320'
+  const run = RUNS[id]
+
+  if (!run) return <PendingRun aircraft={aircraft} />
 
   return (
     <div className="sim-cfd">
       <div className="sim-canvas-wrap">
         <video
-          key={view}
+          key={`${id}-${view}`}
           className="sim-cfd-video"
-          src={asset(`media/cfd/a320-${view}.mp4`)}
-          poster={view === 'hero' ? asset('media/cfd/a320-poster.jpg') : undefined}
+          src={asset(`media/cfd/${id}-${view}.mp4`)}
+          poster={view === 'hero' ? asset(`media/cfd/${id}-poster.jpg`) : undefined}
           autoPlay
           loop
           muted
@@ -41,13 +79,13 @@ export default function WindTunnel() {
         />
         <div className="sim-readout">
           {Object.entries({
-            Aircraft: RUN.aircraft,
-            Condition: `${RUN.speed} · ${RUN.aoa}`,
-            Grid: RUN.grid,
-            Solver: RUN.solver,
-            'Lift (measured)': RUN.lift,
-            'Drag (measured)': RUN.drag,
-            Playback: RUN.playback,
+            Aircraft: `${name} (our parametric model)`,
+            Condition: `${run.speed} · ${run.aoa}`,
+            Grid: run.grid,
+            Solver: run.solver,
+            'Lift (measured)': run.lift,
+            'Drag (measured)': run.drag,
+            Playback: run.playback,
           }).map(([k, v]) => (
             <div className="sim-lift" key={k}>
               <span className="k">{k}</span>
@@ -71,7 +109,7 @@ export default function WindTunnel() {
 
       <p className="sim-note">
         This is not an animation — it is a <b>real CFD run</b> over the exact same
-        parametric A320 model you can orbit on this site. The glowing filaments are{' '}
+        parametric {name} model you can orbit on this site. The glowing filaments are{' '}
         <em>vortex cores</em> (Q-criterion isosurfaces, coloured by air speed): watch
         them roll up at the wingtips, peel off the wing at this high angle of attack,
         and tangle into the turbulent wake. Simulated with{' '}

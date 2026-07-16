@@ -667,6 +667,15 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .sim-spec .k { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; margin-top: 2px; }
 @media (max-width: 860px) { .sim-specs { grid-template-columns: repeat(3, 1fr); } }
 
+/* wind tunnel: pending-run panel for variants without a baked CFD video */
+.sim-cfd-pending { border: 1px solid var(--border); background: var(--bg-2); padding: 20px 22px; max-width: 80ch; }
+.sim-cfd-pending h3 { margin: 0 0 10px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.03em; }
+.sim-cfd-pending p { color: var(--muted); font-size: 13px; line-height: 1.6; margin: 0 0 12px; }
+.sim-cfd-pending p:last-child { margin-bottom: 0; }
+.sim-cfd-pending code { display: inline-block; margin-bottom: 12px; padding: 6px 10px; }
+.sim-cfd-pending em { color: var(--info); font-style: normal; }
+.sim-cfd-pending b { color: var(--ink); font-weight: 500; }
+
 /* wind tunnel (precomputed FluidX3D CFD) */
 .sim-cfd-video { width: 100%; display: block; aspect-ratio: 16 / 9; background: #000; }
 .sim-cfd-v { font-size: 13px; color: var(--ink); }
