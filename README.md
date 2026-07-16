@@ -24,15 +24,6 @@ are declared as roadmap stubs.
 - **react-router** (hash router, so it deploys cleanly to static hosts/GitHub Pages)
 - Plain-JS data layer — the whole archive is diff-able in git, no database.
 
-## Run it
-
-```bash
-npm install
-npm run dev      # http://localhost:5173
-npm run build    # production build into dist/
-npm run preview  # preview the production build
-```
-
 ## Projector apps (sideload APKs)
 
 The archive doubles as a **big-screen appliance**: `projector/` builds two tiny

@@ -220,19 +220,22 @@ function Planes({ flights, onSelect }) {
 
 const MAX_TRAIL_VERTS = 240000 // 8k aircraft × 15 segments × 2 verts
 
+// paths are deliberately a single muted tone (not the altitude palette) so
+// they read as history, clearly distinct from the bright plane markers
+const TRAIL_COLOR = new THREE.Color('#39627e')
+
 /**
  * Flight paths: every aircraft's position history this session, drawn as one
- * LineSegments buffer, altitude-coloured and faded toward the older end. The
- * selected aircraft's track is re-drawn on top in accent colour.
+ * LineSegments buffer, faded toward the older end. The selected aircraft's
+ * track is re-drawn on top in accent colour.
  */
-function Trails({ flights, tracks, selected }) {
+function Trails({ flights, tracks, selected, visible = true }) {
   const ref = useRef()
   const selRef = useRef()
   const positions = useMemo(() => new Float32Array(MAX_TRAIL_VERTS * 3), [])
   const colors = useMemo(() => new Float32Array(MAX_TRAIL_VERTS * 3), [])
   const selPositions = useMemo(() => new Float32Array(64 * 3), [])
   const a = useMemo(() => new THREE.Vector3(), [])
-  const color = useMemo(() => new THREE.Color(), [])
 
   useLayoutEffect(() => {
     const line = ref.current
@@ -247,12 +250,11 @@ function Trails({ flights, tracks, selected }) {
           positions[v * 3] = a.x
           positions[v * 3 + 1] = a.y
           positions[v * 3 + 2] = a.z
-          altColor(pts[j][2], false, color)
           // fade toward the older end of the trail
-          const fade = 0.2 + 0.8 * (j / (pts.length - 1))
-          colors[v * 3] = color.r * fade
-          colors[v * 3 + 1] = color.g * fade
-          colors[v * 3 + 2] = color.b * fade
+          const fade = 0.15 + 0.85 * (j / (pts.length - 1))
+          colors[v * 3] = TRAIL_COLOR.r * fade
+          colors[v * 3 + 1] = TRAIL_COLOR.g * fade
+          colors[v * 3 + 2] = TRAIL_COLOR.b * fade
           v++
         }
       }
@@ -261,7 +263,7 @@ function Trails({ flights, tracks, selected }) {
     g.attributes.position.needsUpdate = true
     g.attributes.color.needsUpdate = true
     g.setDrawRange(0, v)
-  }, [flights, tracks, positions, colors, a, color])
+  }, [flights, tracks, positions, colors, a])
 
   useLayoutEffect(() => {
     const line = selRef.current
@@ -279,7 +281,7 @@ function Trails({ flights, tracks, selected }) {
   }, [selected, flights, tracks, selPositions, a])
 
   return (
-    <group>
+    <group visible={visible}>
       <lineSegments ref={ref} frustumCulled={false}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[positions, 3]} />
@@ -318,7 +320,7 @@ function SelectionMarker({ flight }) {
   )
 }
 
-export default function FlightGlobe({ flights, tracks, selected, onSelect, height = 560, autoSpin = true }) {
+export default function FlightGlobe({ flights, tracks, selected, onSelect, height = 560, autoSpin = true, showTrails = true }) {
   return (
     <div style={{ height, width: '100%', background: 'radial-gradient(120% 120% at 50% 30%, #0a1017, #06080b)' }}>
       <CanvasFallback label="Live globe needs WebGL — unavailable on this device">
@@ -328,7 +330,7 @@ export default function FlightGlobe({ flights, tracks, selected, onSelect, heigh
           <Stars radius={60} depth={30} count={1200} factor={2} fade speed={0.4} />
           <group rotation={[0, 0, 0]}>
             <Earth />
-            <Trails flights={flights} tracks={tracks} selected={selected} />
+            <Trails flights={flights} tracks={tracks} selected={selected} visible={showTrails} />
             <Planes flights={flights} onSelect={onSelect} />
             <SelectionMarker flight={selected} />
           </group>

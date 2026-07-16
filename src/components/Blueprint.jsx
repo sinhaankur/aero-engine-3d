@@ -19,7 +19,7 @@
  */
 
 // Realistic narrowbody proportions, expressed as fractions of a core dimension.
-const RATIO = {
+export const RATIO = {
   noseFrac: 0.10, // nose taper length / fuselage length
   tailFrac: 0.20, // tail upsweep length / fuselage length
   wingRootFrac: 0.17, // wing root chord / length
@@ -148,7 +148,7 @@ function buildSchedule(aircraft, engineCount) {
 /* =====================================================================
  * Parametric airframe geometry (shared by the views)
  * ===================================================================== */
-function fuselagePath(x0, L, cy, r, upsweep = 0) {
+export function fuselagePath(x0, L, cy, r, upsweep = 0) {
   const noseLen = L * RATIO.noseFrac
   const tailLen = L * RATIO.tailFrac
   const noseX = x0 + noseLen
@@ -167,7 +167,7 @@ function fuselagePath(x0, L, cy, r, upsweep = 0) {
   ].join(' ')
 }
 
-function wingPath(x0, L, cy, r, span, dir) {
+export function wingPath(x0, L, cy, r, span, dir) {
   const leRoot = x0 + L * RATIO.wingLEFrac
   const rootChord = L * RATIO.wingRootFrac
   const tipChord = L * RATIO.wingTipFrac
@@ -185,7 +185,7 @@ function wingPath(x0, L, cy, r, span, dir) {
   ].join(' ')
 }
 
-function htPath(x0, L, cy, r, span, dir) {
+export function htPath(x0, L, cy, r, span, dir) {
   const leRoot = x0 + L * RATIO.finLEFrac
   const rootChord = L * RATIO.htRootFrac
   const tipChord = L * RATIO.htTipFrac

@@ -61,6 +61,7 @@ function DetailPanel({ flight, onClose }) {
 export default function LiveMapPage() {
   const { flights, tracks, time, status, count, configured } = useFlightData({ intervalMs: 15000 })
   const [selected, setSelected] = useState(null)
+  const [showPaths, setShowPaths] = useState(true)
 
   return (
     <div>
@@ -72,10 +73,12 @@ export default function LiveMapPage() {
         </span>
       </div>
       <p className="lede">
-        Every dot is a real aircraft, right now, from the airplanes.live ADS-B
-        network — plotted on the globe at its true position and altitude.
-        Colour runs from amber on the ground through green and cyan to white at
-        cruise. Drag to orbit, scroll to zoom, click a target to read its telemetry.
+        Every bright dot is a real aircraft, right now, from the airplanes.live
+        ADS-B network — plotted at its true position and altitude, colour running
+        from amber on the ground through green and cyan to white at cruise. The
+        dim blue lines behind them are flight paths, drawn as each aircraft moves
+        while you watch. Drag to orbit, scroll to zoom, click a target to read
+        its telemetry and highlight its track.
       </p>
 
       {!configured && (
@@ -99,9 +102,13 @@ export default function LiveMapPage() {
       <div className="live-body">
         <div className="live-globe">
           <Suspense fallback={<div className="viewport-loading" style={{ height: 560 }}>Loading globe…</div>}>
-            <FlightGlobe flights={flights} tracks={tracks} selected={selected} onSelect={setSelected} height={560} />
+            <FlightGlobe flights={flights} tracks={tracks} selected={selected} onSelect={setSelected} height={560} showTrails={showPaths} />
           </Suspense>
           <span className="live-attrib">Data · airplanes.live · ADS-B · via CORS proxy · refreshed every 15s</span>
+          <label className="sim-toggle live-paths-toggle" title="Paths build up while the page is open — dim blue history behind each bright plane">
+            <input type="checkbox" checked={showPaths} onChange={(e) => setShowPaths(e.target.checked)} />
+            Flight paths
+          </label>
         </div>
         <DetailPanel flight={selected} onClose={() => setSelected(null)} />
       </div>

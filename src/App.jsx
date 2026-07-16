@@ -17,6 +17,8 @@ function routeMeta(pathname) {
       return ['Live Air Traffic on a 3D Globe', 'Every airborne aircraft right now — real-time ADS-B positions, altitudes and flight paths, plotted on an interactive globe.']
     case 'simulate':
       return ['Flight Physics Simulator — Every Airbus, Any Wind', 'Pick any Airbus variant and fly its wing through calm air, gusts, turbulence and wind shear. Real lift physics computed from real specs.']
+    case 'compare':
+      return ['Compare Aircraft at True Scale', 'Overlay any two Airbus variants at true relative scale — plan and profile silhouettes plus a full spec delta table.']
     case 'systems':
       return ['How Aircraft Systems Work', "Interactive schematics of the A320's electrical, hydraulic, fly-by-wire, fuel, pneumatic and landing-gear systems — including what happens when they fail."]
     case 'projector':
@@ -63,6 +65,7 @@ export default function App() {
           <Link to="/">Index</Link>
           <Link to="/live">Live</Link>
           <Link to="/simulate">Simulate</Link>
+          <Link to="/compare">Compare</Link>
           <Link to="/systems">Systems</Link>
           <Link to="/projector">Projector</Link>
         </nav>

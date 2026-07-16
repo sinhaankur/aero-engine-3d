@@ -23,6 +23,7 @@ export default function AircraftPage() {
   const family = getFamily(familyId)
   const a = getAircraft(familyId, aircraftId)
   const [view, setView] = useState('3d')
+  const [explode, setExplode] = useState(0)
 
   if (!a) return <p>Aircraft not found. <Link to={`/family/${familyId}`}>Back</Link></p>
 
@@ -55,13 +56,25 @@ export default function AircraftPage() {
       <p className="lede">{a.summary}</p>
 
       {/* ---- 3D / blueprint toggle ---- */}
-      <div className="viewer-toggle">
-        <button className={view === '3d' ? 'on' : ''} onClick={() => setView('3d')}>3D model</button>
-        <button className={view === 'blueprint' ? 'on' : ''} onClick={() => setView('blueprint')}>Blueprint</button>
+      <div className="viewer-bar">
+        <div className="viewer-toggle">
+          <button className={view === '3d' ? 'on' : ''} onClick={() => setView('3d')}>3D model</button>
+          <button className={view === 'blueprint' ? 'on' : ''} onClick={() => setView('blueprint')}>Blueprint</button>
+        </div>
+        {view === '3d' && a.model && (
+          <label className="explode-ctrl" title="Spread the airframe into its components">
+            <span>Assembled</span>
+            <input
+              type="range" min="0" max="100" step="1" value={explode}
+              onChange={(e) => setExplode(+e.target.value)}
+            />
+            <span>Exploded</span>
+          </label>
+        )}
       </div>
       {view === '3d' ? (
         <Suspense fallback={<div className="viewport-loading">Loading 3D model…</div>}>
-          <AircraftViewer modelUrl={modelUrl} dimensions={d} engineCount={engineCount} />
+          <AircraftViewer modelUrl={modelUrl} dimensions={d} engineCount={engineCount} exploded={explode / 100} />
         </Suspense>
       ) : (
         <Blueprint
@@ -73,6 +86,16 @@ export default function AircraftPage() {
           wideBody={isWidebody}
         />
       )}
+      {/* function-focused cross-links: this page is the hub for visualising
+          the aircraft and how it works */}
+      <div className="ac-actions">
+        <Link className="ac-action" to={`/simulate?ac=${familyId}/${a.id}`}>
+          🌬 Fly this wing — lift, stall &amp; wind conditions
+        </Link>
+        <Link className="ac-action" to="/compare">⇄ Compare against another variant</Link>
+        <Link className="ac-action" to="/systems">⚙ How its systems work</Link>
+      </div>
+
       {!a.model && (
         <p className="model-note">
           Showing a parametric model generated from this aircraft's dimensions.

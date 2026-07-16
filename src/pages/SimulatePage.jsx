@@ -1,6 +1,6 @@
 import { lazy, Suspense, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { FAMILIES, getAircraftForFamily } from '../data/index.js'
+import { Link, useSearchParams } from 'react-router-dom'
+import { FAMILIES, getAircraftForFamily, getAircraft } from '../data/index.js'
 import AirfoilFlow, { WIND_CONDITIONS } from '../sim/AirfoilFlow.jsx'
 import FuelSystem from '../sim/FuelSystem.jsx'
 import WindTunnel from '../sim/WindTunnel.jsx'
@@ -53,9 +53,15 @@ function SpecMini({ aircraft }) {
  * selectable and the wind-condition chips drive the physics.
  */
 export default function SimulatePage() {
+  // deep-linkable: /simulate?ac=<familyId>/<aircraftId> preselects a variant
+  // (aircraft pages link here as "fly this wing")
+  const [searchParams] = useSearchParams()
+  const [initFam, initAc] = (searchParams.get('ac') || '').split('/')
+  const preselected = getAircraft(initFam, initAc)
+
   const [tab, setTab] = useState('aero')
-  const [familyId, setFamilyId] = useState('a320')
-  const [aircraftId, setAircraftId] = useState('a320')
+  const [familyId, setFamilyId] = useState(preselected ? initFam : 'a320')
+  const [aircraftId, setAircraftId] = useState(preselected ? initAc : 'a320')
   const [wind, setWind] = useState('calm')
   const stageRef = useRef(null)
 
