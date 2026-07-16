@@ -1,4 +1,4 @@
-import { isaAtmosphere } from './AirfoilFlow.jsx'
+import { isaAtmosphere } from './atmosphere.js'
 
 /**
  * The flight envelope, live: for the selected aircraft, which combinations of

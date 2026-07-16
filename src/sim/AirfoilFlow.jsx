@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { isaAtmosphere } from './atmosphere.js'
+import { VariablesLive, GoodVsBad } from './FlightFactors.jsx'
 
 /**
  * A 2D airflow-over-wing visualization. This is an intuition-builder, not a CFD
@@ -28,22 +30,6 @@ const STALL_DEG_ICED = 11  // ice accretion trips the flow much earlier
 const ICE_CL_PENALTY = 0.75 // iced wing keeps ~75% of its lift coefficient
 const KT = 0.514444        // knots -> m/s
 const G = 9.81
-
-// ISA troposphere (valid to 11 km): temperature falls 6.5 °C/km, pressure
-// follows the barometric power law, and a hot or cold day (ISA deviation)
-// shifts density at the same pressure altitude — the "density altitude" story.
-export function isaAtmosphere(altM, isaDevC = 0) {
-  const h = Math.min(altM, 11000)
-  const Tisa = 288.15 - 0.0065 * h
-  const p = 101325 * Math.pow(1 - (0.0065 * h) / 288.15, 5.2559)
-  const T = Tisa + isaDevC
-  return {
-    rho: p / (287.05 * T),               // kg/m³
-    pKpa: p / 1000,
-    tempC: T - 273.15,
-    soundMs: Math.sqrt(1.4 * 287.05 * T),
-  }
-}
 
 export const WIND_CONDITIONS = [
   { id: 'calm', name: 'Calm', blurb: 'Steady air — the baseline. Lift depends only on your speed, your angle of attack, and how thick the air is.' },
@@ -615,6 +601,9 @@ export default function AirfoilFlow({
           </div>
         </div>
       </details>
+
+      <VariablesLive out={out} S={S} mtowKg={stateRef.current.mtowKg} alt={alt} isaDev={isaDev} kt={kt} />
+      <GoodVsBad aircraft={aircraft} />
 
       {!fill && <p className="sim-note">{note}</p>}
     </div>

@@ -41,6 +41,23 @@ const RUNS = {
   },
 }
 
+/**
+ * Aerodynamically distinct representatives: within a family, variants share
+ * the wing and general configuration, so at this voxel fidelity their flow
+ * pictures are near-identical. Siblings show their representative's run,
+ * clearly labelled, instead of shipping hundreds of MB of duplicate video.
+ * (The A310 keeps its own slot — it genuinely has a different wing.)
+ */
+const REP_FOR = {
+  a318: 'a320', a319: 'a320', a321: 'a320', a321xlr: 'a320',
+  'b737-700': 'b737-800', 'b737-max8': 'b737-800',
+  'a220-100': 'a220-300',
+  'a330-200': 'a330-900', 'a330-300': 'a330-900', 'a330-800': 'a330-900',
+  'a350-1000': 'a350-900',
+  a300b4: 'a300-600',
+  'a310-200': 'a310-300',
+}
+
 function PendingRun({ aircraft }) {
   const d = aircraft.dimensions
   return (
@@ -67,14 +84,23 @@ function PendingRun({ aircraft }) {
 
 export default function WindTunnel({ aircraft }) {
   const [view, setView] = useState('hero')
-  const id = aircraft?.id ?? 'a320'
+  const ownId = aircraft?.id ?? 'a320'
   const name = aircraft ? short(aircraft.name) : 'A320'
-  const run = RUNS[id]
+  // exact run if baked; otherwise the family representative's run
+  const id = RUNS[ownId] ? ownId : REP_FOR[ownId] && RUNS[REP_FOR[ownId]] ? REP_FOR[ownId] : null
+  const run = id && RUNS[id]
 
   if (!run) return <PendingRun aircraft={aircraft} />
+  const isRep = id !== ownId
 
   return (
     <div className="sim-cfd">
+      {isRep && (
+        <p className="sim-blurb">
+          Showing the <b>{id.toUpperCase().replace('B737', '737')}</b> case — within a family the wing and
+          configuration are shared, so the flow picture is representative for the {name}.
+        </p>
+      )}
       <div className="sim-canvas-wrap">
         <video
           key={`${id}-${view}`}
@@ -88,7 +114,7 @@ export default function WindTunnel({ aircraft }) {
         />
         <div className="sim-readout">
           {Object.entries({
-            Aircraft: `${name} (our parametric model)`,
+            Aircraft: `${id.toUpperCase().replace('B737', '737')} (our parametric model)`,
             Condition: `${run.speed} · ${run.aoa}`,
             Grid: run.grid,
             Solver: run.solver,
