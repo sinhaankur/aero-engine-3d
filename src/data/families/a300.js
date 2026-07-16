@@ -39,6 +39,7 @@ export const a300Aircraft = [
     dimensions: {
       lengthM: 53.62,
       wingspanM: 44.84,
+      wingAreaM2: 260,
       heightM: 16.53,
       fuselageDiaM: 5.64,
       mtowKg: 165000,
@@ -82,6 +83,7 @@ export const a300Aircraft = [
     dimensions: {
       lengthM: 54.08,
       wingspanM: 44.84,
+      wingAreaM2: 260,
       heightM: 16.62,
       fuselageDiaM: 5.64,
       mtowKg: 170500,
@@ -125,6 +127,7 @@ export const a300Aircraft = [
     dimensions: {
       lengthM: 46.66,
       wingspanM: 43.89,
+      wingAreaM2: 219,
       heightM: 15.8,
       fuselageDiaM: 5.64,
       mtowKg: 142000,
@@ -166,6 +169,7 @@ export const a300Aircraft = [
     dimensions: {
       lengthM: 46.66,
       wingspanM: 43.89,
+      wingAreaM2: 219,
       heightM: 15.8,
       fuselageDiaM: 5.64,
       mtowKg: 164000,

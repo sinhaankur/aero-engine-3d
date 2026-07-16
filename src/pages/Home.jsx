@@ -9,61 +9,24 @@ import { SYSTEMS } from '../data/systems.js'
 // keeping it out of the initial bundle shared with every other route.
 const HeroPlane = lazy(() => import('../three/HeroPlane.jsx'))
 
-const pad = (n) => String(n).padStart(2, '0')
+const short = (name) => name.replace(/^Airbus /, '')
 
-// Flatten every aircraft across families, so the catalog can list them all.
-function allAircraft() {
-  return FAMILIES.flatMap((f) =>
-    getAircraftForFamily(f.id).map((a) => ({ ...a, familyName: f.name })),
-  )
-}
+/**
+ * Single-screen sitemap. The whole IA — every family, variant, engine, system
+ * and experience — is one click away without scrolling on a laptop display:
+ * masthead + live render up top, then three columns of the full catalog.
+ */
 
-// One row in a numbered index. `to` may be null → a "dead"/unlinked entry that
-// still shows in the catalog (the tol.is "awaiting_prompt" energy), elevated
-// here into an honest "not yet wired" marker.
-function Row({ n, name, desc, meta, tag, to }) {
-  const inner = (
-    <>
-      <span className="idx-num">{pad(n)}</span>
-      <span className="idx-main">
-        <span className="idx-name">{name}</span>
-        {desc && <span className="idx-desc">{desc}</span>}
-      </span>
-      <span className="idx-meta">
-        {meta && <span>{meta}</span>}
-        {tag && <span className={`idx-tag ${tag.kind || ''}`}>{tag.label}</span>}
-        {to && <span className="idx-arrow">→</span>}
-      </span>
-    </>
-  )
-  if (!to) return <div className="idx-row is-dead" title="Not wired yet">{inner}</div>
-  return <Link to={to} className="idx-row">{inner}</Link>
-}
-
-function Section({ hash, title, count, children }) {
-  return (
-    <>
-      <div className="idx-head">
-        <span className="hash">{hash}</span>
-        <span className="title">{title}</span>
-        {count != null && <span className="count">{count} {count === 1 ? 'entry' : 'entries'}</span>}
-      </div>
-      <div className="idx-list">{children}</div>
-    </>
-  )
-}
+const EXPLORE = [
+  { to: '/live', name: 'Live traffic', tag: { label: 'Live', kind: 'live' }, desc: 'Every real aircraft in the sky right now, plotted on a 3D globe from ADS-B.' },
+  { to: '/simulate', name: 'Simulate', tag: { label: 'Interactive', kind: 'live' }, desc: 'Pick any variant and drive lift, stalls, wind conditions, fuel flow and a real CFD wind tunnel.' },
+  { to: '/systems', name: 'Systems', tag: { label: 'Learn', kind: 'live' }, desc: 'How the electrics, hydraulics and fly-by-wire actually work, with live schematics.' },
+  { to: '/projector', name: 'Projector', tag: { label: 'APK', kind: 'soon' }, desc: 'Kiosk apps that turn a projector into a live aviation wall.' },
+]
 
 export default function Home() {
-  const aircraft = allAircraft()
   const engines = Object.values(ENGINES)
-  const stats = {
-    families: FAMILIES.length,
-    aircraft: aircraft.length,
-    engines: engines.length,
-    systems: SYSTEMS.length,
-  }
-
-  let i = 0 // running index across the whole catalog
+  const aircraftCount = FAMILIES.reduce((n, f) => n + getAircraftForFamily(f.id).length, 0)
 
   return (
     <div>
@@ -74,133 +37,124 @@ export default function Home() {
         <span className="v">ONLINE</span>
         <span className="sep">/</span>
         <span className="k">Archive</span>
-        <span className="v">{stats.families} families · {stats.aircraft} aircraft</span>
+        <span className="v">{FAMILIES.length} families · {aircraftCount} aircraft</span>
         <span className="spacer" />
         <Link to="/live">LIVE TRAFFIC →</Link>
       </div>
 
-      {/* ---- MASTHEAD ---- */}
-      <div className="masthead">
-        <h1>
-          Aircraft Design <span className="accent">Archive</span>
-          <span className="cursor">_</span>
-        </h1>
-        <p>
-          An interactive, engineering-grade catalog of aircraft families — every
-          variant in 3D, dimensioned blueprints, exploded engines, and the systems
-          that keep them flying. Pick an index entry below.
-        </p>
+      {/* ---- MASTHEAD + LIVE RENDER ---- */}
+      <div className="map-top">
+        <div className="map-mast">
+          <h1>
+            Aircraft Design <span className="accent">Archive</span>
+            <span className="cursor">_</span>
+          </h1>
+          <p>
+            An interactive, engineering-grade catalog of aircraft families — every
+            variant in 3D, dimensioned blueprints, exploded engines, live traffic
+            and the systems that keep them flying. Everything is one click away.
+          </p>
+          <div className="map-stats">
+            <div className="map-stat"><span className="n">{String(FAMILIES.length).padStart(2, '0')}</span><span className="l">Families</span></div>
+            <div className="map-stat"><span className="n">{String(aircraftCount).padStart(2, '0')}</span><span className="l">Aircraft</span></div>
+            <div className="map-stat"><span className="n">{String(engines.length).padStart(2, '0')}</span><span className="l">Engines</span></div>
+            <div className="map-stat"><span className="n">{String(SYSTEMS.length).padStart(2, '0')}</span><span className="l">Systems</span></div>
+          </div>
+        </div>
+        <div className="map-hero">
+          <span className="tag-corner">MODEL // <b>A320</b> · LIVE RENDER</span>
+          <Suspense fallback={<div className="viewport-loading" style={{ height: 230 }}>Loading model…</div>}>
+            <HeroPlane url="/models/a320.glb" height={230} />
+          </Suspense>
+        </div>
       </div>
 
-      {/* ---- ANIMATED MODEL VIEWPORT ---- */}
-      <div className="hero-viewport">
-        <span className="tag-corner">MODEL // <b>A320</b> · LIVE RENDER</span>
-        <Suspense fallback={<div className="viewport-loading" style={{ height: 340 }}>Loading model…</div>}>
-          <HeroPlane url="/models/a320.glb" height={340} />
-        </Suspense>
+      {/* ---- THE SITEMAP GRID ---- */}
+      <div className="map-grid">
+        {/* fleet: every family, every variant */}
+        <div className="map-col">
+          <div className="map-col-head">
+            <span className="hash">//</span>
+            <span>Fleet</span>
+            <span className="count">{FAMILIES.length} families · {aircraftCount} aircraft</span>
+          </div>
+          {FAMILIES.map((f) => {
+            const variants = getAircraftForFamily(f.id)
+            return (
+              <div key={f.id} className="map-fam">
+                <Link to={`/family/${f.id}`} className="map-fam-name">
+                  {f.name}<span className="map-fam-meta">{variants.length} variants →</span>
+                </Link>
+                <div className="map-chips">
+                  {variants.map((a) => (
+                    <Link key={a.id} to={`/family/${f.id}/${a.id}`} className="map-chip">
+                      {short(a.name)}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* engines + systems */}
+        <div className="map-col">
+          <div className="map-col-head">
+            <span className="hash">//</span>
+            <span>Engines</span>
+            <span className="count">{engines.length}</span>
+          </div>
+          <div className="map-chips">
+            {engines.map((e) => (
+              <Link
+                key={e.id}
+                to={`/engine/${e.id}`}
+                className={`map-chip ${ENGINE_MODELS[e.id] ? 'is-3d' : ''}`}
+                title={`${e.manufacturer} · ${e.thrustKn} kN${ENGINE_MODELS[e.id] ? ' · exploded 3D' : ''}`}
+              >
+                {e.name}
+              </Link>
+            ))}
+          </div>
+          <div className="map-col-head map-col-head-2">
+            <span className="hash">//</span>
+            <span>Systems</span>
+            <span className="count">{SYSTEMS.length}</span>
+          </div>
+          <div className="map-chips">
+            {SYSTEMS.map((s) => (
+              <Link key={s.id} to={`/systems/${s.id}`} className="map-chip">
+                {s.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* experiences + reference */}
+        <div className="map-col">
+          <div className="map-col-head">
+            <span className="hash">//</span>
+            <span>Explore</span>
+          </div>
+          {EXPLORE.map((x) => (
+            <Link key={x.to} to={x.to} className="map-big">
+              <span className="name">
+                {x.name}
+                <span className={`idx-tag ${x.tag.kind}`}>{x.tag.label}</span>
+              </span>
+              <span className="desc">{x.desc}</span>
+            </Link>
+          ))}
+          <div className="map-col-head map-col-head-2">
+            <span className="hash">//</span>
+            <span>Reference</span>
+          </div>
+          <div className="map-fine">
+            Nominal public specs; safety figures attributed per aircraft.
+            Roadmap: open aviation knowledge base + LLM — <code>docs/ROADMAP.md</code>.
+          </div>
+        </div>
       </div>
-
-      {/* ---- LIVE COUNTS ---- */}
-      <div className="count-strip">
-        <div className="count-cell"><span className="n">{pad(stats.families)}</span><span className="l">Families</span></div>
-        <div className="count-cell"><span className="n">{pad(stats.aircraft)}</span><span className="l">Aircraft</span></div>
-        <div className="count-cell"><span className="n">{pad(stats.engines)}</span><span className="l">Engines</span></div>
-        <div className="count-cell"><span className="n">{pad(stats.systems)}</span><span className="l">Systems</span></div>
-      </div>
-
-      {/* ---- FAMILIES ---- */}
-      <Section hash="//" title="Families" count={FAMILIES.length}>
-        {FAMILIES.map((f) => {
-          const count = getAircraftForFamily(f.id).length
-          i += 1
-          return (
-            <Row
-              key={f.id}
-              n={i}
-              name={f.name}
-              desc={f.tagline}
-              meta={`${count} variants`}
-              tag={{ label: 'Live', kind: 'live' }}
-              to={`/family/${f.id}`}
-            />
-          )
-        })}
-      </Section>
-
-      {/* ---- ALL AIRCRAFT ---- */}
-      <Section hash="//" title="Aircraft" count={aircraft.length}>
-        {aircraft.map((a) => {
-          i += 1
-          return (
-            <Row
-              key={a.id}
-              n={i}
-              name={a.name.replace(/^Airbus /, '')}
-              desc={`${a.dimensions.lengthM.toFixed(1)} m · ${a.dimensions.paxTypical} seats`}
-              meta={a.status.replace('-', ' ')}
-              tag={{ label: '3D', kind: 'live' }}
-              to={`/family/${a.familyId}/${a.id}`}
-            />
-          )
-        })}
-      </Section>
-
-      {/* ---- ENGINES ---- */}
-      <Section hash="//" title="Engines" count={engines.length}>
-        {engines.map((e) => {
-          i += 1
-          const hasModel = !!ENGINE_MODELS[e.id]
-          return (
-            <Row
-              key={e.id}
-              n={i}
-              name={e.name}
-              desc={`${e.thrustKn} kN · BPR ${e.bypassRatio} · Ø${e.fanDiameterM} m`}
-              meta={e.manufacturer}
-              tag={hasModel ? { label: 'Exploded 3D', kind: 'live' } : { label: 'Schematic', kind: 'soon' }}
-              to={`/engine/${e.id}`}
-            />
-          )
-        })}
-      </Section>
-
-      {/* ---- SYSTEMS ---- */}
-      <Section hash="//" title="Systems" count={SYSTEMS.length}>
-        {SYSTEMS.map((s) => {
-          i += 1
-          return (
-            <Row
-              key={s.id}
-              n={i}
-              name={s.name}
-              desc={s.summary?.slice(0, 68) + (s.summary && s.summary.length > 68 ? '…' : '')}
-              meta={`${s.components?.length ?? 0} components`}
-              tag={{ label: 'Schematic', kind: 'live' }}
-              to="/systems"
-            />
-          )
-        })}
-      </Section>
-
-      {/* ---- REFERENCE / ROADMAP (surfacing the currently-unlinked doc) ---- */}
-      <Section hash="//" title="Reference" count={2}>
-        <Row
-          n={(i += 1)}
-          name="Roadmap"
-          desc="Where this is going: open aviation knowledge base + LLM"
-          meta="docs/ROADMAP.md"
-          tag={{ label: 'Doc', kind: 'soon' }}
-          to={null}
-        />
-        <Row
-          n={(i += 1)}
-          name="Data sources"
-          desc="Nominal public specs; safety figures attributed per aircraft"
-          meta="public records"
-          tag={{ label: 'Note', kind: 'soon' }}
-          to={null}
-        />
-      </Section>
     </div>
   )
 }

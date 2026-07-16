@@ -24,6 +24,7 @@
  * @typedef {Object} Dimensions
  * @property {number} lengthM
  * @property {number} wingspanM
+ * @property {number} wingAreaM2       Reference wing area (nominal public figure).
  * @property {number} heightM
  * @property {number} fuselageDiaM
  * @property {number} mtowKg          Max takeoff weight.

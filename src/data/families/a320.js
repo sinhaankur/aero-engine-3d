@@ -33,6 +33,7 @@ export const a320Aircraft = [
     dimensions: {
       lengthM: 31.44,
       wingspanM: 35.8,
+      wingAreaM2: 122.6,
       heightM: 12.51,
       fuselageDiaM: 3.95,
       mtowKg: 68000,
@@ -73,6 +74,7 @@ export const a320Aircraft = [
     dimensions: {
       lengthM: 33.84,
       wingspanM: 35.8,
+      wingAreaM2: 122.6,
       heightM: 11.76,
       fuselageDiaM: 3.95,
       mtowKg: 75500,
@@ -112,6 +114,7 @@ export const a320Aircraft = [
     dimensions: {
       lengthM: 37.57,
       wingspanM: 35.8,
+      wingAreaM2: 122.6,
       heightM: 11.76,
       fuselageDiaM: 3.95,
       mtowKg: 78000,
@@ -154,6 +157,7 @@ export const a320Aircraft = [
     dimensions: {
       lengthM: 44.51,
       wingspanM: 35.8,
+      wingAreaM2: 128,
       heightM: 11.76,
       fuselageDiaM: 3.95,
       mtowKg: 93500,
@@ -193,6 +197,7 @@ export const a320Aircraft = [
     dimensions: {
       lengthM: 44.51,
       wingspanM: 35.8,
+      wingAreaM2: 128,
       heightM: 11.76,
       fuselageDiaM: 3.95,
       mtowKg: 101000,

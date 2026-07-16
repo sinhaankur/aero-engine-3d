@@ -38,6 +38,7 @@ export const a220Aircraft = [
     dimensions: {
       lengthM: 35.0,
       wingspanM: 35.1,
+      wingAreaM2: 112.3,
       heightM: 11.5,
       fuselageDiaM: 3.7,
       mtowKg: 63100,
@@ -81,6 +82,7 @@ export const a220Aircraft = [
     dimensions: {
       lengthM: 38.7,
       wingspanM: 35.1,
+      wingAreaM2: 112.3,
       heightM: 11.5,
       fuselageDiaM: 3.7,
       mtowKg: 70900,

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { SYSTEMS } from '../data/systems.js'
 import SystemSchematic from '../components/SystemSchematic.jsx'
 
@@ -10,9 +10,17 @@ import SystemSchematic from '../components/SystemSchematic.jsx'
  * diagram), and the redundancy/failure story. Built on A320 systems data.
  */
 export default function SystemsPage() {
-  const [activeSystem, setActiveSystem] = useState(SYSTEMS[0].id)
+  // deep-linkable: /systems/:systemId (used by the home sitemap) picks the tab
+  const { systemId } = useParams()
+  const [activeSystem, setActiveSystem] = useState(
+    SYSTEMS.some((s) => s.id === systemId) ? systemId : SYSTEMS[0].id,
+  )
   const [hoverNode, setHoverNode] = useState(null)
   const sys = SYSTEMS.find((s) => s.id === activeSystem) || SYSTEMS[0]
+
+  useEffect(() => {
+    if (systemId && SYSTEMS.some((s) => s.id === systemId)) setActiveSystem(systemId)
+  }, [systemId])
 
   return (
     <div>

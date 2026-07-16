@@ -38,6 +38,7 @@ export const a330Aircraft = [
     dimensions: {
       lengthM: 63.66,
       wingspanM: 60.3,
+      wingAreaM2: 361.6,
       heightM: 16.83,
       fuselageDiaM: 5.64,
       mtowKg: 242000,
@@ -81,6 +82,7 @@ export const a330Aircraft = [
     dimensions: {
       lengthM: 58.82,
       wingspanM: 60.3,
+      wingAreaM2: 361.6,
       heightM: 17.39,
       fuselageDiaM: 5.64,
       mtowKg: 242000,
@@ -123,6 +125,7 @@ export const a330Aircraft = [
     dimensions: {
       lengthM: 63.66,
       wingspanM: 64.0,
+      wingAreaM2: 372,
       heightM: 16.79,
       fuselageDiaM: 5.64,
       mtowKg: 251000,
@@ -164,6 +167,7 @@ export const a330Aircraft = [
     dimensions: {
       lengthM: 58.82,
       wingspanM: 64.0,
+      wingAreaM2: 372,
       heightM: 17.39,
       fuselageDiaM: 5.64,
       mtowKg: 251000,

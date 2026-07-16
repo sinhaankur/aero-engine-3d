@@ -21,6 +21,7 @@ const router = createHashRouter([
       { path: 'live', element: <LiveMapPage /> },
       { path: 'simulate', element: <SimulatePage /> },
       { path: 'systems', element: <SystemsPage /> },
+      { path: 'systems/:systemId', element: <SystemsPage /> },
       { path: 'projector', element: <ProjectorPage /> },
       { path: 'engine/:engineId', element: <EnginePage /> },
       { path: 'family/:familyId', element: <FamilyPage /> },

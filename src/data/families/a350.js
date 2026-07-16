@@ -38,6 +38,7 @@ export const a350Aircraft = [
     dimensions: {
       lengthM: 66.8,
       wingspanM: 64.75,
+      wingAreaM2: 442,
       heightM: 17.05,
       fuselageDiaM: 5.96,
       mtowKg: 283000,
@@ -81,6 +82,7 @@ export const a350Aircraft = [
     dimensions: {
       lengthM: 73.78,
       wingspanM: 64.75,
+      wingAreaM2: 464.3,
       heightM: 17.08,
       fuselageDiaM: 5.96,
       mtowKg: 322000,

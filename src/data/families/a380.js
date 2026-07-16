@@ -38,6 +38,7 @@ export const a380Aircraft = [
     dimensions: {
       lengthM: 72.72,
       wingspanM: 79.75,
+      wingAreaM2: 845,
       heightM: 24.09,
       fuselageDiaM: 7.14,
       mtowKg: 575000,
