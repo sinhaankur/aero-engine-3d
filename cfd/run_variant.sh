@@ -17,6 +17,10 @@ LEN="${2:?length in metres, e.g. 39.47}"
 AREA="${3:?wing area in m2, e.g. 124.6}"
 AOA="${4:-8}"
 
+# C++ float literals need a decimal point: 372f is a compile error, 372.0f isn't
+case "$LEN"  in *.*) ;; *) LEN="${LEN}.0"  ;; esac
+case "$AREA" in *.*) ;; *) AREA="${AREA}.0" ;; esac
+
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 FX3D="${FLUIDX3D_DIR:-"$(dirname "$REPO")/FluidX3D"}"
 BLENDER="${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender}"
