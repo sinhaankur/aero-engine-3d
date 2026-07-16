@@ -111,13 +111,26 @@ function camber(xc, m = 0.02, p = 0.4) {
 
 const FALLBACK_DIMS = { mtowKg: 78000, wingAreaM2: 122.6 }
 
-export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420, fill = false }) {
+export default function AirfoilFlow({
+  aircraft, wind = 'calm', height = 420, fill = false,
+  // controls may be owned by the parent (SimulatePage shares them with the
+  // flight-envelope chart); uncontrolled falls back to internal state
+  aoa: aoaProp, onAoa, kt: ktProp, onKt, alt: altProp, onAlt, isaDev: isaDevProp, onIsaDev,
+}) {
   const canvasRef = useRef(null)
-  const [aoa, setAoa] = useState(6)        // angle of attack, degrees
-  const [kt, setKt] = useState(250)        // airspeed, knots (TAS)
-  const [alt, setAlt] = useState(0)        // pressure altitude, metres
-  const [isaDev, setIsaDev] = useState(0)  // day temperature vs ISA, °C
+  const [aoaI, setAoaI] = useState(6)        // angle of attack, degrees
+  const [ktI, setKtI] = useState(250)        // airspeed, knots (TAS)
+  const [altI, setAltI] = useState(0)        // pressure altitude, metres
+  const [isaDevI, setIsaDevI] = useState(0)  // day temperature vs ISA, °C
   const [showPressure, setShowPressure] = useState(true)
+  const aoa = aoaProp ?? aoaI
+  const setAoa = onAoa ?? setAoaI
+  const kt = ktProp ?? ktI
+  const setKt = onKt ?? setKtI
+  const alt = altProp ?? altI
+  const setAlt = onAlt ?? setAltI
+  const isaDev = isaDevProp ?? isaDevI
+  const setIsaDev = onIsaDev ?? setIsaDevI
 
   const dims = aircraft?.dimensions || FALLBACK_DIMS
   const shortName = (aircraft?.name || 'Airbus A320').replace(/^(Airbus|Boeing) /, '')

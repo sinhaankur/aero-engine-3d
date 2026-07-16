@@ -2,6 +2,7 @@ import { lazy, Suspense, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { FAMILIES, getAircraftForFamily, getAircraft } from '../data/index.js'
 import AirfoilFlow, { WIND_CONDITIONS } from '../sim/AirfoilFlow.jsx'
+import FlightEnvelope from '../sim/FlightEnvelope.jsx'
 import FuelSystem from '../sim/FuelSystem.jsx'
 import WindTunnel from '../sim/WindTunnel.jsx'
 
@@ -63,6 +64,11 @@ export default function SimulatePage() {
   const [familyId, setFamilyId] = useState(preselected ? initFam : 'a320')
   const [aircraftId, setAircraftId] = useState(preselected ? initAc : 'a320')
   const [wind, setWind] = useState('calm')
+  // sim controls live here so the flight-envelope chart shares them
+  const [aoa, setAoa] = useState(6)
+  const [kt, setKt] = useState(250)
+  const [alt, setAlt] = useState(0)
+  const [isaDev, setIsaDev] = useState(0)
   const stageRef = useRef(null)
 
   const variants = getAircraftForFamily(familyId)
@@ -153,12 +159,22 @@ export default function SimulatePage() {
                 <p>{aircraft.summary}</p>
               </div>
               <SpecMini aircraft={aircraft} />
+              <div className="sim-env-head">// Flight envelope — where it works</div>
+              <FlightEnvelope aircraft={aircraft} kt={kt} alt={alt} isaDev={isaDev} />
               <Link className="sim-showcase-link" to={`/family/${familyId}/${aircraft.id}`}>
                 Full profile: blueprint · engines · safety →
               </Link>
             </aside>
             <div className="sim-flow">
-              <AirfoilFlow fill aircraft={aircraft} wind={wind} />
+              <AirfoilFlow
+                fill
+                aircraft={aircraft}
+                wind={wind}
+                aoa={aoa} onAoa={setAoa}
+                kt={kt} onKt={setKt}
+                alt={alt} onAlt={setAlt}
+                isaDev={isaDev} onIsaDev={setIsaDev}
+              />
             </div>
           </div>
         </>

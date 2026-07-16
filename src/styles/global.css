@@ -632,6 +632,12 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
   .sim-wind-note { width: 100%; margin-left: 66px; }
 }
 
+/* simulate: flight envelope chart in the showcase rail */
+.sim-env-head { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.sim-env svg { width: 100%; display: block; background: var(--bg); border: 1px solid var(--border); }
+.sim-env-cap { font-size: 10.5px; letter-spacing: 0.05em; margin-top: 5px; font-variant-numeric: tabular-nums; }
+.sim-env-legend { display: flex; gap: 12px; font-size: 9.5px; margin-top: 3px; letter-spacing: 0.03em; }
+
 /* simulate: the live math panel — equations with current values substituted */
 .sim-math { margin-top: 12px; border: 1px solid var(--border); background: var(--bg-2); }
 .sim-math summary {
