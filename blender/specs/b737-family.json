@@ -1,0 +1,41 @@
+[
+  {
+    "id": "b737-700",
+    "length": 33.63,
+    "fuse_dia": 3.76,
+    "wingspan": 35.79,
+    "height": 12.55,
+    "sweep_deg": 25,
+    "engine_count": 2,
+    "fan_dia": 1.55,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#0f2f6d"
+  },
+  {
+    "id": "b737-800",
+    "length": 39.47,
+    "fuse_dia": 3.76,
+    "wingspan": 35.79,
+    "height": 12.55,
+    "sweep_deg": 25,
+    "engine_count": 2,
+    "fan_dia": 1.55,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#0f2f6d"
+  },
+  {
+    "id": "b737-max8",
+    "length": 39.52,
+    "fuse_dia": 3.76,
+    "wingspan": 35.92,
+    "height": 12.3,
+    "sweep_deg": 25,
+    "engine_count": 2,
+    "fan_dia": 1.76,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#0f2f6d"
+  }
+]

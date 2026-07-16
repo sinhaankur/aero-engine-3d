@@ -87,7 +87,7 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420, fil
   const [showPressure, setShowPressure] = useState(true)
 
   const dims = aircraft?.dimensions || FALLBACK_DIMS
-  const shortName = (aircraft?.name || 'Airbus A320').replace(/^Airbus /, '')
+  const shortName = (aircraft?.name || 'Airbus A320').replace(/^(Airbus|Boeing) /, '')
   const stateRef = useRef({})
   stateRef.current = {
     aoa, kt, showPressure, wind,

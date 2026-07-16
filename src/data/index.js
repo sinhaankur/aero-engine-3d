@@ -4,6 +4,7 @@ import { a330Family, a330Aircraft } from './families/a330.js'
 import { a350Family, a350Aircraft } from './families/a350.js'
 import { a380Family, a380Aircraft } from './families/a380.js'
 import { a300Family, a300Aircraft } from './families/a300.js'
+import { b737Family, b737Aircraft } from './families/b737.js'
 import { ENGINES } from './engines.js'
 
 /**
@@ -14,6 +15,7 @@ import { ENGINES } from './engines.js'
 
 export const FAMILIES = [
   { ...a320Family, stub: false },
+  { ...b737Family, stub: false },
   { ...a220Family, stub: false },
   { ...a330Family, stub: false },
   { ...a350Family, stub: false },
@@ -23,6 +25,7 @@ export const FAMILIES = [
 
 export const AIRCRAFT_BY_FAMILY = {
   a320: a320Aircraft,
+  b737: b737Aircraft,
   a220: a220Aircraft,
   a330: a330Aircraft,
   a350: a350Aircraft,

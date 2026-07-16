@@ -126,7 +126,7 @@ def obj_from_bm(bm, name, material, smooth=True):
     return ob
 
 
-def naca4(t_max, n=16):
+def naca4(t_max, n=32):
     """
     Half-thickness distribution of a symmetric NACA-4 airfoil over x in [0,1],
     returned as (x, y_half) pairs from LE to TE. `t_max` is max thickness ratio.
@@ -143,7 +143,7 @@ def naca4(t_max, n=16):
     return pts
 
 
-def airfoil_loop(chord, t_ratio, camber, n=16):
+def airfoil_loop(chord, t_ratio, camber, n=32):
     """
     Closed airfoil outline as ordered (dx, dy) offsets around the section, TE ->
     upper -> LE -> lower -> TE. dx runs 0..chord (LE at 0), dy is vertical.
@@ -182,7 +182,7 @@ def build_fuselage(spec, materials):
 
     stations = []  # (x, radius_scale, vertical_center_offset, vertical_scale)
     # nose: rounded ogive growing from a near-point, drooped slightly down
-    NN = 12
+    NN = 26
     for i in range(NN):
         t = i / (NN - 1)
         x = -L / 2 + nose * t
@@ -190,13 +190,13 @@ def build_fuselage(spec, materials):
         droop = -R * droop_amt * (1 - t) ** 2   # nose tip sits low
         stations.append((x, rs, droop, 1.0))
     # cabin: constant, finely sampled so window/door cuts land cleanly later
-    NC = 16
+    NC = 30
     for i in range(1, NC + 1):
         t = i / NC
         x = x_nose_end + (x_tail_start - x_nose_end) * t
         stations.append((x, 1.0, 0.0, 1.0))
     # tail: shrink + upsweep toward the fin
-    NT = 14
+    NT = 30
     for i in range(1, NT + 1):
         t = i / NT
         x = x_tail_start + tail * t
@@ -204,7 +204,7 @@ def build_fuselage(spec, materials):
         up = R * 0.62 * (t ** 1.7)
         stations.append((x, max(rs, 0.015), up, 1.0 - 0.12 * t))
 
-    seg = 64
+    seg = 112
     # real A380 section is ~8.4 m tall × 7.1 m wide -> ~1.18× taller than wide
     v_scale_deck = 1.20 if decks == 2 else 1.0
     bm = bmesh.new()
@@ -261,7 +261,7 @@ def build_wing(spec, materials, side, fuse):
         camber = 0.020
         le_x = x_le_root + math.tan(sweep) * (z - z_root)
         y = y_root + math.tan(dihedral) * (z - z_root)
-        loop = airfoil_loop(chord, t_ratio, camber, n=18)
+        loop = airfoil_loop(chord, t_ratio, camber, n=36)
         tw = math.radians(twist)
         ring = []
         for (dx, dy) in loop:
@@ -445,7 +445,7 @@ def build_engine(spec, materials, side, index, fuse):
         (x_back - nac_len * 0.06, nac_r * 0.70),
         (x_back, nac_r * 0.60),
     ]
-    seg = 28
+    seg = 56
     bm = bmesh.new()
     rings = []
     for (px, pr) in prof:

@@ -4,9 +4,9 @@ import { getFamily, getAircraft, getEngine } from './data/index.js'
 
 const BASE_TITLE = 'Aircraft Design Archive'
 const BASE_DESC =
-  'An interactive encyclopedia of aircraft families: rotate every Airbus ' +
-  'variant in 3D, read engineering blueprints, explode the engines, simulate ' +
-  'the physics and explore attributed safety records.'
+  'An interactive encyclopedia of aircraft families: rotate every Airbus and ' +
+  'Boeing variant in 3D, read engineering blueprints, explode the engines, ' +
+  'simulate the physics and explore attributed safety records.'
 
 // per-route <title> + meta description, resolved from the data layer so
 // aircraft/engine pages get real names in search results and link previews
@@ -50,6 +50,33 @@ function RouteEffects() {
     document.querySelector('meta[name="description"]')?.setAttribute('content', desc)
     window.scrollTo(0, 0)
   }, [pathname])
+
+  // scroll-reveal: catalog blocks drift in as they enter the viewport, with a
+  // light stagger — skipped entirely under prefers-reduced-motion
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const els = document.querySelectorAll(
+      '.section-title, .map-col, .engine-card, .sys-card, .spec-grid, .cmp-body, .proj-card, .safety-panel, .count-strip',
+    )
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            e.target.classList.add('revealed')
+            io.unobserve(e.target)
+          }
+        }
+      },
+      { threshold: 0.08 },
+    )
+    els.forEach((el, i) => {
+      el.classList.add('will-reveal')
+      el.style.transitionDelay = `${Math.min(i * 45, 270)}ms`
+      io.observe(el)
+    })
+    return () => io.disconnect()
+  }, [pathname])
+
   return null
 }
 
@@ -57,6 +84,9 @@ export default function App() {
   return (
     <div className="app">
       <RouteEffects />
+      {/* drawing-sheet frame: the faint bordered/ticked edge of an engineering
+          drawing, fixed around the whole viewport */}
+      <div className="sheet-frame" aria-hidden />
       <header className="topbar">
         <Link to="/" className="brand">
           <span className="brand-mark">✈</span> ADA / Aircraft Design Archive

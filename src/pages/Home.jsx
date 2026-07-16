@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { FAMILIES, getAircraftForFamily } from '../data/index.js'
 import { ENGINES } from '../data/engines.js'
@@ -9,7 +9,7 @@ import { SYSTEMS } from '../data/systems.js'
 // keeping it out of the initial bundle shared with every other route.
 const HeroPlane = lazy(() => import('../three/HeroPlane.jsx'))
 
-const short = (name) => name.replace(/^Airbus /, '')
+const short = (name) => name.replace(/^(Airbus|Boeing) /, '')
 
 /**
  * Single-screen sitemap. The whole IA — every family, variant, engine, system
@@ -28,6 +28,27 @@ const EXPLORE = [
 export default function Home() {
   const engines = Object.values(ENGINES)
   const aircraftCount = FAMILIES.reduce((n, f) => n + getAircraftForFamily(f.id).length, 0)
+
+  // pointer-parallax on the hero tile: the render tilts a few degrees toward
+  // the cursor, like handling a desk model. No-op under reduced motion.
+  const heroRef = useRef(null)
+  const tiltRaf = useRef(0)
+  const onHeroMove = (e) => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const el = heroRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const x = (e.clientX - r.left) / r.width - 0.5
+    const y = (e.clientY - r.top) / r.height - 0.5
+    cancelAnimationFrame(tiltRaf.current)
+    tiltRaf.current = requestAnimationFrame(() => {
+      el.style.transform = `perspective(900px) rotateX(${(-y * 4).toFixed(2)}deg) rotateY(${(x * 6).toFixed(2)}deg)`
+    })
+  }
+  const onHeroLeave = () => {
+    cancelAnimationFrame(tiltRaf.current)
+    if (heroRef.current) heroRef.current.style.transform = ''
+  }
 
   return (
     <div>
@@ -62,7 +83,7 @@ export default function Home() {
             <div className="map-stat"><span className="n">{String(SYSTEMS.length).padStart(2, '0')}</span><span className="l">Systems</span></div>
           </div>
         </div>
-        <div className="map-hero">
+        <div className="map-hero" ref={heroRef} onMouseMove={onHeroMove} onMouseLeave={onHeroLeave}>
           <span className="tag-corner">MODEL // <b>A320</b> · LIVE RENDER</span>
           <Suspense fallback={<div className="viewport-loading" style={{ height: 230 }}>Loading model…</div>}>
             <HeroPlane url="/models/a320.glb" height={230} />

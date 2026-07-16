@@ -29,12 +29,40 @@ body {
   font: 14px/1.55 var(--mono);
   -webkit-font-smoothing: antialiased;
   overflow-x: clip; /* the full-bleed sim stage uses 100vw, which includes the scrollbar */
-  /* faint engineering grid */
+  /* layered engineering grid: fine + major lines + an ambient glow. All layers
+     are viewport-fixed while content scrolls over them — cheap, GPU-friendly
+     parallax depth, like sliding a sheet across a light table. */
   background-image:
-    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-  background-size: 28px 28px;
+    radial-gradient(90% 60% at 70% -10%, rgba(216,255,62,0.045), transparent 60%),
+    radial-gradient(70% 50% at 10% 110%, rgba(62,140,200,0.05), transparent 60%),
+    linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 140px 140px, 140px 140px, 28px 28px, 28px 28px;
+  background-attachment: fixed;
 }
+
+/* drawing-sheet frame: faint border + station ticks around the viewport,
+   echoing the zone frame of the GA blueprints */
+.sheet-frame { position: fixed; inset: 7px; border: 1px solid rgba(255,255,255,0.06); pointer-events: none; z-index: 60; }
+.sheet-frame::before, .sheet-frame::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 5px;
+  background: repeating-linear-gradient(90deg, transparent 0 69px, rgba(255,255,255,0.10) 69px 70px);
+}
+.sheet-frame::before { top: 0; }
+.sheet-frame::after { bottom: 0; }
+@media (max-width: 720px) { .sheet-frame { display: none; } }
+
+/* scroll-reveal (classes applied by RouteEffects; skipped under reduced motion) */
+.will-reveal { opacity: 0; transform: translateY(14px); }
+.will-reveal.revealed {
+  opacity: 1; transform: none;
+  transition: opacity .55s ease, transform .55s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* pointer-parallax hero tile eases back when the cursor leaves */
+.map-hero { transition: transform .35s ease; will-change: transform; }
 
 a { color: var(--ink); text-decoration: none; }
 a:hover { color: var(--accent); }

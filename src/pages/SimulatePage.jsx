@@ -18,7 +18,7 @@ const TAB_BLURB = {
   cfd: 'A real GPU CFD run over our A320 model — vortices and all.',
 }
 
-const shortName = (name) => name.replace(/^Airbus /, '')
+const shortName = (name) => name.replace(/^(Airbus|Boeing) /, '')
 
 /** Compact per-variant performance cells for the showcase rail. */
 function SpecMini({ aircraft }) {

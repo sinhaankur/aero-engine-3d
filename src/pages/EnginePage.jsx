@@ -98,7 +98,7 @@ export default function EnginePage() {
             <Link key={`${a.familyId}-${a.id}`} to={`/family/${a.familyId}/${a.id}`} className="idx-row">
               <span className="idx-num">{a.familyName.replace(' Family', '')}</span>
               <span className="idx-main">
-                <span className="idx-name">{a.name.replace(/^Airbus /, '')}</span>
+                <span className="idx-name">{a.name.replace(/^(Airbus|Boeing) /, '')}</span>
                 <span className="idx-desc">{a.dimensions.paxTypical} seats · {a.dimensions.rangeKm.toLocaleString()} km</span>
               </span>
               <span className="idx-meta"><span className="idx-arrow">→</span></span>

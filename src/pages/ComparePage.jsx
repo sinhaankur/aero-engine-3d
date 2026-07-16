@@ -6,7 +6,7 @@ import CompareOverlay from '../components/CompareOverlay.jsx'
 const COLOR_A = '#d8ff3e'
 const COLOR_B = '#86b7ff'
 
-const short = (name) => name.replace(/^Airbus /, '')
+const short = (name) => name.replace(/^(Airbus|Boeing) /, '')
 
 function VariantSelect({ value, onChange, label, color }) {
   return (
