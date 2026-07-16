@@ -54,6 +54,46 @@ body {
 .sheet-frame::after { bottom: 0; }
 @media (max-width: 720px) { .sheet-frame { display: none; } }
 
+/* night-flight atmosphere: two cloud strata drifting at different speeds and
+   a passing contrail. All fixed, pointer-inert, and behind the content; the
+   global reduced-motion rule freezes the drift and hides the contrail. */
+.atmosphere { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
+.clouds {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 200%;
+  background-repeat: repeat-x; background-size: 50% 100%; will-change: transform;
+}
+.clouds-a {
+  background-image:
+    radial-gradient(38% 22% at 12% 20%, rgba(120,150,190,0.10), transparent 70%),
+    radial-gradient(30% 18% at 38% 68%, rgba(100,130,170,0.08), transparent 70%),
+    radial-gradient(42% 24% at 72% 34%, rgba(120,150,190,0.09), transparent 70%);
+  animation: cloud-drift 260s linear infinite;
+}
+.clouds-b {
+  background-image:
+    radial-gradient(26% 16% at 22% 82%, rgba(140,170,210,0.07), transparent 70%),
+    radial-gradient(34% 20% at 58% 12%, rgba(110,140,180,0.08), transparent 70%),
+    radial-gradient(24% 14% at 88% 58%, rgba(140,170,210,0.06), transparent 70%);
+  animation: cloud-drift 160s linear infinite;
+}
+@keyframes cloud-drift { to { transform: translateX(-50%); } }
+.contrail {
+  position: absolute; top: 15%; left: -28%; width: 26%; height: 1.5px; opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(190,210,235,0.35));
+  animation: contrail-pass 95s linear infinite;
+  animation-delay: 8s;
+}
+.contrail-plane {
+  position: absolute; right: -13px; top: -8px; font-size: 11px;
+  color: rgba(200,220,240,0.65); transform: rotate(45deg);
+}
+@keyframes contrail-pass {
+  0%, 76% { opacity: 0; transform: translateX(0); }
+  79% { opacity: 0.8; }
+  97% { opacity: 0.8; }
+  100% { opacity: 0; transform: translateX(560%); }
+}
+
 /* scroll-reveal (classes applied by RouteEffects; skipped under reduced motion) */
 .will-reveal { opacity: 0; transform: translateY(14px); }
 .will-reveal.revealed {

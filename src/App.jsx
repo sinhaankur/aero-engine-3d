@@ -87,6 +87,14 @@ export default function App() {
       {/* drawing-sheet frame: the faint bordered/ticked edge of an engineering
           drawing, fixed around the whole viewport */}
       <div className="sheet-frame" aria-hidden />
+      {/* night-flight atmosphere: cloud layers drifting at different speeds
+          behind the content, and a tiny aircraft that draws a contrail across
+          the sky every minute or two */}
+      <div className="atmosphere" aria-hidden>
+        <div className="clouds clouds-a" />
+        <div className="clouds clouds-b" />
+        <div className="contrail"><span className="contrail-plane">✈</span></div>
+      </div>
       <header className="topbar">
         <Link to="/" className="brand">
           <span className="brand-mark">✈</span> ADA / Aircraft Design Archive

@@ -96,7 +96,7 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420, fil
   }
 
   // live readout, pushed from the animation loop at ~8 Hz
-  const [out, setOut] = useState({ cl: liftCoef(6), ktEff: 250, tonnes: 0, pct: 0, stalled: false, shear: false })
+  const [out, setOut] = useState({ cl: liftCoef(6), ktEff: 250, qKpa: 0, tonnes: 0, pct: 0, stalled: false, shear: false, buffet: false })
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -143,7 +143,12 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420, fil
       return [g.cx + rx, g.cy + ry]
     }
 
-    function drawAirfoil(g, aoaRad, stalled) {
+    function drawAirfoil(g, aoaRad, stalled, spdFrac, buffet) {
+      ctx.save()
+      // high-speed buffet: the airframe trembles as airspeed nears Vmo
+      if (buffet > 0.01) {
+        ctx.translate((Math.random() - 0.5) * 2.6 * buffet, (Math.random() - 0.5) * 2.6 * buffet)
+      }
       ctx.beginPath()
       const N = 40
       for (let i = 0; i <= N; i++) {
@@ -163,7 +168,9 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420, fil
       ctx.fill()
       ctx.stroke()
 
-      // pressure hint: low-pressure blue wash over the upper surface
+      // pressure hint: low-pressure blue wash over the upper surface.
+      // Its intensity and reach scale with dynamic pressure (∝ V²), so winding
+      // the speed up makes the suction zone visibly bloom.
       if (stateRef.current.showPressure) {
         ctx.save()
         ctx.globalCompositeOperation = 'lighter'
@@ -172,12 +179,13 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420, fil
           const [px, py] = surfacePoint(xc, true, g, aoaRad)
           const boost = Math.max(0, 1 - Math.abs(xc - 0.25) * 1.6)
           ctx.beginPath()
-          ctx.arc(px, py - 3, 10, 0, Math.PI * 2)
-          ctx.fillStyle = `rgba(62,200,255,${0.05 * boost})`
+          ctx.arc(px, py - 3, 10 + 7 * spdFrac, 0, Math.PI * 2)
+          ctx.fillStyle = `rgba(62,200,255,${(0.04 + 0.10 * spdFrac * spdFrac) * boost})`
           ctx.fill()
         }
         ctx.restore()
       }
+      ctx.restore()
     }
 
     // particle field. Spread initial x across the whole width so the flow is
@@ -211,19 +219,26 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420, fil
       const flowRad = (aoaEff * Math.PI) / 180
       const stall = aoaEff > STALL_DEG
       const vx = 0.4 + ktEff / 70            // base horizontal speed, canvas units
+      // 0 at 120 kt -> 1 at 350 kt: drives all the "energy" visuals below
+      const spdFrac = Math.min(1, Math.max(0, (ktEff - 120) / 230))
+      // approaching Vmo (~350 kt for these narrowbodies): overspeed buffet
+      const buffet = Math.max(0, Math.min(1.2, (ktEff - 330) / 20))
 
-      // trails: fade the canvas instead of clearing, for streak lines
-      ctx.fillStyle = 'rgba(8,9,11,0.28)'
+      // trails: fade the canvas instead of clearing, for streak lines — fade
+      // less at speed so the streaks linger and the whole field rushes
+      ctx.fillStyle = `rgba(8,9,11,${0.30 - 0.14 * spdFrac})`
       ctx.fillRect(0, 0, g.w, g.h)
 
-      // keep the pool full
-      while (particles.length < 520) particles.push(spawn(g))
+      // the pool densifies as the wind winds up
+      const targetN = 520 + Math.round(460 * spdFrac)
+      while (particles.length < targetN) particles.push(spawn(g))
 
       const leX = g.cx - 0.25 * g.chord * Math.cos(aoaRad)
       const crestX = g.cx                                  // ~mid chord
       const teX = g.cx + 0.75 * g.chord * Math.cos(aoaRad) // trailing edge x
 
-      for (const p of particles) {
+      for (let pi = 0; pi < Math.min(particles.length, targetN); pi++) {
+        const p = particles[pi]
         p.life += 1
         // vertical deflection: air near the airfoil band bends around it
         const nearBand = Math.abs(p.y - g.cy) < g.chord * 0.5 &&
@@ -269,23 +284,27 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420, fil
         p.x += dvx
         p.y += dvy
 
-        // draw as a short streak
+        // draw as a streak: longer, brighter and hotter as speed rises —
+        // the fastest air over the crest blooms from cyan toward white
         const sp = Math.min(1, (dvx - vx * 0.8) / (vx * 0.9))
+        const stretch = 1.4 + 2.4 * spdFrac
         let col
         if (p.turb > 0.05) col = `rgba(255,157,77,${0.5 + p.turb * 0.4})`
-        else if (sp > 0.15) col = 'rgba(62,200,255,0.75)'  // fast = low pressure
-        else col = 'rgba(150,168,190,0.5)'
+        else if (sp > 0.15) {
+          const hot = sp * spdFrac
+          col = `rgba(${Math.round(62 + 170 * hot)},${Math.round(200 + 45 * hot)},255,${0.65 + 0.3 * spdFrac})`
+        } else col = `rgba(150,168,190,${0.45 + 0.25 * spdFrac})`
         ctx.strokeStyle = col
-        ctx.lineWidth = p.turb > 0.05 ? 1.6 : 1
+        ctx.lineWidth = (p.turb > 0.05 ? 1.6 : 1) + 0.5 * spdFrac
         ctx.beginPath()
         ctx.moveTo(p.x, p.y)
-        ctx.lineTo(p.x - dvx * 1.4, p.y - dvy * 1.4)
+        ctx.lineTo(p.x - dvx * stretch, p.y - dvy * stretch)
         ctx.stroke()
 
         if (p.x > g.w + 20 || p.y < -20 || p.y > g.h + 20) reset(p, g)
       }
 
-      drawAirfoil(g, aoaRad, stall)
+      drawAirfoil(g, aoaRad, stall, spdFrac, buffet)
 
       // push the physics readout to React, throttled
       if (t - lastOut > 0.12) {
@@ -296,10 +315,12 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420, fil
         setOut({
           cl,
           ktEff,
+          qKpa: (0.5 * RHO * v * v) / 1000,
           tonnes: liftN / G / 1000,
           pct: (liftN / (st.mtowKg * G)) * 100,
           stalled: stall,
           shear: env.shear,
+          buffet: buffet > 0.05,
         })
       }
 
@@ -340,7 +361,7 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420, fil
           <div className={`sim-lift ${out.stalled ? 'is-stall' : ''}`}>
             <span className="k">Lift</span>
             <span className="v">{out.tonnes.toFixed(0)} t</span>
-            <span className="k2">Cₗ {out.cl.toFixed(2)} · {Math.round(out.ktEff)} kt eff</span>
+            <span className="k2">Cₗ {out.cl.toFixed(2)} · {Math.round(out.ktEff)} kt eff · q {out.qKpa.toFixed(1)} kPa</span>
           </div>
           <div className="sim-liftbar">
             <div className="sim-liftbar-fill" style={{ width: `${barPct}%` }} />
@@ -351,6 +372,7 @@ export default function AirfoilFlow({ aircraft, wind = 'calm', height = 420, fil
           </div>
           {out.stalled && <div className="sim-stall-tag">STALL · FLOW SEPARATED</div>}
           {out.shear && <div className="sim-stall-tag">WIND SHEAR · AIRSPEED LOST</div>}
+          {out.buffet && !out.stalled && <div className="sim-stall-tag">HIGH-SPEED BUFFET · NEAR Vmo</div>}
         </div>
         {fill && <p className="sim-note sim-note-hud">{note}</p>}
       </div>
