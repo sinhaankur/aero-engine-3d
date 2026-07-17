@@ -24,7 +24,7 @@ function withBase(path) {
 const SKIES = {
   day: { bg: '#6fa3d8', sun: 1.5, hemi: 0.65, ground: '#22301f' },
   haze: { bg: '#b09a6e', sun: 1.1, hemi: 0.5, ground: '#4a4228' },
-  storm: { bg: '#2e3540', sun: 0.35, hemi: 0.4, ground: '#171d1a' },
+  storm: { bg: '#2e3540', sun: 0.5, hemi: 0.55, ground: '#1b221e' },
   cold: { bg: '#a9c2d9', sun: 1.2, hemi: 0.7, ground: '#c8d3da' },
 }
 

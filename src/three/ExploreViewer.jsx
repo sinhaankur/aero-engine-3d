@@ -48,8 +48,10 @@ const LABEL_LINKS = {
 }
 
 function SectionLabel({ position, children, id }) {
+  // constant screen-size chips: distance-scaled Html balloons to unreadable
+  // sizes the moment the eye-level camera walks near one
   return (
-    <Html position={position} center distanceFactor={30} zIndexRange={[20, 0]}>
+    <Html position={position} center zIndexRange={[20, 0]}>
       <a className="explore-label" href={`#/components?focus=${LABEL_LINKS[id] || ''}`}>
         {children}
       </a>
@@ -225,15 +227,17 @@ function Interior({ dims, H0, labels }) {
 
       {labels && (
         <>
+          {/* above the crown */}
           <SectionLabel id="cockpit" position={[-L / 2 + nose * 0.5, H0 + R + 1.5, 0]}>Cockpit</SectionLabel>
-          <SectionLabel id="avionics" position={[-L / 2 + nose * 0.66, H0 - R - 1.2, 0]}>Avionics (E/E) bay</SectionLabel>
           <SectionLabel id="cabin" position={[0, H0 + R + 1.6, 0]}>Cabin</SectionLabel>
-          <SectionLabel id="cargoFwd" position={[xNoseEnd + L * 0.12, H0 - R - 1.3, 0]}>Fwd cargo hold</SectionLabel>
-          <SectionLabel id="cargoAft" position={[xTailStart - L * 0.1, H0 - R - 1.3, 0]}>Aft cargo hold</SectionLabel>
-          <SectionLabel id="centerTank" position={[xWing, H0 - R - 2.2, 0]}>Centre tank + wing box</SectionLabel>
-          <SectionLabel id="wingTank" position={[xWing + L * 0.05, H0 + 1.2, dims.wingspanM * 0.24]}>Wing fuel tank</SectionLabel>
-          <SectionLabel id="gearBay" position={[xWing + L * 0.07, H0 - R - 3.1, 0]}>Main gear bay</SectionLabel>
           <SectionLabel id="apu" position={[L / 2 - tail * 0.22, H0 + R + 1.4, 0]}>APU</SectionLabel>
+          <SectionLabel id="wingTank" position={[xWing + L * 0.05, H0 + 1.2, dims.wingspanM * 0.24]}>Wing fuel tank</SectionLabel>
+          {/* below the belly — fixed heights so they never sink under the apron */}
+          <SectionLabel id="avionics" position={[-L / 2 + nose * 0.66, 0.9, 0]}>Avionics (E/E) bay</SectionLabel>
+          <SectionLabel id="cargoFwd" position={[xNoseEnd + L * 0.12, 0.9, 0]}>Fwd cargo hold</SectionLabel>
+          <SectionLabel id="cargoAft" position={[xTailStart - L * 0.1, 0.9, 0]}>Aft cargo hold</SectionLabel>
+          <SectionLabel id="centerTank" position={[xWing - L * 0.04, 1.8, 0]}>Centre tank + wing box</SectionLabel>
+          <SectionLabel id="gearBay" position={[xWing + L * 0.09, 0.55, 0]}>Main gear bay</SectionLabel>
         </>
       )}
     </group>
@@ -321,10 +325,10 @@ function ExploreScene({ modelUrl, dims, cut, xray, labels, view, controlsRef }) 
       <Car position={[6, 0, span / 2 + 5]} />
       {labels && (
         <>
-          <Html position={[-L / 2 - 3, 2.6, 5]} center distanceFactor={30} zIndexRange={[20, 0]}>
+          <Html position={[-L / 2 - 3, 2.6, 5]} center zIndexRange={[20, 0]}>
             <span className="explore-label plain">Human — 1.75 m</span>
           </Html>
-          <Html position={[6, 2.4, span / 2 + 5]} center distanceFactor={30} zIndexRange={[20, 0]}>
+          <Html position={[6, 2.4, span / 2 + 5]} center zIndexRange={[20, 0]}>
             <span className="explore-label plain">Car — 4.5 m</span>
           </Html>
         </>
