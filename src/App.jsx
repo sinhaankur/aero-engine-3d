@@ -102,9 +102,11 @@ export default function App() {
         <nav className="topnav">
           <Link to="/">Index</Link>
           <Link to="/live">Live</Link>
+          <Link to="/fly">Fly</Link>
           <Link to="/simulate">Simulate</Link>
           <Link to="/compare">Compare</Link>
           <Link to="/systems">Systems</Link>
+          <Link to="/components">Components</Link>
           <Link to="/projector">Projector</Link>
         </nav>
       </header>

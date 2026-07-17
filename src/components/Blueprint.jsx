@@ -55,7 +55,7 @@ export default function Blueprint({ dimensions, engineCount = 2, aircraft, subti
 
   // ----- sheet layout -------------------------------------------------------
   const VB_W = 240
-  const VB_H = 268
+  const VB_H = 304
   const margin = 10
   const colX = 168 // left edge of the right-hand annotation/schedule column
 
@@ -94,7 +94,7 @@ export default function Blueprint({ dimensions, engineCount = 2, aircraft, subti
       <FrameZones C={C} VB_W={VB_W} VB_H={VB_H} />
 
       {/* column separator */}
-      <line x1={colX - 4} y1={36} x2={colX - 4} y2={VB_H - 40} stroke={C.inkFaint} strokeWidth="0.3" strokeDasharray="1.5 1.5" />
+      <line x1={colX - 4} y1={36} x2={colX - 4} y2={VB_H - 58} stroke={C.inkFaint} strokeWidth="0.3" strokeDasharray="1.5 1.5" />
 
       {/* ============================ TITLE + SPECS ======================= */}
       <TitleBlock C={C} aircraft={aircraft} d={d} margin={margin} subtitle={subtitle} />
@@ -108,9 +108,106 @@ export default function Blueprint({ dimensions, engineCount = 2, aircraft, subti
       <ComponentSchedule C={C} x={colX} y={40} schedule={schedule} />
       <DataTables C={C} x={colX} y={40 + 7 + schedule.length * 4.65 + 5} d={d} aircraft={aircraft} engineCount={engineCount} />
 
+      {/* ================== NOTES / REVISIONS / SCALE BAR ================ */}
+      <NotesBlock C={C} x={margin + 2} y={VB_H - 52} />
+      <RevTable C={C} x={118} y={VB_H - 52} w={72} />
+      <ScaleBar C={C} x={196} y={VB_H - 46} scale={(colX - 12 - 8 - 14) / d.lengthM} />
+
       {/* ============================ TITLE BLOCK ======================== */}
       <DrawingTitleBlock C={C} aircraft={aircraft} d={d} VB_W={VB_W} VB_H={VB_H} margin={margin} />
     </svg>
+  )
+}
+
+/* =====================================================================
+ * GENERAL NOTES — the numbered notes column every real sheet carries
+ * ===================================================================== */
+function NotesBlock({ C, x, y }) {
+  const notes = [
+    'ALL DIMENSIONS IN METRES UNLESS NOTED.',
+    'DO NOT SCALE DRAWING — USE STATED DIMENSIONS.',
+    'OUTLINES GENERATED PARAMETRICALLY FROM PUBLISHED TYPE DATA.',
+    'FUSELAGE STATIONS (FS) MEASURED IN METRES AFT OF NOSE DATUM.',
+    'SAFETY & PERFORMANCE FIGURES PER ATTRIBUTED PUBLIC SOURCES.',
+  ]
+  return (
+    <g>
+      <text x={x} y={y} fontSize="3.2" fill={C.ink} fontWeight="700" letterSpacing="0.8">GENERAL NOTES</text>
+      <line x1={x} y1={y + 1.8} x2={x + 98} y2={y + 1.8} stroke={C.inkSoft} strokeWidth="0.35" />
+      {notes.map((n, i) => (
+        <text key={i} x={x} y={y + 6 + i * 3.6} fontSize="2.15" fill={C.dim} letterSpacing="0.1">
+          {i + 1}.  {n}
+        </text>
+      ))}
+    </g>
+  )
+}
+
+/* =====================================================================
+ * REVISION TABLE — REV / DESCRIPTION / DATE
+ * ===================================================================== */
+function RevTable({ C, x, y, w }) {
+  const rows = [
+    ['REV', 'DESCRIPTION', 'DATE'],
+    ['A', 'INITIAL ISSUE — PARAMETRIC GA', new Date().toISOString().slice(0, 10)],
+  ]
+  const colW = [8, w - 30, 22]
+  const rh = 5.4
+  return (
+    <g>
+      <text x={x} y={y} fontSize="3.2" fill={C.ink} fontWeight="700" letterSpacing="0.8">REVISIONS</text>
+      {rows.map((r, ri) => {
+        let cx = x
+        const ry = y + 2.4 + ri * rh
+        return (
+          <g key={ri}>
+            {r.map((cell, ci) => {
+              const el = (
+                <g key={ci}>
+                  <rect x={cx} y={ry} width={colW[ci]} height={rh} fill="none" stroke={C.inkSoft} strokeWidth="0.25" />
+                  <text x={cx + 1.4} y={ry + 3.6} fontSize="2.1" fill={ri === 0 ? C.inkSoft : C.dim}>{cell}</text>
+                </g>
+              )
+              cx += colW[ci]
+              return el
+            })}
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
+/* =====================================================================
+ * GRAPHIC SCALE BAR — measured against the profile view's scale
+ * ===================================================================== */
+function ScaleBar({ C, x, y, scale }) {
+  // pick the largest round span that still fits inside the sheet border
+  const fits = (m) => m * scale <= 32
+  const maxM = fits(20) ? 20 : fits(10) ? 10 : 5
+  const seg = maxM / 4
+  return (
+    <g>
+      <text x={x} y={y - 2} fontSize="2.4" fill={C.dim} letterSpacing="0.4">GRAPHIC SCALE · PROFILE</text>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <rect
+          key={i}
+          x={x + i * seg * scale}
+          y={y}
+          width={seg * scale}
+          height={2.2}
+          fill={i % 2 ? C.ink : 'none'}
+          stroke={C.ink}
+          strokeWidth="0.3"
+        />
+      ))}
+      {[0, 1, 2, 3, 4].map((i) => (
+        <text key={i} x={x + i * seg * scale} y={y + 5.6} fontSize="2" fill={C.dim} textAnchor="middle">
+          {Math.round(i * seg)}
+        </text>
+      ))}
+      <text x={x + maxM * scale + 4} y={y + 5.6} fontSize="2" fill={C.dim}>m</text>
+    </g>
   )
 }
 
@@ -360,6 +457,16 @@ function PlanView({ C, dims, colX }) {
       {/* wingspan + centre-wing-box dimensions */}
       <HDim x1={cx - W / 2} x2={cx + W / 2} y={cy - W / 2 - 5} ext={-(W / 2 - r) + 2} label={`${wingspanM.toFixed(2)} m`} C={C} />
 
+      {/* quarter-chord sweep callout, measured off the drawn leading edge */}
+      {(() => {
+        const sweepDeg = Math.round((Math.atan2(L * RATIO.wingSweep, W / 2 - r) * 180) / Math.PI)
+        return (
+          <text x={leRoot + L * RATIO.wingSweep + 4} y={cy + W / 2 + 3.6} fontSize="2.3" fill={C.dim} letterSpacing="0.2">
+            LE SWEEP Λ ≈ {sweepDeg}°
+          </text>
+        )
+      })()}
+
       {/* numbered leaders — point up into clear space above the wing */}
       <Leader n={6} px={leRoot + L * RATIO.wingRootFrac * 0.5} py={cy} tx={cx - 2} ty={cy - W / 2 + 4} C={C} />
       <Leader n={7} px={leRoot + L * 0.03} py={cy - (W / 2) * 0.6} tx={cx - 20} ty={cy - W / 2 + 4} C={C} />
@@ -441,6 +548,34 @@ function ProfileView({ C, dims, colX, doubleDeck = false }) {
       <Gear x={mainGearX} groundY={groundY} topY={cy + r} C={C} dual />
       <line x1={x0 - 6} y1={groundY} x2={x0 + L + 6} y2={groundY} stroke={C.inkSoft} strokeWidth="0.4" strokeDasharray="2 1.4" />
 
+      {/* ---- fuselage-station (FS) datum ruler above the profile ---- */}
+      <g>
+        <line x1={x0} y1={cy - r - 10} x2={x0 + L} y2={cy - r - 10} stroke={C.inkSoft} strokeWidth="0.3" />
+        {Array.from({ length: 9 }).map((_, i) => {
+          const fx = x0 + (L * i) / 8
+          const major = i % 2 === 0
+          return (
+            <g key={i}>
+              <line x1={fx} y1={cy - r - 10} x2={fx} y2={cy - r - 10 + (major ? 2 : 1.2)} stroke={C.inkSoft} strokeWidth="0.3" />
+              {major && (
+                <text x={fx} y={cy - r - 11.4} fontSize="1.9" fill={C.dim} textAnchor="middle">
+                  FS {((lengthM * i) / 8).toFixed(1)}
+                </text>
+              )}
+            </g>
+          )
+        })}
+      </g>
+      {/* waterline datum tag on the ground line */}
+      <text x={x0 - 6} y={groundY - 1.2} fontSize="2" fill={C.inkSoft} textAnchor="end">WL 0.0</text>
+      {/* centre of gravity (reference) — the classic quartered circle at ~25% MAC */}
+      <g>
+        <circle cx={x0 + L * 0.46} cy={cy + r * 0.1} r="1.7" fill="none" stroke={C.dim} strokeWidth="0.35" />
+        <path d={`M ${x0 + L * 0.46} ${cy + r * 0.1} L ${x0 + L * 0.46 + 1.7} ${cy + r * 0.1} A 1.7 1.7 0 0 1 ${x0 + L * 0.46} ${cy + r * 0.1 + 1.7} Z`} fill={C.dim} stroke="none" />
+        <path d={`M ${x0 + L * 0.46} ${cy + r * 0.1} L ${x0 + L * 0.46 - 1.7} ${cy + r * 0.1} A 1.7 1.7 0 0 1 ${x0 + L * 0.46} ${cy + r * 0.1 - 1.7} Z`} fill={C.dim} stroke="none" />
+        <text x={x0 + L * 0.46 + 3} y={cy + r * 0.1 + 0.8} fontSize="2.1" fill={C.dim}>CG 25% MAC (REF)</text>
+      </g>
+
       {/* ---- engineering dimensions ---- */}
       {/* cabin length, above the crown (clear of nacelle + gear below) */}
       <HDim x1={winStart} x2={winEnd} y={cy - r - 5} ext={-4} label={`CABIN ${((winEnd - winStart) / scale).toFixed(1)} m`} C={C} size={2.8} />
@@ -516,6 +651,11 @@ function FrontView({ C, dims, engineCount = 2, doubleDeck = false }) {
       {/* wingspan + wheel track dimensions */}
       <HDim x1={cx - W / 2} x2={cx + W / 2} y={groundY + 7} ext={-6} label={`${wingspanM.toFixed(2)} m`} C={C} />
       <HDim x1={cx - track / 2} x2={cx + track / 2} y={groundY + 14} ext={-(groundY + 14 - groundY)} label={`TRACK ${(track / scale).toFixed(2)} m`} C={C} size={2.7} />
+
+      {/* dihedral callout off the drawn wing */}
+      <text x={cx - W / 2 + 1} y={cy - r * 0.15 - dih - 3.2} fontSize="2.3" fill={C.dim} letterSpacing="0.2">
+        DIHEDRAL Γ ≈ {Math.max(1, Math.round((Math.atan2(dih, W / 2) * 180) / Math.PI + 4))}°
+      </text>
 
       {/* leaders: sharklet + nose gear track */}
       <Leader n={10} px={cx + (W / 2 - 0.6)} py={cy - r * 0.15 - dih - H * 0.07} tx={cx + W / 2 - 2} ty={cy - H * 0.62} C={C} />
@@ -609,9 +749,9 @@ function DataTables({ C, x, y, d, aircraft, engineCount }) {
  * ===================================================================== */
 function DrawingTitleBlock({ C, aircraft, d, VB_W, VB_H, margin }) {
   const x = margin
-  const y = VB_H - 30
+  const y = VB_H - 32
   const w = VB_W - margin * 2
-  const h = 22
+  const h = 25
   // Derived drawing number from the id + a deterministic suffix.
   const id = (aircraft?.id ?? 'ac').toUpperCase().replace(/[^A-Z0-9]/g, '')
   const dwgNo = `GA-${id}-001`
@@ -635,6 +775,14 @@ function DrawingTitleBlock({ C, aircraft, d, VB_W, VB_H, margin }) {
     { label: 'STATUS', value: (aircraft?.status ?? 'reference').toUpperCase().replace('-', ' '), wfrac: 0.24 },
     { label: 'SOURCE', value: 'DERIVED FROM TYPE DATA', wfrac: 0.26 },
   ]
+  // third row: signature + tolerance cells, like a released production sheet
+  const cells3 = [
+    { label: 'DRAWN', value: 'ADA / PARAMETRIC', wfrac: 0.22 },
+    { label: 'CHECKED', value: 'DATA REGISTRY', wfrac: 0.2 },
+    { label: 'APPROVED', value: 'FOR REFERENCE ONLY', wfrac: 0.24 },
+    { label: 'TOLERANCE', value: 'NOM ± 0.1 m', wfrac: 0.16 },
+    { label: 'NOTE', value: 'DO NOT SCALE', wfrac: 0.18 },
+  ]
 
   function Row({ cells, ry, rh }) {
     let cxp = x
@@ -655,10 +803,11 @@ function DrawingTitleBlock({ C, aircraft, d, VB_W, VB_H, margin }) {
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill="rgba(8,40,96,0.6)" stroke={C.ink} strokeWidth="0.5" />
-      <Row cells={cells} ry={y} rh={h / 2} />
-      <Row cells={cells2} ry={y + h / 2} rh={h / 2} />
+      <Row cells={cells} ry={y} rh={h / 3} />
+      <Row cells={cells2} ry={y + h / 3} rh={h / 3} />
+      <Row cells={cells3} ry={y + (2 * h) / 3} rh={h / 3} />
       {/* first-angle projection symbol, drawn over the title cell's right side */}
-      <ProjectionSymbol C={C} cx={x + w * 0.36} cy={y + h / 2} />
+      <ProjectionSymbol C={C} cx={x + w * 0.36} cy={y + h / 3} />
     </g>
   )
 }

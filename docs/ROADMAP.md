@@ -47,11 +47,20 @@ Runs alongside the knowledge-base phases below:
 
 1. ~~Data schema, A320 family, procedural 3D + blueprint, full UI.~~ *(shipped)*
 2. ~~Author real Blender glTF airframes + standalone engine models.~~ *(shipped —
-   18 HD variants + engine models)*
-3. **Comparison view** (overlay variants against each other) and
-   **per-component exploded airframe views**; optional **cockpit rendering**.
-4. **Boeing / Embraer / other manufacturers** — new families through the same
-   spec → generator → GLB pipeline.
+   HD variants + engine models)*
+3. ~~Comparison view, per-component exploded airframe views, cockpit
+   rendering.~~ *(shipped — `/compare`, exploded slider, and `/fly`'s
+   cockpit-level sim with a working PFD)*
+4. ~~Boeing / Embraer / other manufacturers.~~ *(shipped — 737 NG/MAX + E-Jet
+   E2 families through the same spec → generator → GLB pipeline; 8 families,
+   21 variants)*
+
+Shipped beyond the original track: **Explore inside/outside** (true-scale
+walkaround + section-cut cutaway with procedural interior), **/fly** (ISA
+atmosphere, dimensions-derived aero, weather presets, cockpit PFD),
+**/components** (how each part is built: material, process, technology, cost),
+and an engineering-document-grade blueprint sheet (notes, revisions, FS datum
+ruler, CG/MAC, scale bar).
 
 ## Phase 1 — Deepen the "how it's designed" layer  *(near term)*
 

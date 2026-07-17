@@ -11,6 +11,8 @@ import LiveMapPage from './pages/LiveMapPage.jsx'
 import SimulatePage from './pages/SimulatePage.jsx'
 import ComparePage from './pages/ComparePage.jsx'
 import ProjectorPage from './pages/ProjectorPage.jsx'
+import FlyPage from './pages/FlyPage.jsx'
+import ComponentsPage from './pages/ComponentsPage.jsx'
 import './styles/global.css'
 
 const router = createHashRouter([
@@ -21,6 +23,8 @@ const router = createHashRouter([
       { index: true, element: <Home /> },
       { path: 'live', element: <LiveMapPage /> },
       { path: 'simulate', element: <SimulatePage /> },
+      { path: 'fly', element: <FlyPage /> },
+      { path: 'components', element: <ComponentsPage /> },
       { path: 'compare', element: <ComparePage /> },
       { path: 'systems', element: <SystemsPage /> },
       { path: 'systems/:systemId', element: <SystemsPage /> },

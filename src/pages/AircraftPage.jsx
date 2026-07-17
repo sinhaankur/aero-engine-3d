@@ -7,6 +7,7 @@ import { ENGINE_MODELS } from '../data/engineParts.js'
 
 // Defer the WebGL-backed viewers so Three.js loads on demand, not up front.
 const AircraftViewer = lazy(() => import('../three/AircraftViewer.jsx'))
+const ExploreViewer = lazy(() => import('../three/ExploreViewer.jsx'))
 const EngineExplorer = lazy(() => import('../components/EngineExplorer.jsx'))
 
 function Spec({ label, value, unit }) {
@@ -59,6 +60,9 @@ export default function AircraftPage() {
       <div className="viewer-bar">
         <div className="viewer-toggle">
           <button className={view === '3d' ? 'on' : ''} onClick={() => setView('3d')}>3D model</button>
+          {a.model && (
+            <button className={view === 'explore' ? 'on' : ''} onClick={() => setView('explore')}>Explore inside</button>
+          )}
           <button className={view === 'blueprint' ? 'on' : ''} onClick={() => setView('blueprint')}>Blueprint</button>
         </div>
         {view === '3d' && a.model && (
@@ -76,6 +80,10 @@ export default function AircraftPage() {
         <Suspense fallback={<div className="viewport-loading">Loading 3D model…</div>}>
           <AircraftViewer modelUrl={modelUrl} dimensions={d} engineCount={engineCount} exploded={explode / 100} />
         </Suspense>
+      ) : view === 'explore' ? (
+        <Suspense fallback={<div className="viewport-loading">Loading explore mode…</div>}>
+          <ExploreViewer modelUrl={modelUrl} dimensions={d} />
+        </Suspense>
       ) : (
         <Blueprint
           dimensions={d}
@@ -89,11 +97,17 @@ export default function AircraftPage() {
       {/* function-focused cross-links: this page is the hub for visualising
           the aircraft and how it works */}
       <div className="ac-actions">
+        {a.model && (
+          <Link className="ac-action" to={`/fly?ac=${familyId}/${a.id}`}>
+            🛫 Fly it — cockpit view, real weather
+          </Link>
+        )}
         <Link className="ac-action" to={`/simulate?ac=${familyId}/${a.id}`}>
           🌬 Fly this wing — lift, stall &amp; wind conditions
         </Link>
         <Link className="ac-action" to="/compare">⇄ Compare against another variant</Link>
         <Link className="ac-action" to="/systems">⚙ How its systems work</Link>
+        <Link className="ac-action" to="/components">🔩 How its parts are built</Link>
       </div>
 
       {!a.model && (

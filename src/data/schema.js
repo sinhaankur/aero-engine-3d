@@ -50,7 +50,7 @@
  * @property {string} id
  * @property {string} name
  * @property {string} familyId
- * @property {string} status          "in-production" | "in-service" | "retired".
+ * @property {string} status          "in-production" | "in-service" | "retired" | "in-development".
  * @property {number} firstFlightYear
  * @property {number} [eisYear]       Entry into service.
  * @property {number} [built]         Units delivered (approx, public figure).

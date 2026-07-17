@@ -1,0 +1,41 @@
+[
+  {
+    "id": "e175-e2",
+    "length": 32.4,
+    "fuse_dia": 3.01,
+    "wingspan": 31.0,
+    "height": 9.98,
+    "sweep_deg": 24,
+    "engine_count": 2,
+    "fan_dia": 1.42,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#0b3d91"
+  },
+  {
+    "id": "e190-e2",
+    "length": 36.24,
+    "fuse_dia": 3.01,
+    "wingspan": 33.72,
+    "height": 10.96,
+    "sweep_deg": 24,
+    "engine_count": 2,
+    "fan_dia": 1.85,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#0b3d91"
+  },
+  {
+    "id": "e195-e2",
+    "length": 41.5,
+    "fuse_dia": 3.01,
+    "wingspan": 35.12,
+    "height": 10.9,
+    "sweep_deg": 24,
+    "engine_count": 2,
+    "fan_dia": 1.85,
+    "sharklet": true,
+    "decks": 1,
+    "tail_color": "#0b3d91"
+  }
+]
