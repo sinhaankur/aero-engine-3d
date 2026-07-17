@@ -41,6 +41,54 @@ function routeMeta(pathname) {
   return [null, BASE_DESC]
 }
 
+/**
+ * Global parallax driver: eases pointer position and mirrors scroll into CSS
+ * custom properties (--pmx/--pmy unitless −0.5..0.5, --psy px). Layers pick
+ * their own depth by multiplying these in `translate:` calc()s, so the cloud
+ * strata, contour glyphs and specks all drift at different rates. Never runs
+ * under prefers-reduced-motion — the variables default to 0 in CSS.
+ */
+function ParallaxDriver() {
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const root = document.documentElement.style
+    let raf = 0
+    let tmx = 0, tmy = 0, mx = 0, my = 0, sy = window.scrollY
+    const loop = () => {
+      mx += (tmx - mx) * 0.055 // floaty easing toward the pointer
+      my += (tmy - my) * 0.055
+      root.setProperty('--pmx', mx.toFixed(4))
+      root.setProperty('--pmy', my.toFixed(4))
+      root.setProperty('--psy', sy.toFixed(1))
+      raf = requestAnimationFrame(loop)
+    }
+    const onMove = (e) => {
+      tmx = e.clientX / window.innerWidth - 0.5
+      tmy = e.clientY / window.innerHeight - 0.5
+    }
+    const onScroll = () => { sy = window.scrollY }
+    window.addEventListener('pointermove', onMove, { passive: true })
+    window.addEventListener('scroll', onScroll, { passive: true })
+    raf = requestAnimationFrame(loop)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('scroll', onScroll)
+    }
+  }, [])
+  return null
+}
+
+/** Route-keyed wrapper so every page glides in instead of popping. */
+function AnimatedOutlet() {
+  const { pathname } = useLocation()
+  return (
+    <div key={pathname} className="page-enter">
+      <Outlet />
+    </div>
+  )
+}
+
 /** Sets title/description per route and resets scroll on navigation. */
 function RouteEffects() {
   const { pathname } = useLocation()
@@ -56,7 +104,7 @@ function RouteEffects() {
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const els = document.querySelectorAll(
-      '.section-title, .map-col, .engine-card, .sys-card, .spec-grid, .cmp-body, .proj-card, .safety-panel, .count-strip',
+      '.section-title, .map-col, .engine-card, .sys-card, .spec-grid, .cmp-body, .proj-card, .safety-panel, .count-strip, .comp-card, .timeline, .ac-actions',
     )
     const io = new IntersectionObserver(
       (entries) => {
@@ -84,6 +132,7 @@ export default function App() {
   return (
     <div className="app">
       <RouteEffects />
+      <ParallaxDriver />
       {/* drawing-sheet frame: the faint bordered/ticked edge of an engineering
           drawing, fixed around the whole viewport */}
       <div className="sheet-frame" aria-hidden />
@@ -91,8 +140,15 @@ export default function App() {
           behind the content, and a tiny aircraft that draws a contrail across
           the sky every minute or two */}
       <div className="atmosphere" aria-hidden>
+        {/* far → near parallax strata: contour glyphs, clouds, specks */}
+        <div className="bp-glyphs">
+          <span className="bp-glyph g1">✈</span>
+          <span className="bp-glyph g2">✈</span>
+          <span className="bp-glyph g3">✈</span>
+        </div>
         <div className="clouds clouds-a" />
         <div className="clouds clouds-b" />
+        <div className="specks" />
         <div className="contrail"><span className="contrail-plane">✈</span></div>
       </div>
       <header className="topbar">
@@ -111,7 +167,7 @@ export default function App() {
         </nav>
       </header>
       <main className="content">
-        <Outlet />
+        <AnimatedOutlet />
       </main>
       <footer className="footer">
         <div className="footer-cols">

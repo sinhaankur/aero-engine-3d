@@ -77,6 +77,82 @@ body {
   animation: cloud-drift 160s linear infinite;
 }
 @keyframes cloud-drift { to { transform: translateX(-50%); } }
+
+/* ---- parallax depth ------------------------------------------------------
+   The ParallaxDriver eases pointer + scroll into --pmx/--pmy (unitless,
+   −0.5..0.5) and --psy (scroll px). Each stratum multiplies them at its own
+   rate via the `translate` property, which composes with the keyframed
+   `transform` drift above. Everything defaults to 0 → static without JS or
+   under reduced motion. */
+.clouds-a {
+  translate: calc(var(--pmx, 0) * -14px)
+             calc(var(--pmy, 0) * -8px + var(--psy, 0) * -0.045px);
+}
+.clouds-b {
+  translate: calc(var(--pmx, 0) * -26px)
+             calc(var(--pmy, 0) * -14px + var(--psy, 0) * -0.09px);
+}
+
+/* farthest stratum: huge ghosted plan-form glyphs, barely there */
+.bp-glyphs { position: absolute; inset: 0; }
+.bp-glyph {
+  position: absolute; color: rgba(88, 166, 255, 0.05); line-height: 1;
+  translate: calc(var(--pmx, 0) * -7px)
+             calc(var(--pmy, 0) * -4px + var(--psy, 0) * -0.02px);
+}
+.bp-glyph.g1 { font-size: 260px; top: 8%; left: 58%; transform: rotate(-18deg); }
+.bp-glyph.g2 { font-size: 150px; top: 58%; left: 6%; transform: rotate(24deg); color: rgba(88, 166, 255, 0.04); }
+.bp-glyph.g3 { font-size: 110px; top: 76%; left: 74%; transform: rotate(-40deg); color: rgba(88, 166, 255, 0.035); }
+
+/* nearest stratum: sparse high-altitude specks, fastest response */
+.specks {
+  position: absolute; inset: -60px; opacity: 0.75;
+  translate: calc(var(--pmx, 0) * -38px)
+             calc(var(--pmy, 0) * -22px + var(--psy, 0) * -0.16px);
+}
+.specks::before {
+  content: ''; position: absolute; width: 2px; height: 2px; border-radius: 50%;
+  background: rgba(190, 210, 235, 0.35);
+  box-shadow:
+    12vw 8vh 0 rgba(190,210,235,0.22), 26vw 22vh 0 rgba(190,210,235,0.16),
+    38vw 6vh 0 rgba(190,210,235,0.25), 47vw 31vh 0 rgba(190,210,235,0.14),
+    58vw 14vh 0 rgba(190,210,235,0.22), 66vw 40vh 0 rgba(190,210,235,0.15),
+    74vw 9vh 0 rgba(190,210,235,0.2), 84vw 27vh 0 rgba(190,210,235,0.16),
+    93vw 18vh 0 rgba(190,210,235,0.22), 8vw 44vh 0 rgba(190,210,235,0.15),
+    19vw 58vh 0 rgba(190,210,235,0.2), 33vw 49vh 0 rgba(190,210,235,0.13),
+    52vw 62vh 0 rgba(190,210,235,0.18), 69vw 55vh 0 rgba(190,210,235,0.13),
+    81vw 68vh 0 rgba(190,210,235,0.2), 90vw 49vh 0 rgba(190,210,235,0.14),
+    5vw 78vh 0 rgba(190,210,235,0.18), 23vw 86vh 0 rgba(190,210,235,0.13),
+    41vw 74vh 0 rgba(190,210,235,0.2), 60vw 88vh 0 rgba(190,210,235,0.14),
+    76vw 81vh 0 rgba(190,210,235,0.18), 95vw 90vh 0 rgba(190,210,235,0.13);
+}
+
+/* content parallax accents on the home masthead */
+.map-mast h1 { translate: calc(var(--pmx, 0) * -5px) 0; }
+.map-stats { translate: calc(var(--pmx, 0) * -10px) calc(var(--pmy, 0) * -5px); }
+
+/* route transitions: pages glide up as they mount */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.page-enter { animation: page-in 0.42s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .page-enter { animation: none; }
+  .clouds-a, .clouds-b, .bp-glyph, .specks, .map-mast h1, .map-stats { translate: none; }
+}
+
+/* hover depth: interactive cards lift toward the pointer */
+.family-card, .engine-card, .comp-card, .map-big, .ac-action {
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.2s ease;
+}
+.family-card:hover, .engine-card:hover, .comp-card:hover, .map-big:hover, .ac-action:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .family-card:hover, .engine-card:hover, .comp-card:hover, .map-big:hover, .ac-action:hover { transform: none; }
+}
 .contrail {
   position: absolute; top: 15%; left: -28%; width: 26%; height: 1.5px; opacity: 0;
   background: linear-gradient(90deg, transparent, rgba(190,210,235,0.35));
