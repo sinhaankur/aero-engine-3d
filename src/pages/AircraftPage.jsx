@@ -1,9 +1,42 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getFamily, getAircraft } from '../data/index.js'
 import { RISK_LEVELS } from '../data/schema.js'
 import Blueprint from '../components/Blueprint.jsx'
 import { ENGINE_MODELS } from '../data/engineParts.js'
+import { TYPES_FOR_AIRCRAFT } from '../data/icaoTypes.js'
+
+/**
+ * Sky ↔ plane bridge: one-shot count of this exact type airborne right now,
+ * from the same ADS-B proxy the live globe uses. Renders nothing when the
+ * proxy is unset, the fetch fails, or none are flying — the page never blocks
+ * on the network.
+ */
+function LiveNow({ aircraftId }) {
+  const codes = TYPES_FOR_AIRCRAFT[aircraftId]
+  const [n, setN] = useState(null)
+  useEffect(() => {
+    const proxy = import.meta.env.VITE_FLIGHT_API
+    if (!proxy || !codes?.length) return undefined
+    let dead = false
+    const ctrl = new AbortController()
+    fetch(proxy, { signal: ctrl.signal })
+      .then((r) => r.json())
+      .then((d) => {
+        if (dead) return
+        const set = new Set(codes)
+        setN((d.states || []).filter((s) => set.has(s[18]) && !s[8]).length)
+      })
+      .catch(() => {})
+    return () => { dead = true; ctrl.abort() }
+  }, [aircraftId]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!n) return null
+  return (
+    <Link className="live-now" to={`/live?type=${codes.join(',')}`} title="See them on the live globe">
+      <span className="live-now-dot" /> {n.toLocaleString()} airborne right now →
+    </Link>
+  )
+}
 
 // Defer the WebGL-backed viewers so Three.js loads on demand, not up front.
 const AircraftViewer = lazy(() => import('../three/AircraftViewer.jsx'))
@@ -53,6 +86,7 @@ export default function AircraftPage() {
       <div className="ac-head">
         <h1>{a.name}</h1>
         <span className={`status status-${a.status}`}>{a.status.replace('-', ' ')}</span>
+        <LiveNow aircraftId={a.id} />
       </div>
       <p className="lede">{a.summary}</p>
 
