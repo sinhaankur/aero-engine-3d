@@ -15,6 +15,12 @@ function routeMeta(pathname) {
   switch (seg[0]) {
     case 'live':
       return ['Live Air Traffic on a 3D Globe', 'Every airborne aircraft right now — real-time ADS-B positions, altitudes and flight paths, plotted on an interactive globe.']
+    case 'fly':
+      return ['Fly Any Airliner — Cockpit-Level Simulator', 'Take off, cruise and land any variant with a working PFD, real ISA atmosphere and five weather presets.']
+    case 'routes':
+      return ['Route Checker — Can It Fly This Route?', 'Pick two airports and test every variant against the great-circle distance with real wind corrections — the payload-range story made visible.']
+    case 'components':
+      return ['Aircraft Components — How Every Part Is Built', 'Material, manufacturing process, required technology, indicative cost and suppliers for each major airliner component.']
     case 'simulate':
       return ['Flight Physics Simulator — Every Airbus, Any Wind', 'Pick any Airbus variant and fly its wing through calm air, gusts, turbulence and wind shear. Real lift physics computed from real specs.']
     case 'compare':
@@ -159,6 +165,7 @@ export default function App() {
           <Link to="/">Index</Link>
           <Link to="/live">Live</Link>
           <Link to="/fly">Fly</Link>
+          <Link to="/routes">Routes</Link>
           <Link to="/simulate">Simulate</Link>
           <Link to="/compare">Compare</Link>
           <Link to="/systems">Systems</Link>

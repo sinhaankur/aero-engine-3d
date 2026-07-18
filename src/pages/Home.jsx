@@ -20,6 +20,7 @@ const short = (name) => name.replace(/^(Airbus|Boeing) /, '')
 const EXPLORE = [
   { to: '/fly', name: 'Fly', tag: { label: 'New', kind: 'live' }, desc: 'Fly any variant cockpit-level: real ISA atmosphere, weather, a working PFD — take off, cruise, land.' },
   { to: '/live', name: 'Live traffic', tag: { label: 'Live', kind: 'live' }, desc: 'Every real aircraft in the sky right now, plotted on a 3D globe from ADS-B.' },
+  { to: '/routes', name: 'Routes', tag: { label: 'New', kind: 'live' }, desc: 'Pick two airports — see which variants can fly it, with the real flight-planning math.' },
   { to: '/simulate', name: 'Simulate', tag: { label: 'Interactive', kind: 'live' }, desc: 'Pick any variant and drive lift, stalls, wind conditions, fuel flow and a real CFD wind tunnel.' },
   { to: '/compare', name: 'Compare', tag: { label: 'Overlay', kind: 'live' }, desc: 'Overlay any two variants at true relative scale, with a full spec delta table.' },
   { to: '/systems', name: 'Systems', tag: { label: 'Learn', kind: 'live' }, desc: 'How the electrics, hydraulics and fly-by-wire actually work, with live schematics.' },

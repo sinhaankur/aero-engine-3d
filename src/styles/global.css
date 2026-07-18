@@ -142,6 +142,41 @@ body {
   .clouds-a, .clouds-b, .bp-glyph, .specks, .map-mast h1, .map-stats { translate: none; }
 }
 
+/* /routes — single-screen route checker */
+.routes-page { display: flex; flex-direction: column; gap: 8px; }
+.routes-stage { display: flex; gap: 14px; height: calc(100vh - 200px); min-height: 480px; }
+.routes-map { flex: 1.7; min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: #0b0f14; cursor: crosshair; height: 100%; }
+.routes-ap { pointer-events: none; }
+.routes-rail { flex: 1; min-width: 330px; max-width: 430px; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); padding: 14px; }
+.routes-pick { display: flex; gap: 8px; align-items: center; }
+.routes-pick select { flex: 1; min-width: 0; background: var(--panel-2, #161b22); color: var(--fg); border: 1px solid var(--border); padding: 7px 8px; font-family: var(--mono); font-size: 12px; border-radius: 3px; }
+.routes-swap { background: none; border: 1px solid var(--border-2); color: var(--fg); padding: 6px 10px; cursor: pointer; border-radius: 3px; }
+.routes-swap:hover { border-color: var(--accent); color: var(--accent); }
+.routes-nums { display: grid; gap: 4px; margin: 12px 0 6px; }
+.routes-nums div { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; }
+.routes-nums span { color: var(--muted); }
+.routes-nums b { color: var(--fg); }
+.routes-wind { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.routes-wind input { flex: 1; accent-color: var(--accent); }
+.routes-list { display: grid; gap: 4px; }
+.routes-row { display: grid; grid-template-columns: 92px 1fr 52px; align-items: center; gap: 8px; font-size: 12px; }
+.rr-name { font-family: var(--mono); font-size: 11px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rr-bar { height: 8px; background: var(--panel-2, #161b22); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
+.rr-bar i { display: block; height: 100%; }
+.routes-row.ok .rr-bar i { background: #3fb950; }
+.routes-row.tight .rr-bar i { background: #d29922; }
+.routes-row.no .rr-bar i { background: #f85149; }
+.rr-val { font-family: var(--mono); font-size: 11px; text-align: right; }
+.routes-row.ok .rr-val { color: #3fb950; }
+.routes-row.tight .rr-val { color: #d29922; }
+.routes-row.no .rr-val { color: #f85149; }
+.routes-note, .routes-hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.routes-math h4 { margin: 12px 0 4px; font-size: 12.5px; color: var(--fg); }
+.routes-math code { display: block; background: #0b0f14; border: 1px solid var(--border); border-radius: 4px; padding: 7px 10px; font-size: 12px; color: #58a6ff; overflow-x: auto; }
+.routes-math p { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.routes-math b { color: var(--fg); }
+@media (max-width: 900px) { .routes-stage { flex-direction: column; height: auto; } .routes-map { min-height: 300px; } }
+
 /* sky ↔ plane bridge: live count on aircraft pages, type filter on /live */
 .live-now {
   display: inline-flex; align-items: center; gap: 7px;
