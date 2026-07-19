@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FAMILIES, getAircraftForFamily, getAircraft } from '../data/index.js'
 import CompareOverlay from '../components/CompareOverlay.jsx'
+import TradeSpace from '../components/TradeSpace.jsx'
 
 const COLOR_A = '#d8ff3e'
 const COLOR_B = '#86b7ff'
@@ -128,6 +129,12 @@ export default function ComparePage() {
         shape details are representative rather than exact — the dimensions,
         and therefore the relative sizes, are the real figures.
       </p>
+
+      <TradeSpace
+        selA={selA}
+        selB={selB}
+        onPick={(sel, which) => (which === 'A' ? setSelA(sel) : setSelB(sel))}
+      />
     </div>
   )
 }

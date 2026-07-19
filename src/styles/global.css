@@ -142,6 +142,13 @@ body {
   .clouds-a, .clouds-b, .bp-glyph, .specks, .map-mast h1, .map-stats { translate: none; }
 }
 
+/* trade-space scatter on /compare */
+.tspace { margin-top: 26px; }
+.tspace-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+.tspace-head label { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; }
+.tspace-head select { background: var(--panel); color: var(--fg); border: 1px solid var(--border); padding: 6px 8px; font-family: var(--mono); font-size: 12px; border-radius: 3px; }
+.tspace-plot { width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: 10px; }
+
 /* /routes — single-screen route checker */
 .routes-page { display: flex; flex-direction: column; gap: 8px; }
 .routes-stage { display: flex; gap: 14px; height: calc(100vh - 200px); min-height: 480px; }
