@@ -348,9 +348,24 @@ export function stepFlight(s, ac, controls, wx, dt) {
   const tas = s.v
   const iasKt = (tas * Math.sqrt(atm.sigma)) / KT
   const mach = tas / atm.a
-  // EGT rises with N1 and thins with altitude (crude but plausible for ECAM)
-  const egt = (n1) => Math.round(380 + n1 * 340 + (1 - atm.sigma) * 120)
-  const ff = (n1) => Math.round((300 + n1 * 2400) * Math.pow(atm.sigma, 0.5)) // kg/h per engine
+  // Per-engine parameters (crude but plausible turbofan behaviour for the ECAM).
+  // N2 (HP spool) leads N1 and idles higher; EGT rises with N1 and thins with
+  // altitude; oil pressure/temp track N2; vibration is low but blips near idle
+  // spool and in the buffet.
+  const egtF = (n1) => Math.round(380 + n1 * 340 + (1 - atm.sigma) * 120)
+  const ffF = (n1) => Math.round((300 + n1 * 2400) * Math.pow(atm.sigma, 0.5)) // kg/h per engine
+  const n2F = (n1) => Math.round(58 + n1 * 47)                                  // % HP spool
+  const oilP = (n1) => Math.round(35 + n1 * 55)                                 // psi
+  const oilT = (n1) => Math.round(70 + n1 * 55 + (1 - atm.sigma) * 10)          // °C
+  const vibF = (n1) => +(0.4 + Math.abs(Math.sin(s.t * 0.7)) * 0.15 + (n1 < 0.25 ? 0.5 : 0) + s.buffet * 1.5).toFixed(1)
+  const eng = (n1raw) => {
+    const n1 = Math.max(0, n1raw)
+    return {
+      n1: Math.round(n1 * 100), n2: n2F(n1), egt: egtF(n1), ff: ffF(n1),
+      oilP: oilP(n1), oilT: oilT(n1), vib: vibF(n1),
+      thrustPct: Math.round(n1 * 100),
+    }
+  }
   return {
     atm, wind,
     iasKt,
@@ -360,8 +375,8 @@ export function stepFlight(s, ac, controls, wx, dt) {
     vsFpm: (vy / FT) * 60,
     hdg: (((s.psi * 180) / Math.PI) % 360 + 360) % 360,
     n1: Math.round((s.eng1N1 + s.eng2N1) * 50),
-    eng1: { n1: Math.round(s.eng1N1 * 100), egt: egt(s.eng1N1), ff: ff(s.eng1N1) },
-    eng2: { n1: Math.round(s.eng2N1 * 100), egt: egt(s.eng2N1), ff: ff(s.eng2N1) },
+    eng1: eng(s.eng1N1),
+    eng2: eng(s.eng2N1),
     L, D, T, W,
     overspeed: mach > ac.mmo || iasKt > 350,
     aoaDeg: (s.alpha * 180) / Math.PI,

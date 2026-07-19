@@ -55,14 +55,28 @@ export default function EngineLive({ out, state, ac, engine }) {
   const len = tailX - noseX
   const st = (f) => noseX + len * f
 
-  const n1 = out ? out.n1 : 0
-  const egt = out?.eng1?.egt ?? 0
-  const ffPerEng = out?.eng1?.ff ?? 0                 // kg/h per engine
+  const e1 = out?.eng1 || {}
+  const n1 = e1.n1 ?? 0
+  const n2 = e1.n2 ?? 0
+  const egt = e1.egt ?? 0
+  const ffPerEng = e1.ff ?? 0                         // kg/h per engine
   const ffTotal = ffPerEng * (ac?.engineCount || 2)   // kg/h total
   const fuel = state?.fuelKg ?? 0
   const fuel0 = (ac?.mass || 60000) * 0.12
   const enduranceH = ffTotal > 1 ? fuel / ffTotal : 0
   const flowSpeed = 0.4 + (n1 / 100) * 2.4            // dash animation rate
+  // gas-path stations: temperature (°C) + pressure ratio grow through the core,
+  // peak at the burner, then drop through the turbines. Scaled by N1.
+  const load = n1 / 100
+  const oatC = out?.atm?.oatC ?? 15
+  const stages = [
+    ['FAN', Math.round(oatC + load * 25), (1 + load * 0.6).toFixed(1)],
+    ['LPC', Math.round(oatC + load * 120), (1 + load * 3).toFixed(1)],
+    ['HPC', Math.round(oatC + load * 430), (1 + load * 28).toFixed(0)],
+    ['BURN', Math.round(700 + load * 1150), (1 + load * 26).toFixed(0)],
+    ['HPT', egt + Math.round(load * 120), (1 + load * 9).toFixed(0)],
+    ['LPT', egt, (1 + load * 2).toFixed(1)],
+  ]
 
   // blades of the spinning fan (drawn as radial spokes on the disc face)
   const blades = []
@@ -122,9 +136,29 @@ export default function EngineLive({ out, state, ac, engine }) {
 
         <div className="el-gauges">
           <Gauge label="N1" value={Math.round(n1)} unit="%" frac={n1 / 100} warn={n1 > 101} />
+          <Gauge label="N2" value={Math.round(n2)} unit="%" frac={n2 / 105} warn={n2 > 100} />
           <Gauge label="EGT" value={Math.round(egt)} unit="°" frac={(egt - 300) / 700} warn={egt > 900} />
           <Gauge label="FF" value={ffPerEng.toLocaleString()} unit="kg/h" frac={ffPerEng / 3000} />
+          <Gauge label="THR" value={e1.thrustPct ?? 0} unit="%" frac={(e1.thrustPct ?? 0) / 100} />
         </div>
+      </div>
+
+      {/* secondary engine params */}
+      <div className="el-sec">
+        <span>OIL <b>{e1.oilP ?? 0}</b> psi</span>
+        <span>OIL <b>{e1.oilT ?? 0}</b>°</span>
+        <span className={e1.vib > 2 ? 'warn' : ''}>VIB <b>{e1.vib ?? 0}</b></span>
+      </div>
+
+      {/* per-stage gas path: temperature + pressure ratio through the core */}
+      <div className="el-stages">
+        {stages.map(([n, t, p]) => (
+          <div key={n} className="el-stage">
+            <span className="el-stage-n">{n}</span>
+            <span className="el-stage-t">{t}°</span>
+            <span className="el-stage-p">×{p}</span>
+          </div>
+        ))}
       </div>
 
       {/* fuel consumption strip */}

@@ -632,6 +632,15 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .el-fuel-bar span { display: block; height: 100%; background: linear-gradient(90deg, #d8ff3e, #98a82c); transition: width 0.4s; }
 .el-fuel-nums { display: flex; justify-content: space-between; gap: 6px; font-size: 10px; color: var(--muted); }
 .el-fuel-nums b { color: var(--ink); }
+.el-sec { display: flex; justify-content: space-around; padding: 5px 8px; border-top: 1px solid var(--border); font-size: 10px; color: var(--muted); }
+.el-sec b { color: var(--ink); }
+.el-sec .warn b { color: #f85149; }
+.el-stages { display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1px solid var(--border); }
+.el-stage { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; border-right: 1px solid var(--border); }
+.el-stage:last-child { border-right: none; }
+.el-stage-n { font-size: 7.5px; letter-spacing: 0.06em; color: var(--accent); }
+.el-stage-t { font-size: 10px; color: #ff9a5c; }
+.el-stage-p { font-size: 8.5px; color: #6fb2ff; }
 @media (max-width: 760px) { .fly-engine { display: none; } }
 
 /* Tower ATC radio panel */
