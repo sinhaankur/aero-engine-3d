@@ -240,9 +240,34 @@ function AircraftModel({ url, simRef, groupRef }) {
 
   useEffect(() => { if (simRef.current) simRef.current.groundClear = H0 }, [H0, simRef])
 
-  useFrame(() => {
+  // Collect the animatable sub-nodes once: fan blades (spin with N1) and the
+  // landing gear (retract up into the belly when gear is up). The GLB is in the
+  // raw frame here (nose −X, up −Z), so the fan axis is local X and "up into the
+  // belly" is local +Z. Gear meshes are the unnamed cylinders/wheels sitting
+  // below the fuselage centreline.
+  const anim = useMemo(() => {
+    const fans = []
+    const gear = []
+    const box = new THREE.Box3().setFromObject(cloned)
+    const height = box.max.z - box.min.z   // vertical extent (raw up = ±z)
+    const c = new THREE.Vector3()
+    cloned.traverse((o) => {
+      if (!o.isMesh) return
+      if (/FanBlades|Spinner/i.test(o.name)) { fans.push(o); return }
+      // gear struts/wheels/hubs are the generic Cylinder*/Torus* nodes that sit
+      // below the belly (raw down = +z), away from the engine cylinders up top
+      if (/Cylinder|Torus/i.test(o.name)) {
+        new THREE.Box3().setFromObject(o).getCenter(c)
+        if (c.z > box.max.z - height * 0.5) gear.push({ o, z0: o.position.z })
+      }
+    })
+    return { fans, gear, retractDist: height * 0.42 }
+  }, [cloned])
+
+  useFrame((_, dt) => {
     const g = groupRef.current
     const s = simRef.current?.state
+    const out = simRef.current?.out
     if (!g || !s) return
     g.position.set(s.x, s.h + H0, s.z)
     g.rotation.order = 'YXZ'
@@ -250,6 +275,17 @@ function AircraftModel({ url, simRef, groupRef }) {
     if (s.buffet > 0.02) {
       g.position.y += Math.sin(s.t * 43) * 0.12 * s.buffet
       g.rotation.z += Math.sin(s.t * 37) * 0.01 * s.buffet
+    }
+    // spin the fans: N1 fraction → rev speed (raw fan axis is local X)
+    const n1 = out ? Math.max(0.04, out.n1 / 100) : 0.04
+    for (const f of anim.fans) f.rotation.x += n1 * 42 * dt
+    // gear retract/extend: lerp gear meshes up into the belly (local +z is down,
+    // so retracting means moving toward −z / into the hull)
+    if (anim.gear.length) {
+      const target = s.gear ? 0 : -anim.retractDist
+      for (const gm of anim.gear) {
+        gm.o.position.z += ((gm.z0 + target) - gm.o.position.z) * Math.min(1, dt * 2.5)
+      }
     }
   })
 
