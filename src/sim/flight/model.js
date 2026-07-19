@@ -118,11 +118,18 @@ export function deriveAircraft(aircraft) {
 // Runway geometry shared by the sim and the 3D scene (metres, centred on z=0).
 export const RUNWAY = { halfLen: 1600, width: 45, heading: 0, threshold: 1500 }
 
-export function createState(ac) {
+// Build a runway descriptor from a real length; the sim/scene are centred on
+// z=0 so the near threshold sits at +halfLen and departures run toward −z.
+export function runwayFor(lenM = 3200) {
+  const halfLen = lenM / 2
+  return { halfLen, width: 45, heading: 0, threshold: halfLen - 100 }
+}
+
+export function createState(ac, rwy = RUNWAY) {
   return {
     // position of the gear/CG reference over the world, h = gear height AGL.
     // Spawn on the runway threshold, on the centreline, lined up down −z.
-    x: 0, z: RUNWAY.threshold, h: 0,
+    x: 0, z: rwy.threshold, h: 0,
     v: 0,            // TAS m/s
     psi: 0,          // heading rad, 0 = down the runway (−z)
     gamma: 0,        // flight-path angle

@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { FAMILIES, getAircraftForFamily, getAircraft } from '../data/index.js'
-import { WEATHER, deriveAircraft, createState } from '../sim/flight/model.js'
+import { WEATHER, deriveAircraft, createState, runwayFor } from '../sim/flight/model.js'
+import { AIRPORTS, AIRPORT_BY_CODE, distanceNm, bearingDeg, etaHours } from '../data/airports.js'
 import PFD from '../sim/flight/PFD.jsx'
 import Cockpit from '../sim/flight/Cockpit.jsx'
 import { updateAtc, callsignFor } from '../sim/flight/atc.js'
@@ -33,6 +34,8 @@ export default function FlyPage() {
   const initial = params.get('ac') || 'a320/a320'
   const [acKey, setAcKey] = useState(initial)
   const [wxKey, setWxKey] = useState('clear')
+  const [fromCode, setFromCode] = useState(params.get('from') || 'LHR')
+  const [toCode, setToCode] = useState(params.get('to') || 'JFK')
   const [view, setView] = useState('cockpit')
   const [mode, setMode] = useState('keyboard') // keyboard | deck
   const [hud, setHud] = useState(null)
@@ -50,11 +53,21 @@ export default function FlyPage() {
   const ac = useMemo(() => deriveAircraft(aircraft), [aircraft])
   const weather = WEATHER[wxKey]
 
+  // real departure / destination airports → runway + great-circle route
+  const from = AIRPORT_BY_CODE[fromCode] || AIRPORTS[0]
+  const to = AIRPORT_BY_CODE[toCode] || AIRPORTS[1]
+  const rwy = useMemo(() => runwayFor(from.rwy.lenM), [from])
+  const route = useMemo(() => ({
+    nm: Math.round(distanceNm(from, to)),
+    brg: Math.round(bearingDeg(from, to)),
+    eta: etaHours(from, to),
+  }), [from, to])
+
   // Mutable sim container shared with the Canvas loop — no re-renders per frame.
   const simRef = useRef(null)
   if (simRef.current == null) {
     simRef.current = {
-      state: createState(ac),
+      state: createState(ac, rwy),
       ac,
       weather,
       controls: { pitch: 0, roll: 0, yaw: 0, throttle: 0, flap: 1, gear: true, brakes: false, speedbrake: 0 },
@@ -66,14 +79,14 @@ export default function FlyPage() {
   simRef.current.weather = weather
 
   const reset = () => {
-    simRef.current.state = createState(ac)
-    simRef.current.controls = { pitch: 0, roll: 0, yaw: 0, throttle: 0, flap: 1, gear: true, brakes: false }
+    simRef.current.state = createState(ac, rwy)
+    simRef.current.controls = { pitch: 0, roll: 0, yaw: 0, throttle: 0, flap: 1, gear: true, brakes: false, speedbrake: 0 }
     simRef.current.out = null
     forceTick((n) => n + 1)
   }
 
   // variant change → fresh state
-  useEffect(() => { reset() }, [acKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { reset() }, [acKey, fromCode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- keyboard ----
   useEffect(() => {
@@ -161,16 +174,17 @@ export default function FlyPage() {
   useEffect(() => {
     if (view !== 'tower') return
     const csign = callsignFor(aircraft.name)
+    const field = { rwy: from.rwy.id, from: from.code, to: to.code, city: from.city, dest: to.city }
     const iv = setInterval(() => {
       const sim = simRef.current
-      atcMem.current = updateAtc(atcMem.current, sim.state, sim.out, csign, weather)
+      atcMem.current = updateAtc(atcMem.current, sim.state, sim.out, csign, weather, field)
       setAtcLog(atcMem.current.log)
     }, 500)
     return () => clearInterval(iv)
-  }, [view, aircraft.name, weather])
+  }, [view, aircraft.name, weather, from, to])
 
-  // reset ATC transcript when the aircraft changes
-  useEffect(() => { atcMem.current = null; setAtcLog([]) }, [acKey])
+  // reset ATC transcript when the aircraft or departure changes
+  useEffect(() => { atcMem.current = null; setAtcLog([]) }, [acKey, fromCode])
 
   const s = simRef.current.state
   const c = simRef.current.controls
@@ -191,6 +205,13 @@ export default function FlyPage() {
           {Object.entries(WEATHER).map(([k, w]) => (
             <option key={k} value={k}>{w.name}</option>
           ))}
+        </select>
+        <select value={fromCode} onChange={(e) => setFromCode(e.target.value)} aria-label="Departure airport" title="Depart from">
+          {AIRPORTS.map((a) => <option key={a.code} value={a.code}>◐ {a.code} · {a.city}</option>)}
+        </select>
+        <span className="fly-arrow">→</span>
+        <select value={toCode} onChange={(e) => setToCode(e.target.value)} aria-label="Destination airport" title="Fly to">
+          {AIRPORTS.map((a) => <option key={a.code} value={a.code}>◑ {a.code} · {a.city}</option>)}
         </select>
         <div className="viewer-toggle" style={{ margin: 0 }}>
           {VIEWS.map((v) => (
@@ -218,9 +239,19 @@ export default function FlyPage() {
               dims={aircraft.dimensions}
               weather={weather}
               view={view}
+              runwayHalfLen={rwy.halfLen}
             />
           )}
         </Suspense>
+
+        {/* route strip: real departure → destination */}
+        <div className="fly-route">
+          <span className="fly-route-ap">{from.code}</span>
+          <span className="fly-route-city">{from.city} · RWY {from.rwy.id} · {from.rwy.lenM.toLocaleString()} m</span>
+          <span className="fly-route-line">— {route.nm.toLocaleString()} nm · {route.brg}° · ~{route.eta.toFixed(1)} h →</span>
+          <span className="fly-route-ap">{to.code}</span>
+          <span className="fly-route-city">{to.city}</span>
+        </div>
 
         {/* cockpit window framing */}
         {view === 'cockpit' && (

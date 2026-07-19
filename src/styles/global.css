@@ -603,6 +603,14 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .cockpit-glareshield { position: absolute; left: 0; right: 0; bottom: 0; height: 26%; pointer-events: none; z-index: 1; background: linear-gradient(to top, #05070a 30%, rgba(5, 7, 10, 0.92) 62%, transparent 100%); }
 
 .fly-mode-hint { color: var(--accent); font-size: 11.5px; }
+.fly-arrow { color: var(--muted); font-family: var(--mono); }
+
+/* Earth Engine route strip: real departure → destination */
+.fly-route { position: absolute; bottom: 12px; left: 14px; display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(8,10,13,0.82); border: 1px solid var(--border-2); border-radius: 20px; font-family: var(--mono); backdrop-filter: blur(5px); max-width: calc(100% - 28px); overflow: hidden; }
+.fly-route-ap { color: var(--accent); font-weight: 700; font-size: 13px; letter-spacing: 0.04em; }
+.fly-route-city { color: var(--ink); font-size: 11px; white-space: nowrap; }
+.fly-route-line { color: var(--muted); font-size: 11px; white-space: nowrap; }
+@media (max-width: 700px) { .fly-route-city { display: none; } }
 
 /* Tower ATC radio panel */
 .fly-atc { position: absolute; top: 14px; left: 14px; width: min(360px, 42vw); background: rgba(8,10,13,0.86); border: 1px solid var(--border-2); border-radius: 8px; backdrop-filter: blur(5px); overflow: hidden; }

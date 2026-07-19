@@ -76,18 +76,18 @@ function Marking({ x = 0, z, w, l, y = 0.06, mat = paintMat }) {
  * lights, a PAPI on the approach, an approach-light bar out past the threshold,
  * and a taxiway. Geometry mirrors sim RUNWAY (±1600 m, 45 m wide).
  */
-function Runway({ night }) {
-  const HL = 1600
+function Runway({ night, halfLen = 1600 }) {
+  const HL = halfLen
   const centreline = useMemo(() => {
     const arr = []
-    for (let z = -1440; z <= 1440; z += 60) arr.push(z)
+    for (let z = -(HL - 160); z <= HL - 160; z += 60) arr.push(z)
     return arr
-  }, [])
+  }, [HL])
   const edgeZ = useMemo(() => {
     const arr = []
-    for (let z = -1560; z <= 1560; z += 60) arr.push(z)
+    for (let z = -(HL - 40); z <= HL - 40; z += 60) arr.push(z)
     return arr
-  }, [])
+  }, [HL])
   const lightMat = useMemo(() => new THREE.MeshStandardMaterial({
     color: '#fff2c8', emissive: '#ffd97a', emissiveIntensity: night ? 3.2 : 1.4,
   }), [night])
@@ -97,33 +97,35 @@ function Runway({ night }) {
   // piano-key threshold bars at each end
   const keys = [-18, -13.5, -9, -4.5, 4.5, 9, 13.5, 18]
 
+  const thr = HL - 40      // threshold bar position
+  const aim = HL - 450     // aiming point ~400 m in
+  const tdz1 = HL - 300, tdz2 = HL - 600
+  const twyZ = useMemo(() => { const a = []; for (let z = -(HL - 400); z <= HL - 400; z += 40) a.push(z); return a }, [HL])
   return (
     <group>
       {/* asphalt + shoulders */}
       <mesh position={[0, 0.02, 0]} material={asphaltMat}>
-        <boxGeometry args={[45, 0.04, 3200]} />
+        <boxGeometry args={[45, 0.04, HL * 2]} />
       </mesh>
       <mesh position={[0, 0.015, 0]}>
-        <boxGeometry args={[62, 0.03, 3240]} />
+        <boxGeometry args={[62, 0.03, HL * 2 + 40]} />
         <meshStandardMaterial color="#2b3a24" roughness={1} />
       </mesh>
 
       {/* side stripes (runway edge line) */}
-      <Marking x={-21} z={0} w={0.6} l={3120} />
-      <Marking x={21} z={0} w={0.6} l={3120} />
+      <Marking x={-21} z={0} w={0.6} l={HL * 2 - 80} />
+      <Marking x={21} z={0} w={0.6} l={HL * 2 - 80} />
 
       {/* dashed centreline */}
       {centreline.map((z) => <Marking key={z} z={z} w={0.9} l={30} />)}
 
-      {/* threshold piano keys + runway number blocks, aiming points, TDZ bars */}
+      {/* threshold piano keys, aiming points, TDZ bars at each end */}
       {[1, -1].map((end) => (
         <group key={end}>
-          {keys.map((x) => <Marking key={x} x={x} z={end * 1555} w={1.8} l={40} />)}
-          {/* aiming point (two fat blocks ~400 m in) */}
-          <Marking x={-6} z={end * 1150} w={4.5} l={45} />
-          <Marking x={6} z={end * 1150} w={4.5} l={45} />
-          {/* touchdown-zone bars */}
-          {[1300, 1000].map((zz) => (
+          {keys.map((x) => <Marking key={x} x={x} z={end * (thr - 5)} w={1.8} l={40} />)}
+          <Marking x={-6} z={end * aim} w={4.5} l={45} />
+          <Marking x={6} z={end * aim} w={4.5} l={45} />
+          {[tdz1, tdz2].map((zz) => (
             <group key={zz}>
               <Marking x={-9} z={end * zz} w={3} l={22} />
               <Marking x={9} z={end * zz} w={3} l={22} />
@@ -140,38 +142,34 @@ function Runway({ night }) {
         </group>
       ))}
 
-      {/* threshold lights: green at the near threshold, red at the far */}
+      {/* threshold lights at the near end */}
       {keys.concat([-22, 22]).map((x) => (
-        <mesh key={`g${x}`} position={[x, 0.3, 1560]} material={whiteMat}><boxGeometry args={[0.7, 0.4, 0.4]} /></mesh>
+        <mesh key={`g${x}`} position={[x, 0.3, thr]} material={whiteMat}><boxGeometry args={[0.7, 0.4, 0.4]} /></mesh>
       ))}
 
-      {/* PAPI — four boxes off the left of the touchdown zone */}
+      {/* PAPI — off the left of the touchdown zone */}
       {[0, 1, 2, 3].map((i) => (
-        <mesh key={i} position={[-32, 0.6, 1180 + i * 3]} material={i < 2 ? whiteMat : redMat}>
+        <mesh key={i} position={[-32, 0.6, aim + i * 3]} material={i < 2 ? whiteMat : redMat}>
           <boxGeometry args={[1.4, 1, 1.4]} />
         </mesh>
       ))}
 
-      {/* approach lighting: a bar array running out past the near threshold */}
-      {[1650, 1710, 1770, 1830, 1890, 1950].map((z, i) => (
-        <group key={z}>
-          <mesh position={[0, 0.3, z]} material={whiteMat}><boxGeometry args={[0.8 + i * 0.3, 0.3, 0.4]} /></mesh>
-        </group>
+      {/* approach lighting: bars running out past the near threshold */}
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <mesh key={i} position={[0, 0.3, thr + 50 + i * 60]} material={whiteMat}><boxGeometry args={[0.8 + i * 0.3, 0.3, 0.4]} /></mesh>
       ))}
 
       {/* parallel taxiway */}
       <mesh position={[75, 0.018, 0]} material={asphaltMat}>
-        <boxGeometry args={[22, 0.036, 2600]} />
+        <boxGeometry args={[22, 0.036, HL * 1.6]} />
       </mesh>
-      {/* taxiway centreline (yellow) */}
-      {useMemo(() => { const a = []; for (let z = -1200; z <= 1200; z += 40) a.push(z); return a }, []).map((z) => (
+      {twyZ.map((z) => (
         <mesh key={z} position={[75, 0.055, z]}>
           <boxGeometry args={[0.5, 0.02, 20]} />
           <meshStandardMaterial color="#d7b53a" roughness={0.8} />
         </mesh>
       ))}
-      {/* twy link to runway */}
-      <mesh position={[47, 0.018, 1400]} material={asphaltMat}>
+      <mesh position={[47, 0.018, thr - 160]} material={asphaltMat}>
         <boxGeometry args={[60, 0.036, 22]} />
       </mesh>
     </group>
@@ -334,7 +332,7 @@ function Loader() {
   )
 }
 
-export default function FlightScene({ simRef, modelUrl, dims, weather, view }) {
+export default function FlightScene({ simRef, modelUrl, dims, weather, view, runwayHalfLen = 1600 }) {
   const sky = SKIES[weather.sky] || SKIES.day
   const groundTex = useGroundTexture(weather.sky)
   const groupRef = useRef()
@@ -358,7 +356,7 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view }) {
           <planeGeometry args={[64000, 64000]} />
           <meshStandardMaterial map={groundTex} roughness={1} />
         </mesh>
-        <Runway night={night} />
+        <Runway night={night} halfLen={runwayHalfLen} />
         <Buildings />
 
         <Suspense fallback={<Loader />}>

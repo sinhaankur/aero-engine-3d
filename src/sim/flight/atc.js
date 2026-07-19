@@ -8,7 +8,6 @@
  * the aircraft is actually doing — altitude, speed, gear, phase transitions.
  */
 
-const RWY = '27'
 const ATIS = 'Information ALPHA'
 
 // Build a fixed callsign from the aircraft name, airline-style.
@@ -23,7 +22,9 @@ export function callsignFor(name) {
  * Only appends when the situation actually changes, so it reads like a real
  * frequency rather than spamming every frame.
  */
-export function updateAtc(mem, s, out, csign, weather) {
+export function updateAtc(mem, s, out, csign, weather, field = {}) {
+  const RWY = field.rwy || '27'
+  const dest = field.dest || 'destination'
   mem = mem || { phase: null, said: {}, log: [], altBand: null }
   const push = (from, text) => {
     mem.log = [...mem.log.slice(-7), { from, text, t: Date.now() }]
@@ -45,8 +46,8 @@ export function updateAtc(mem, s, out, csign, weather) {
         once('rolling', 'PILOT', `Cleared for takeoff, ${RWY}, ${csign}.`)
         break
       case 'climb':
-        once('airborne', 'TOWER', `${csign}, radar contact, climb and maintain flight level two-five-zero, contact departure.`)
-        once('climb-ack', 'PILOT', `Climb two-five-zero, good day, ${csign}.`)
+        once('airborne', 'TOWER', `${csign}, radar contact, climb and maintain flight level two-five-zero, cleared to ${dest}, contact departure.`)
+        once('climb-ack', 'PILOT', `Climb two-five-zero, ${dest}, good day, ${csign}.`)
         break
       case 'cruise':
         once('level', 'DEPARTURE', `${csign}, maintain present level, cleared en-route.`)
