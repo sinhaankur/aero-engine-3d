@@ -360,6 +360,49 @@ function CameraRig({ simRef, groupRef, view, dims }) {
   return null
 }
 
+/**
+ * Altitude atmosphere: drives the scene background + fog by height so climbing
+ * actually leaves the surface. Low down you get the weather sky and thick haze;
+ * as you climb the sky darkens through deep blue to near-black space and the fog
+ * pushes far out, so the ground recedes instead of clinging to the aircraft.
+ * The band edges follow the real atmosphere — most scattering is gone by ~15 km.
+ */
+function Atmosphere({ simRef, baseColor, visM }) {
+  const { scene } = useThree()
+  const base = useMemo(() => new THREE.Color(baseColor), [baseColor])
+  const space = useMemo(() => new THREE.Color('#05070f'), [])   // high-altitude sky
+  const horizon = useMemo(() => new THREE.Color('#1a2c50'), []) // thin bright band
+  const tmp = useMemo(() => new THREE.Color(), [])
+  const fog = useMemo(() => new THREE.Fog(baseColor, visM * 0.12, visM), [baseColor, visM])
+
+  useEffect(() => {
+    scene.fog = fog
+    if (!scene.background) scene.background = base.clone()
+    return () => { scene.fog = null }
+  }, [scene, fog, base])
+
+  useFrame(() => {
+    const h = simRef.current?.state?.h || 0
+    // 0 at sea level, 1 by ~13 km. The sky noticeably deepens from ~2 km up
+    // (cruise for a regional leg) so climbing reads as leaving the surface.
+    const f = Math.min(1, h / 13000)
+    const darken = Math.pow(f, 0.7)   // meaningful shift even at a few km
+    // surface sky → deep space, warm horizon band blended through the middle
+    tmp.copy(base).lerp(horizon, Math.min(1, darken * 1.2)).lerp(space, Math.pow(f, 1.3))
+    if (scene.background?.isColor) scene.background.copy(tmp)
+    else scene.background = tmp.clone()
+    // A ground-haze layer that thickens with altitude: as you climb, the fog
+    // near-plane closes in on the FAR ground so the surface washes out into the
+    // sky, instead of a crisp lawn clinging under the aircraft.
+    fog.color.copy(tmp)
+    // near stays close so distant terrain fogs; far shrinks with altitude so the
+    // 64 km ground sheet is swallowed by haze the higher you get
+    fog.near = 200 + h * 1.5
+    fog.far = Math.max(4000, visM * 1.1 - h * 3.2)
+  })
+  return null
+}
+
 function Loader() {
   return (
     <Html center>
@@ -383,8 +426,7 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
         gl={{ powerPreference: 'high-performance', antialias: true }}
         camera={{ position: [150, 40, 1700], fov: 45, near: 0.5, far: 90000 }}
       >
-        <color attach="background" args={[sky.bg]} />
-        <fog attach="fog" args={[sky.bg, visM * 0.12, visM]} />
+        <Atmosphere simRef={simRef} baseColor={sky.bg} visM={visM} />
         <hemisphereLight intensity={sky.hemi} color="#dfe9f2" groundColor="#3a4450" />
         <directionalLight position={[2500, 3800, 1200]} intensity={sky.sun} />
 
