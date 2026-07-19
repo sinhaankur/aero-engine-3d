@@ -5,6 +5,7 @@ import { WEATHER, deriveAircraft, createState } from '../sim/flight/model.js'
 import PFD from '../sim/flight/PFD.jsx'
 import Cockpit from '../sim/flight/Cockpit.jsx'
 import { updateAtc, callsignFor } from '../sim/flight/atc.js'
+import { FlightAudio } from '../sim/flight/audio.js'
 
 const FlightScene = lazy(() => import('../three/FlightScene.jsx'))
 
@@ -37,6 +38,9 @@ export default function FlyPage() {
   const [hud, setHud] = useState(null)
   const [atcLog, setAtcLog] = useState([])
   const atcMem = useRef(null)
+  const [sound, setSound] = useState(false)
+  const audioRef = useRef(null)
+  if (audioRef.current == null) audioRef.current = new FlightAudio()
   const [, forceTick] = useState(0)
 
   const [familyId, aircraftId] = acKey.split('/')
@@ -135,6 +139,24 @@ export default function FlyPage() {
     return () => clearInterval(iv)
   }, [])
 
+  // ---- Engine/wind audio: pump live sim values at 30 Hz while sound is on ----
+  useEffect(() => {
+    if (!sound) return
+    const audio = audioRef.current
+    const iv = setInterval(() => {
+      audio.update(simRef.current.state, simRef.current.out)
+    }, 33)
+    return () => clearInterval(iv)
+  }, [sound])
+  // stop audio on unmount
+  useEffect(() => () => { audioRef.current?.stop() }, [])
+
+  const toggleSound = () => {
+    const audio = audioRef.current
+    if (sound) { audio.stop(); setSound(false) }
+    else { audio.start(); setSound(true) } // start() resumes the context (user gesture)
+  }
+
   // ---- Tower ATC: run the controller ~2 Hz while the tower view is active ----
   useEffect(() => {
     if (view !== 'tower') return
@@ -180,6 +202,9 @@ export default function FlyPage() {
             <button key={m.id} className={mode === m.id ? 'on' : ''} onClick={() => setMode(m.id)}>{m.name}</button>
           ))}
         </div>
+        <button className={`fly-reset ${sound ? 'on' : ''}`} onClick={toggleSound} title="Procedural engine + wind audio">
+          {sound ? '♪ Sound on' : '♪ Sound off'}
+        </button>
         <button className="fly-reset" onClick={reset}>↺ Reset</button>
         <span className="fly-blurb">{weather.blurb}</span>
       </div>
