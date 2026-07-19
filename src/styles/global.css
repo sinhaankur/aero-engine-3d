@@ -612,6 +612,28 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .fly-route-line { color: var(--muted); font-size: 11px; white-space: nowrap; }
 @media (max-width: 700px) { .fly-route-city { display: none; } }
 
+/* Live engine + fuel panel */
+.fly-engine { position: absolute; right: 14px; bottom: 14px; width: 340px; max-width: 46vw; }
+.el { background: rgba(8,10,13,0.9); border: 1px solid var(--border-2); border-radius: 8px; overflow: hidden; backdrop-filter: blur(6px); font-family: var(--mono); }
+.el-head { padding: 6px 10px; font-size: 9.5px; letter-spacing: 0.08em; color: var(--accent); border-bottom: 1px solid var(--border); background: rgba(216,255,62,0.05); }
+.el-body { display: grid; grid-template-columns: 1fr auto; gap: 6px; padding: 6px 8px; align-items: center; }
+.el-svg { width: 100%; height: auto; }
+.el-gauges { display: flex; flex-direction: column; gap: 5px; min-width: 96px; }
+.el-gauge { display: grid; grid-template-columns: 26px 1fr; grid-template-rows: auto auto; column-gap: 5px; }
+.el-gauge-l { grid-row: 1 / 3; align-self: center; font-size: 9px; color: var(--muted); }
+.el-gauge-v { font-size: 12px; color: #3fb950; font-weight: 700; }
+.el-gauge-v i { font-size: 8px; color: var(--muted); font-style: normal; margin-left: 2px; }
+.el-gauge.warn .el-gauge-v { color: #f85149; }
+.el-gauge-bar { height: 3px; background: #20242c; border-radius: 2px; overflow: hidden; }
+.el-gauge-bar span { display: block; height: 100%; background: #3fb950; }
+.el-gauge.warn .el-gauge-bar span { background: #f85149; }
+.el-fuel { padding: 6px 10px 8px; border-top: 1px solid var(--border); }
+.el-fuel-bar { height: 6px; background: #20242c; border-radius: 3px; overflow: hidden; margin-bottom: 5px; }
+.el-fuel-bar span { display: block; height: 100%; background: linear-gradient(90deg, #d8ff3e, #98a82c); transition: width 0.4s; }
+.el-fuel-nums { display: flex; justify-content: space-between; gap: 6px; font-size: 10px; color: var(--muted); }
+.el-fuel-nums b { color: var(--ink); }
+@media (max-width: 760px) { .fly-engine { display: none; } }
+
 /* Tower ATC radio panel */
 .fly-atc { position: absolute; top: 14px; left: 14px; width: min(360px, 42vw); background: rgba(8,10,13,0.86); border: 1px solid var(--border-2); border-radius: 8px; backdrop-filter: blur(5px); overflow: hidden; }
 .fly-atc-head { display: flex; align-items: center; gap: 7px; padding: 7px 10px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--accent); border-bottom: 1px solid var(--border); background: rgba(216,255,62,0.05); }

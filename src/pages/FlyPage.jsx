@@ -7,6 +7,7 @@ import PFD from '../sim/flight/PFD.jsx'
 import Cockpit from '../sim/flight/Cockpit.jsx'
 import { updateAtc, callsignFor } from '../sim/flight/atc.js'
 import { FlightAudio } from '../sim/flight/audio.js'
+import EngineLive from '../sim/flight/EngineLive.jsx'
 
 const FlightScene = lazy(() => import('../three/FlightScene.jsx'))
 
@@ -42,6 +43,7 @@ export default function FlyPage() {
   const [atcLog, setAtcLog] = useState([])
   const atcMem = useRef(null)
   const [sound, setSound] = useState(false)
+  const [showEngine, setShowEngine] = useState(false)
   const audioRef = useRef(null)
   if (audioRef.current == null) audioRef.current = new FlightAudio()
   const [, forceTick] = useState(0)
@@ -226,6 +228,9 @@ export default function FlyPage() {
         <button className={`fly-reset ${sound ? 'on' : ''}`} onClick={toggleSound} title="Procedural engine + wind audio">
           {sound ? '♪ Sound on' : '♪ Sound off'}
         </button>
+        <button className={`fly-reset ${showEngine ? 'on' : ''}`} onClick={() => setShowEngine((v) => !v)} title="Live engine + fuel panel">
+          ⚙ Engine
+        </button>
         <button className="fly-reset" onClick={reset}>↺ Reset</button>
         <span className="fly-blurb">{weather.blurb}</span>
       </div>
@@ -281,6 +286,13 @@ export default function FlyPage() {
                 </p>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* live engine + fuel panel */}
+        {showEngine && (
+          <div className="fly-engine">
+            <EngineLive out={hud} state={s} ac={ac} engine={aircraft.engines?.[0]} />
           </div>
         )}
 
