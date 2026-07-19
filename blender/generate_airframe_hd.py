@@ -663,9 +663,9 @@ def build_gear_and_details(spec, materials, fuse):
     objs = []
     ground_y = -Rv - R * 0.62     # wheels sit here below the belly
 
-    def strut(x, z, top_y, bot_y, r):
+    def strut(x, z, top_y, bot_y, r, verts=12):
         bpy.ops.mesh.primitive_cylinder_add(
-            vertices=10, radius=r, depth=(top_y - bot_y),
+            vertices=verts, radius=r, depth=(top_y - bot_y),
             location=(x, (top_y + bot_y) / 2, z))
         s = bpy.context.active_object
         assign(s, materials["gear"])
@@ -673,30 +673,84 @@ def build_gear_and_details(spec, materials, fuse):
         return s
 
     def wheel(x, z, y, r):
+        # tyre
         bpy.ops.mesh.primitive_cylinder_add(
-            vertices=16, radius=r, depth=r * 0.7,
+            vertices=20, radius=r, depth=r * 0.62,
             location=(x, y, z), rotation=(math.radians(90), 0, 0))
         w = bpy.context.active_object
         assign(w, materials["tyre"])
         shade_smooth(w, True)
+        objs.append(w)
+        # brake hub / rim, slightly inboard
+        bpy.ops.mesh.primitive_cylinder_add(
+            vertices=16, radius=r * 0.55, depth=r * 0.66,
+            location=(x, y, z), rotation=(math.radians(90), 0, 0))
+        h = bpy.context.active_object
+        assign(h, materials["hub"])
+        shade_smooth(h, True)
+        objs.append(h)
         return w
 
-    # nose gear
-    nx = fuse["x_nose_end"] + R * 0.2
-    nr = R * 0.16
-    objs.append(strut(nx, 0, -Rv * 0.55, ground_y + nr, R * 0.05))
-    for dz in (-nr * 0.9, nr * 0.9):
-        objs.append(wheel(nx, dz, ground_y + nr, nr))
+    def axle(x, z, y, half_span, r):
+        bpy.ops.mesh.primitive_cylinder_add(
+            vertices=8, radius=r, depth=half_span * 2,
+            location=(x, y, z), rotation=(math.radians(90), 0, 0))
+        a = bpy.context.active_object
+        assign(a, materials["gear"])
+        shade_smooth(a, True)
+        objs.append(a)
 
-    # main gear: two bogies just aft of the wing box, one per side
+    def torque_link(x, z, y_top, y_bot, r):
+        # slim diagonal link on the front face of the oleo
+        bpy.ops.mesh.primitive_cylinder_add(
+            vertices=6, radius=r, depth=(y_top - y_bot),
+            location=(x - r * 3, (y_top + y_bot) / 2, z))
+        t = bpy.context.active_object
+        t.rotation_euler = (0, 0, math.radians(12))
+        assign(t, materials["gear"])
+        objs.append(t)
+
+    # ---- nose gear: oleo + twin wheels + drag strut ----
+    nx = fuse["x_nose_end"] + R * 0.2
+    nr = R * 0.15
+    n_top, n_bot = -Rv * 0.55, ground_y + nr
+    objs.append(strut(nx, 0, n_top, n_bot + nr * 0.4, R * 0.06))       # main oleo
+    torque_link(nx, 0, n_top * 0.4, n_bot + nr, R * 0.018)             # torque link
+    axle(nx, 0, n_bot + nr, nr * 1.0, R * 0.02)
+    for dz in (-nr * 0.85, nr * 0.85):
+        wheel(nx, dz, n_bot + nr, nr)
+    # forward drag strut up into the bay
+    bpy.ops.mesh.primitive_cylinder_add(
+        vertices=6, radius=R * 0.03, depth=Rv * 0.7,
+        location=(nx + R * 0.28, n_top * 0.55, 0),
+        rotation=(0, math.radians(58), 0))
+    ds = bpy.context.active_object
+    assign(ds, materials["gear"]); objs.append(ds)
+
+    # ---- main gear: one leg per side, a real bogie of wheels ----
     mx = -L * 0.02
-    mr = R * 0.20
+    mr = R * 0.19
+    # widebodies (bigger radius section) carry a 4-wheel bogie; narrowbody twin
+    four_wheel = R > 2.4
+    m_top, m_bot = -Rv * 0.28, ground_y + mr
     for side in (-1, 1):
-        mz = R * 0.55 * side
-        objs.append(strut(mx, mz, -Rv * 0.30, ground_y + mr, R * 0.07))
-        # 2-wheel bogie
-        for dx in (-mr * 0.9, mr * 0.9):
-            objs.append(wheel(mx + dx, mz, ground_y + mr, mr))
+        mz = R * 0.52 * side
+        objs.append(strut(mx, mz, m_top, m_bot + mr * 0.5, R * 0.075))  # oleo
+        torque_link(mx, mz, m_top * 0.4, m_bot + mr, R * 0.022)
+        # side/drag brace up to the wing box
+        bpy.ops.mesh.primitive_cylinder_add(
+            vertices=6, radius=R * 0.035, depth=R * 0.9,
+            location=(mx, m_top * 0.5, mz - R * 0.24 * side),
+            rotation=(math.radians(28 * side), 0, 0))
+        br = bpy.context.active_object
+        assign(br, materials["gear"]); objs.append(br)
+        # bogie beam + wheels (fore/aft pairs)
+        offs = (-mr * 1.05, mr * 1.05) if four_wheel else (0,)
+        axle_span = mr * 0.95
+        for dx in offs:
+            axle(mx + dx, mz, m_bot + mr, axle_span, R * 0.025)
+            for ddz in (-axle_span, axle_span):
+                wheel(mx + dx, mz + ddz, m_bot + mr, mr)
 
     # belly / wing-root fairing (smooth blister under the wing box) — a low,
     # elongated blister that hugs the belly rather than a big hanging pod.
