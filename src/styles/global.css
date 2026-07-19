@@ -279,7 +279,10 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
   }
 }
 
-.app { max-width: 980px; margin: 0 auto; padding: 0 22px 90px; }
+/* Fluid shell: uses the screen — wider on large displays, tighter side padding
+   on phones — instead of a fixed 980 px column. clamp keeps it readable. */
+.app { width: 100%; max-width: clamp(980px, 92vw, 1320px); margin: 0 auto; padding: 0 clamp(12px, 3vw, 26px) 90px; }
+@media (max-width: 640px) { .app { padding-bottom: 60px; } }
 
 .topbar {
   position: sticky; top: 0; z-index: 20;
@@ -557,6 +560,10 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 
 /* /fly — cockpit-level flight sim */
 .fly-page { display: flex; flex-direction: column; gap: 10px; }
+/* Cockpit mode goes end-to-end: lock the page to the viewport and let the
+   flight stage flex down so the flight-deck panel always fits below it. */
+.fly-page.has-deck { height: calc(100vh - 24px); gap: 8px; }
+.fly-page.has-deck .fly-stage { flex: 1 1 auto; height: auto; min-height: 220px; }
 .fly-topbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .fly-topbar select { background: var(--panel); color: var(--fg); border: 1px solid var(--border); padding: 7px 10px; font-family: var(--mono); font-size: 12px; border-radius: 3px; }
 .fly-reset { background: none; border: 1px solid var(--border-2); color: var(--fg); padding: 7px 12px; cursor: pointer; font-family: var(--mono); font-size: 11px; text-transform: uppercase; border-radius: 3px; }
@@ -593,6 +600,129 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .cockpit-pillar.left { left: 0; background: linear-gradient(105deg, #05070a 18%, rgba(5, 7, 10, 0.85) 42%, transparent 78%); }
 .cockpit-pillar.right { right: 0; background: linear-gradient(-105deg, #05070a 18%, rgba(5, 7, 10, 0.85) 42%, transparent 78%); }
 .cockpit-glareshield { position: absolute; left: 0; right: 0; bottom: 0; height: 26%; pointer-events: none; z-index: 1; background: linear-gradient(to top, #05070a 30%, rgba(5, 7, 10, 0.92) 62%, transparent 100%); }
+
+.fly-mode-hint { color: var(--accent); font-size: 11.5px; }
+
+/* Tower ATC radio panel */
+.fly-atc { position: absolute; top: 14px; left: 14px; width: min(360px, 42vw); background: rgba(8,10,13,0.86); border: 1px solid var(--border-2); border-radius: 8px; backdrop-filter: blur(5px); overflow: hidden; }
+.fly-atc-head { display: flex; align-items: center; gap: 7px; padding: 7px 10px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--accent); border-bottom: 1px solid var(--border); background: rgba(216,255,62,0.05); }
+.fly-atc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse-dot 1.6s infinite; }
+.fly-atc-log { padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; max-height: 200px; overflow-y: auto; }
+.fly-atc-empty { margin: 0; color: var(--muted); font-size: 11.5px; }
+.fly-atc-msg { margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--ink); font-family: var(--mono); }
+.fly-atc-msg b { color: #4fd1e0; font-weight: 700; margin-right: 4px; }
+.fly-atc-msg.me { color: var(--muted); }
+.fly-atc-msg.me b { color: var(--accent); }
+@keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ================================================================== */
+/* Interactive Airbus flight deck (Cockpit.jsx)                        */
+/* ================================================================== */
+.ck {
+  flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px;
+  padding: 10px; border: 1px solid var(--border-2); border-radius: 10px;
+  background:
+    radial-gradient(120% 80% at 50% -20%, rgba(216,255,62,0.04), transparent 60%),
+    linear-gradient(#111318, #0b0d10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 -8px 24px rgba(0,0,0,0.4);
+  font-family: var(--mono);
+}
+.ck button { font-family: var(--mono); cursor: pointer; }
+
+/* ---- glareshield FCU ---- */
+.ck-fcu {
+  display: flex; align-items: stretch; gap: 10px; justify-content: center;
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: linear-gradient(#15181d, #0d0f13);
+}
+.ck-fcu-side { display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.ck-fcu-hdg { display: flex; align-items: flex-end; gap: 6px; }
+
+.ck-win { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 8px; border: 1px solid var(--border-2); border-radius: 6px; background: #05070a; }
+.ck-win-lbl { font-size: 9px; letter-spacing: 0.12em; color: var(--muted); }
+.ck-win-row { display: flex; align-items: center; gap: 4px; }
+.ck-win-val { min-width: 62px; text-align: center; font-size: 20px; font-weight: 700; color: #4fd1e0; text-shadow: 0 0 8px rgba(79,209,224,0.4); letter-spacing: 0.04em; }
+.ck-win-val.managed { color: var(--accent); }
+.ck-win-unit { font-size: 8px; color: var(--faint); letter-spacing: 0.1em; }
+.ck-step { width: 20px; height: 24px; border: 1px solid var(--border-2); background: #1a1e24; color: var(--ink); border-radius: 4px; font-size: 15px; line-height: 1; }
+.ck-step:hover { border-color: var(--accent); color: var(--accent); }
+.ck-step:active { background: var(--accent); color: #000; }
+
+.ck-push { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 48px; padding: 5px 7px; border: 1px solid var(--border-2); border-radius: 5px; background: #14171c; color: var(--muted); }
+.ck-push-top { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
+.ck-push-bot { font-size: 8px; letter-spacing: 0.08em; }
+.ck-push.lit { color: #0a0a0a; background: var(--accent); border-color: var(--accent); box-shadow: 0 0 10px rgba(216,255,62,0.5); }
+.ck-push.mode.lit { background: #4fd1e0; border-color: #4fd1e0; box-shadow: 0 0 10px rgba(79,209,224,0.5); }
+.ck-push:not(.lit):hover { border-color: var(--muted); color: var(--ink); }
+
+/* ---- lower: three panels ---- */
+.ck-lower { display: grid; grid-template-columns: 1.05fr 1fr 1.1fr; gap: 8px; align-items: stretch; }
+.ck-panel { position: relative; border: 1px solid var(--border); border-radius: 8px; background: linear-gradient(#14161b, #0d0f12); padding: 8px 10px 10px; }
+.ck-panel-title { font-size: 8.5px; letter-spacing: 0.18em; color: var(--faint); margin-bottom: 8px; }
+
+.ck-grp { margin-bottom: 7px; }
+.ck-grp-lbl { display: block; font-size: 8px; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 3px; }
+.ck-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* toggle switch */
+.ck-toggle { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; padding: 2px; }
+.ck-toggle-body { width: 26px; height: 34px; border-radius: 5px; background: linear-gradient(#0a0c0f, #04050700); border: 1px solid var(--border-2); display: flex; align-items: flex-end; justify-content: center; padding: 3px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.6); }
+.ck-toggle-nub { width: 16px; height: 15px; border-radius: 3px; background: linear-gradient(#3a4048, #22262c); box-shadow: 0 1px 2px rgba(0,0,0,0.6); transition: transform 0.12s, background 0.12s; }
+.ck-toggle.on .ck-toggle-nub { transform: translateY(-14px); background: linear-gradient(#dff56a, var(--accent-dim)); box-shadow: 0 0 8px rgba(216,255,62,0.55); }
+.ck-toggle.warn.on .ck-toggle-nub { background: linear-gradient(#ffd27a, #d29922); box-shadow: 0 0 8px rgba(210,153,34,0.55); }
+.ck-toggle-lbl { font-size: 8px; letter-spacing: 0.05em; color: var(--muted); }
+.ck-toggle.on .ck-toggle-lbl { color: var(--ink); }
+
+/* ECAM engine display */
+.ck-ecam { background: linear-gradient(#0a0f0b, #070a08); }
+.ck-ecam-engines { display: flex; gap: 14px; justify-content: center; }
+.ck-eng { display: flex; flex-direction: column; align-items: center; }
+.ck-eng.off { opacity: 0.55; }
+.ck-eng-gauge { width: 92px; height: auto; }
+.ck-eng-rows { display: grid; gap: 1px; width: 100%; }
+.ck-eng-rows div { display: flex; justify-content: space-between; font-size: 10px; }
+.ck-eng-rows span { color: var(--muted); }
+.ck-eng-rows b { color: #3fb950; font-weight: 700; }
+.ck-eng-rows b.hot { color: #f85149; }
+.ck-ecam-foot { display: flex; justify-content: space-around; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.ck-ecam-foot div { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.ck-ecam-foot span { font-size: 8px; color: var(--muted); letter-spacing: 0.1em; }
+.ck-ecam-foot b { font-size: 12px; color: #3fb950; }
+.ck-ecam-foot b.up { color: var(--accent); }
+.ck-ecam-memo { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; min-height: 16px; }
+.ck-ecam-memo span { font-size: 9px; padding: 1px 6px; border-radius: 3px; letter-spacing: 0.05em; }
+.ck-ecam-memo .ok { color: #3fb950; border: 1px solid rgba(63,185,80,0.4); }
+.ck-ecam-memo .warn { color: #e3b341; border: 1px solid rgba(210,153,34,0.5); }
+
+/* pedestal */
+.ck-lever-bank { display: flex; gap: 12px; justify-content: space-between; }
+.ck-thr, .ck-spd, .ck-flap { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1; }
+.ck-lever-lbl { font-size: 8px; letter-spacing: 0.12em; color: var(--muted); }
+.ck-thr-slider, .ck-spd-slider {
+  -webkit-appearance: slider-vertical; appearance: slider-vertical;
+  writing-mode: vertical-lr; direction: rtl;
+  width: 26px; height: 92px; accent-color: var(--accent); cursor: grab;
+}
+.ck-spd-slider { accent-color: #e3b341; }
+.ck-thr-val { font-size: 12px; font-weight: 700; color: var(--ink); }
+.ck-thr-detents { display: flex; flex-direction: column; gap: 3px; width: 100%; }
+.ck-thr-detents button { font-size: 8.5px; padding: 3px 0; border: 1px solid var(--border-2); background: #14171c; color: var(--muted); border-radius: 3px; letter-spacing: 0.06em; }
+.ck-thr-detents button:hover { border-color: var(--accent); color: var(--accent); }
+
+.ck-flap-gate { display: flex; flex-direction: column; gap: 3px; width: 100%; }
+.ck-flap-gate button { padding: 5px 0; border: 1px solid var(--border-2); background: #14171c; color: var(--muted); border-radius: 3px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
+.ck-flap-gate button.on { background: var(--accent); color: #000; border-color: var(--accent); }
+
+.ck-ped-row { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.ck-gear { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 2px solid var(--border-2); border-radius: 6px; background: #14171c; color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; }
+.ck-gear-wheel { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; }
+.ck-gear.down { color: #3fb950; border-color: rgba(63,185,80,0.5); }
+.ck-gear.up { color: var(--accent); border-color: rgba(216,255,62,0.5); }
+
+@media (max-width: 900px) {
+  .ck-lower { grid-template-columns: 1fr; }
+  .ck-fcu { flex-wrap: wrap; }
+}
 
 /* /components — how every part is built */
 .comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; margin-top: 14px; }
@@ -986,3 +1116,26 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .proj-install li { margin-bottom: 8px; }
 .proj-install em { color: var(--ink); font-style: normal; }
 .proj-fine { margin-top: 18px; color: var(--faint); font-size: 12px; line-height: 1.6; max-width: 68ch; }
+
+/* ================================================================== */
+/* Global small-screen pass — make the whole site fit the viewport    */
+/* ================================================================== */
+@media (max-width: 760px) {
+  body { font-size: 13px; }
+  .topbar { gap: 12px; padding: 10px 0; margin-bottom: 18px; }
+  .comp-grid { grid-template-columns: 1fr; }
+  .count-strip { grid-template-columns: repeat(2, 1fr); }
+  /* the /fly cockpit stacks its three deck panels on phones already; keep the
+     stage tall enough to see the runway */
+  .fly-page.has-deck { height: auto; }
+  .fly-page.has-deck .fly-stage { min-height: 44vh; }
+  .fly-atc { width: min(300px, 60vw); }
+  .fly-readout { min-width: 140px; font-size: 10.5px; }
+}
+@media (max-width: 480px) {
+  .count-strip { grid-template-columns: 1fr 1fr; }
+  .sim-specs { grid-template-columns: repeat(2, 1fr); }
+  .fly-topbar { gap: 6px; }
+  .fly-topbar select, .fly-topbar .viewer-toggle button { font-size: 10px; padding: 5px 8px; }
+  .fly-help { font-size: 11px; gap: 10px; }
+}

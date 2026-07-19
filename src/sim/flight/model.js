@@ -115,10 +115,14 @@ export function deriveAircraft(aircraft) {
 /* ------------------------------------------------------------------ */
 /* State + integrator                                                  */
 /* ------------------------------------------------------------------ */
+// Runway geometry shared by the sim and the 3D scene (metres, centred on z=0).
+export const RUNWAY = { halfLen: 1600, width: 45, heading: 0, threshold: 1500 }
+
 export function createState(ac) {
   return {
-    // position of the gear/CG reference over the world, h = gear height AGL
-    x: 0, z: 1500, h: 0,
+    // position of the gear/CG reference over the world, h = gear height AGL.
+    // Spawn on the runway threshold, on the centreline, lined up down −z.
+    x: 0, z: RUNWAY.threshold, h: 0,
     v: 0,            // TAS m/s
     psi: 0,          // heading rad, 0 = down the runway (−z)
     gamma: 0,        // flight-path angle
@@ -127,19 +131,82 @@ export function createState(ac) {
     throttle: 0,
     flap: 1,         // takeoff flap preselected
     gear: true,
-    brakes: false,
+    brakes: true,    // park brake set on the threshold, real-sim style
+    speedbrake: 0,   // 0..1 spoiler/speedbrake deployment
     onGround: true,
     stalled: false, buffet: 0,
     crashed: false, landedHard: false, touchdownVs: null,
-    apAlt: null, apOn: false,
     t: 0,
     fuelKg: ac ? ac.mass * 0.12 : 8000,
+
+    // flight phase for ATC / coaching: parked → takeoff → climb → cruise →
+    // descent → approach → landed
+    phase: 'parked', airborneOnce: false,
+
+    // --- engines: master switches + spool state (N1 fraction 0..1) ---
+    eng1Master: true, eng2Master: true,
+    eng1N1: 0.2, eng2N1: 0.2,   // idle at start; ATHR/throttle drives them up
+    engStartValve: false,        // overhead ENG start selector engaged
+
+    // --- overhead systems ---
+    apuMaster: false, apuRunning: false,
+    beacon: true, navLights: true, strobe: false, landingLights: true,
+    fuelPump1: true, fuelPump2: true,
+    seatbeltSign: true,
+
+    // --- autopilot / FCU (Airbus flight control unit) ---
+    apOn: false, athrOn: false,
+    fcuSpd: 250,          // selected speed (kt)
+    fcuHdg: 0,            // selected heading (deg)
+    fcuAlt: 10000,        // selected altitude (ft)
+    fcuVs: 0,             // selected vertical speed (fpm)
+    apVsMode: false,      // true = V/S mode, false = ALT capture/hold
+    apHdgMode: false,     // true = HDG select engaged
+    apAlt: null,          // captured ALT hold target (m), legacy field kept
+  }
+}
+
+/**
+ * Autopilot / autothrust driver. When AP or A/THR is engaged, this overwrites
+ * the relevant control channels from the FCU targets each frame, before the
+ * physics step. Mirrors the Airbus split: AP flies pitch+roll, A/THR flies
+ * speed via the thrust levers. Returns nothing; mutates `controls`.
+ */
+export function autoflight(s, ac, controls, out, dt) {
+  // --- A/THR: hold FCU speed by trimming throttle toward target IAS ---
+  if (s.athrOn && !s.onGround) {
+    const iasKt = out ? out.iasKt : 0
+    const err = s.fcuSpd - iasKt
+    controls.throttle = Math.max(0, Math.min(1, controls.throttle + err * 0.004 * dt * 60))
+  }
+  if (!s.apOn) return
+  // --- AP roll channel: HDG select ---
+  if (s.apHdgMode) {
+    let dpsi = s.fcuHdg - (((s.psi * 180) / Math.PI) % 360 + 360) % 360
+    if (dpsi > 180) dpsi -= 360
+    if (dpsi < -180) dpsi += 360
+    controls.roll = Math.max(-0.6, Math.min(0.6, dpsi * 0.03))
+  } else {
+    controls.roll = 0 // wings level
+  }
+  // --- AP pitch channel: V/S or ALT capture/hold ---
+  const altFt = s.h / FT
+  const vsFpm = out ? out.vsFpm : 0
+  const altErr = s.fcuAlt - altFt
+  if (s.apVsMode && Math.abs(altErr) > 120) {
+    // hold selected V/S, but don't blow through the selected altitude
+    const vsCmd = Math.sign(altErr) === Math.sign(s.fcuVs) || s.fcuVs === 0 ? s.fcuVs : 0
+    controls.pitch = Math.max(-0.6, Math.min(0.6, (vsCmd - vsFpm) * 0.00035))
+  } else {
+    // ALT capture/hold toward FCU altitude
+    controls.pitch = Math.max(-0.5, Math.min(0.5, altErr * 0.004 - vsFpm * 0.0004))
   }
 }
 
 /**
  * One integration step. controls: {pitch −1..1 (pull +), roll −1..1,
- * yaw −1..1, throttle 0..1, flap idx, gear bool, brakes bool}.
+ * yaw −1..1, throttle 0..1, flap idx, gear bool, brakes bool,
+ * speedbrake 0..1}.
  * Returns derived readouts for the HUD.
  */
 export function stepFlight(s, ac, controls, wx, dt) {
@@ -154,8 +221,22 @@ export function stepFlight(s, ac, controls, wx, dt) {
   s.flap = controls.flap
   s.gear = controls.gear
   s.brakes = controls.brakes
+  if (controls.speedbrake != null) s.speedbrake = controls.speedbrake
 
   const flap = ac.flaps[s.flap]
+
+  // --- engine spool: N1 chases a commanded value per running engine ---
+  // A dead master (or no start) means that engine can't make thrust; N1 decays.
+  const engCmd = (running) => running ? (0.2 + s.throttle * 0.78) : 0
+  const spool = (n1, target) => n1 + (target - n1) * Math.min(1, dt / (target > n1 ? 2.2 : 3.5))
+  const e1run = s.eng1Master
+  const e2run = s.eng2Master
+  s.eng1N1 = Math.max(0, spool(s.eng1N1, engCmd(e1run)))
+  s.eng2N1 = Math.max(0, spool(s.eng2N1, engCmd(e2run)))
+  // fraction of installed thrust actually available (average of live engines)
+  const perEng = ac.thrustMax / Math.max(ac.engineCount, 1)
+  const liveN1 = [s.eng1N1, s.eng2N1].reduce((a, b) => a + Math.max(0, (b - 0.2) / 0.78), 0)
+  const thrustAvail = perEng * (ac.engineCount / 2) * Math.max(0, liveN1)
 
   if (!s.onGround) {
     // bank: rate-command, max ~30°/s, capped at 67° (protections-ish)
@@ -181,10 +262,13 @@ export function stepFlight(s, ac, controls, wx, dt) {
   }
   cl = Math.min(cl, clMax)
   const q = 0.5 * atm.rho * s.v * s.v
-  const cd = ac.cd0 + flap.dCd + (s.gear ? 0.02 : 0) + (cl * cl) / (Math.PI * ac.AR * ac.e)
-  const L = q * ac.S * cl
+  const cd = ac.cd0 + flap.dCd + (s.gear ? 0.02 : 0) + s.speedbrake * 0.06 + (cl * cl) / (Math.PI * ac.AR * ac.e)
+  // spoilers also spoil lift when deployed
+  const clSpoiled = cl * (1 - s.speedbrake * 0.35)
+  const L = q * ac.S * clSpoiled
   const D = q * ac.S * cd
-  const T = s.throttle * ac.thrustMax * Math.pow(atm.sigma, 0.72)
+  // thrust: available (engine-gated) thrust scaled by density lapse
+  const T = thrustAvail * Math.pow(atm.sigma, 0.72)
   const W = ac.mass * G
 
   // --- point-mass equations ---
@@ -238,10 +322,28 @@ export function stepFlight(s, ac, controls, wx, dt) {
   // --- fuel burn: crude TSFC ~ 15 g/kN·s ---
   s.fuelKg = Math.max(0, s.fuelKg - (T / 1000) * 0.015 * dt)
 
+  // --- flight phase (drives ATC + coaching) ---
+  const vsFpmNow = (vy / FT) * 60
+  if (!s.onGround) s.airborneOnce = true
+  if (s.onGround) {
+    s.phase = s.airborneOnce ? 'landed' : (s.v > 3 ? 'takeoff' : 'parked')
+  } else if (s.h / FT < 1500 && s.airborneOnce && vsFpmNow < -200) {
+    s.phase = 'approach'
+  } else if (vsFpmNow > 200) {
+    s.phase = 'climb'
+  } else if (vsFpmNow < -200) {
+    s.phase = 'descent'
+  } else {
+    s.phase = 'cruise'
+  }
+
   // --- readouts ---
   const tas = s.v
   const iasKt = (tas * Math.sqrt(atm.sigma)) / KT
   const mach = tas / atm.a
+  // EGT rises with N1 and thins with altitude (crude but plausible for ECAM)
+  const egt = (n1) => Math.round(380 + n1 * 340 + (1 - atm.sigma) * 120)
+  const ff = (n1) => Math.round((300 + n1 * 2400) * Math.pow(atm.sigma, 0.5)) // kg/h per engine
   return {
     atm, wind,
     iasKt,
@@ -250,7 +352,9 @@ export function stepFlight(s, ac, controls, wx, dt) {
     altFt: s.h / FT,
     vsFpm: (vy / FT) * 60,
     hdg: (((s.psi * 180) / Math.PI) % 360 + 360) % 360,
-    n1: 20 + s.throttle * 78,
+    n1: Math.round((s.eng1N1 + s.eng2N1) * 50),
+    eng1: { n1: Math.round(s.eng1N1 * 100), egt: egt(s.eng1N1), ff: ff(s.eng1N1) },
+    eng2: { n1: Math.round(s.eng2N1 * 100), egt: egt(s.eng2N1), ff: ff(s.eng2N1) },
     L, D, T, W,
     overspeed: mach > ac.mmo || iasKt > 350,
     aoaDeg: (s.alpha * 180) / Math.PI,

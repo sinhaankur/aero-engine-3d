@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { FAMILIES, getAircraftForFamily, getAircraft } from '../data/index.js'
 import { WEATHER, deriveAircraft, createState } from '../sim/flight/model.js'
 import PFD from '../sim/flight/PFD.jsx'
+import Cockpit from '../sim/flight/Cockpit.jsx'
+import { updateAtc, callsignFor } from '../sim/flight/atc.js'
 
 const FlightScene = lazy(() => import('../three/FlightScene.jsx'))
 
@@ -12,6 +14,12 @@ const VIEWS = [
   { id: 'cockpit', name: 'Cockpit' },
   { id: 'chase', name: 'Chase' },
   { id: 'tower', name: 'Tower' },
+]
+
+// how the pilot flies: keyboard, or by clicking the real flight-deck controls
+const MODES = [
+  { id: 'keyboard', name: 'Keyboard' },
+  { id: 'deck', name: 'Cockpit' },
 ]
 
 /**
@@ -25,7 +33,10 @@ export default function FlyPage() {
   const [acKey, setAcKey] = useState(initial)
   const [wxKey, setWxKey] = useState('clear')
   const [view, setView] = useState('cockpit')
+  const [mode, setMode] = useState('keyboard') // keyboard | deck
   const [hud, setHud] = useState(null)
+  const [atcLog, setAtcLog] = useState([])
+  const atcMem = useRef(null)
   const [, forceTick] = useState(0)
 
   const [familyId, aircraftId] = acKey.split('/')
@@ -42,7 +53,7 @@ export default function FlyPage() {
       state: createState(ac),
       ac,
       weather,
-      controls: { pitch: 0, roll: 0, yaw: 0, throttle: 0, flap: 1, gear: true, brakes: false },
+      controls: { pitch: 0, roll: 0, yaw: 0, throttle: 0, flap: 1, gear: true, brakes: false, speedbrake: 0 },
       out: null,
       paused: false,
     }
@@ -80,7 +91,13 @@ export default function FlyPage() {
         case 'KeyC': setView((v) => VIEWS[(VIEWS.findIndex((x) => x.id === v) + 1) % VIEWS.length].id); break
         case 'KeyA':
           s.apOn = !s.apOn
-          s.apAlt = s.apOn ? s.h : null
+          if (s.apOn) {
+            // engage ALT-hold at the current altitude, wings level
+            s.apAlt = s.h
+            s.fcuAlt = Math.round((s.h / 0.3048) / 100) * 100
+            s.apVsMode = false
+            s.apHdgMode = false
+          }
           break
         case 'Space': simRef.current.paused = !simRef.current.paused; e.preventDefault(); break
         case 'Enter': if (s.crashed) reset(); break
@@ -118,11 +135,26 @@ export default function FlyPage() {
     return () => clearInterval(iv)
   }, [])
 
+  // ---- Tower ATC: run the controller ~2 Hz while the tower view is active ----
+  useEffect(() => {
+    if (view !== 'tower') return
+    const csign = callsignFor(aircraft.name)
+    const iv = setInterval(() => {
+      const sim = simRef.current
+      atcMem.current = updateAtc(atcMem.current, sim.state, sim.out, csign, weather)
+      setAtcLog(atcMem.current.log)
+    }, 500)
+    return () => clearInterval(iv)
+  }, [view, aircraft.name, weather])
+
+  // reset ATC transcript when the aircraft changes
+  useEffect(() => { atcMem.current = null; setAtcLog([]) }, [acKey])
+
   const s = simRef.current.state
   const c = simRef.current.controls
 
   return (
-    <div className="fly-page">
+    <div className={`fly-page ${mode === 'deck' ? 'has-deck' : ''}`}>
       <div className="fly-topbar">
         <select value={acKey} onChange={(e) => setAcKey(e.target.value)} aria-label="Aircraft">
           {FAMILIES.map((f) => (
@@ -141,6 +173,11 @@ export default function FlyPage() {
         <div className="viewer-toggle" style={{ margin: 0 }}>
           {VIEWS.map((v) => (
             <button key={v.id} className={view === v.id ? 'on' : ''} onClick={() => setView(v.id)}>{v.name}</button>
+          ))}
+        </div>
+        <div className="viewer-toggle fly-mode" style={{ margin: 0 }} title="Fly with the keyboard, or click the real flight-deck controls">
+          {MODES.map((m) => (
+            <button key={m.id} className={mode === m.id ? 'on' : ''} onClick={() => setMode(m.id)}>{m.name}</button>
           ))}
         </div>
         <button className="fly-reset" onClick={reset}>↺ Reset</button>
@@ -174,6 +211,23 @@ export default function FlyPage() {
           <PFD out={hud} state={s} ac={ac} weatherName={weather.name} />
         </div>
 
+        {/* Tower ATC radio panel */}
+        {view === 'tower' && (
+          <div className="fly-atc">
+            <div className="fly-atc-head">
+              <span className="fly-atc-dot" /> TOWER · {aircraft.name.replace(/^(Airbus|Boeing|Embraer) /, '')} · {s.phase.toUpperCase()}
+            </div>
+            <div className="fly-atc-log">
+              {atcLog.length === 0 && <p className="fly-atc-empty">Radio quiet — throttle up for takeoff clearance.</p>}
+              {atcLog.map((m) => (
+                <p key={m.t} className={`fly-atc-msg ${m.from === 'PILOT' ? 'me' : ''}`}>
+                  <b>{m.from}</b> {m.text}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* conditions readout */}
         {hud && (
           <div className="fly-readout">
@@ -191,9 +245,10 @@ export default function FlyPage() {
         {/* takeoff coach */}
         {s.onGround && s.v < 3 && !s.crashed && (
           <div className="fly-coach">
-            <b>{shortName(aircraft.name)}</b> ready — {weather.name}.
-            Hold <kbd>W</kbd> for full thrust, rotate with <kbd>↑</kbd> at ~{Math.round(ac.vr / 0.514444)} kt,
-            gear up <kbd>G</kbd>, flaps up <kbd>V</kbd> as you accelerate.
+            <b>{shortName(aircraft.name)}</b> lined up on runway 27 — {weather.name}.
+            {c.brakes ? <> Release the park brake <kbd>B</kbd>, then hold <kbd>W</kbd> for takeoff thrust.</> :
+              <> Hold <kbd>W</kbd> for full thrust, rotate <kbd>↑</kbd> at V<sub>R</sub> ≈ {Math.round(ac.vr / 0.514444)} kt,
+              gear up <kbd>G</kbd>, flaps up <kbd>V</kbd> as you accelerate.</>}
           </div>
         )}
 
@@ -209,7 +264,10 @@ export default function FlyPage() {
         )}
       </div>
 
+      {mode === 'deck' && <Cockpit simRef={simRef} ac={ac} />}
+
       <div className="fly-help">
+        {mode === 'deck' && <span className="fly-mode-hint">Click the flight-deck controls below — keyboard still works too:</span>}
         <span><kbd>W</kbd>/<kbd>S</kbd> thrust</span>
         <span><kbd>↑</kbd><kbd>↓</kbd> pitch</span>
         <span><kbd>←</kbd><kbd>→</kbd> roll</span>
