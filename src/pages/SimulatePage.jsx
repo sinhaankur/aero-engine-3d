@@ -5,16 +5,20 @@ import AirfoilFlow, { WIND_CONDITIONS } from '../sim/AirfoilFlow.jsx'
 import FlightEnvelope from '../sim/FlightEnvelope.jsx'
 import FuelSystem from '../sim/FuelSystem.jsx'
 import WindTunnel from '../sim/WindTunnel.jsx'
+import EngineLive from '../sim/flight/EngineLive.jsx'
+import { isa, deriveAircraft, engineParams, KT } from '../sim/flight/model.js'
 
 // the showcase model viewer pulls in three.js — keep it lazy like the home hero
 const HeroPlane = lazy(() => import('../three/HeroPlane.jsx'))
 
 const TABS = [
   { id: 'aero', name: 'Aerodynamics', icon: '🌬' },
+  { id: 'engine', name: 'Engine', icon: '⚙' },
   { id: 'fuel', name: 'Fuel system', icon: '⛽' },
   { id: 'cfd', name: 'Wind tunnel', icon: '🌀' },
 ]
 const TAB_BLURB = {
+  engine: 'What the engine is doing to hold this condition — N1/N2, EGT, gas-path temps and fuel flow at the speed and altitude you set.',
   fuel: 'Live fuel flow from tanks through pumps to the engines.',
   cfd: 'Real GPU CFD over our own models — pick an aircraft and watch its vortices. A320 vs 737-800 is a head-to-head.',
 }
@@ -160,6 +164,26 @@ export default function SimulatePage() {
   const aircraft = variants.find((a) => a.id === aircraftId) || variants[0]
   const windDef = WIND_CONDITIONS.find((w) => w.id === wind)
 
+  // Static engine readout for the Engine tab: find the N1 that produces the
+  // thrust needed to hold the set speed at the set altitude (level, drag = T),
+  // then run the shared engineParams model at that N1.
+  const engineOut = (() => {
+    const acm = deriveAircraft(aircraft)
+    const atm = isa(alt * 0.3048, isaDev)
+    const tas = kt * KT
+    const q = 0.5 * atm.rho * tas * tas
+    const W = acm.mass * 9.80665
+    const cl = q > 1 ? Math.min(acm.clMaxClean, W / (q * acm.S)) : acm.clMaxClean
+    const cd = acm.cd0 + (cl * cl) / (Math.PI * acm.AR * acm.e)
+    const drag = q * acm.S * cd                                   // thrust required
+    const thrustAvail = acm.thrustMax * Math.pow(atm.sigma, 0.72) // installed, lapsed
+    // N1 fraction: idle 0.2 → thrust maps ~linearly to N1 above idle
+    const n1frac = Math.max(0.2, Math.min(1.05, 0.2 + (drag / Math.max(1, thrustAvail)) * 0.8))
+    const p = engineParams(n1frac, atm)
+    return { n1: p.n1, eng1: p, eng2: p, atm, tasKt: kt, dragKn: drag / 1000, thrustAvailKn: thrustAvail / 1000 }
+  })()
+  const engineFuelState = { fuelKg: deriveAircraft(aircraft).mass * 0.12 }
+
   const pickFamily = (id) => {
     setFamilyId(id)
     setAircraftId(getAircraftForFamily(id)[0]?.id)
@@ -285,6 +309,26 @@ export default function SimulatePage() {
                 alt={alt} onAlt={manual(setAlt)}
                 isaDev={isaDev} onIsaDev={manual(setIsaDev)}
               />
+            </div>
+          </div>
+        </>
+      ) : tab === 'engine' ? (
+        <>
+          <div className="sim-picker">{aircraftPicker}</div>
+          <div className="sim-stage-scroll">
+            <p className="sim-blurb">{TAB_BLURB[tab]}</p>
+            <div className="sim-engine-conds">
+              <label>Speed <input type="range" min="130" max="560" value={kt} onChange={(e) => manual(setKt)(+e.target.value)} /><b>{kt} kt</b></label>
+              <label>Altitude <input type="range" min="0" max="41000" step="500" value={alt} onChange={(e) => manual(setAlt)(+e.target.value)} /><b>{alt.toLocaleString()} ft</b></label>
+              <label>ISA dev <input type="range" min="-30" max="35" value={isaDev} onChange={(e) => manual(setIsaDev)(+e.target.value)} /><b>{isaDev > 0 ? '+' : ''}{isaDev} °C</b></label>
+            </div>
+            <div className="sim-engine-panel">
+              <EngineLive out={engineOut} state={engineFuelState} ac={deriveAircraft(aircraft)} engine={aircraft.engines?.[0]} />
+              <p className="sim-engine-note">
+                To hold <b>{kt} kt</b> at <b>{alt.toLocaleString()} ft</b>, the {shortName(aircraft.name)} needs about{' '}
+                <b>{engineOut.dragKn.toFixed(0)} kN</b> of thrust — that sets the N1 above.
+                {' '}Installed thrust available here (density-lapsed): <b>{engineOut.thrustAvailKn.toFixed(0)} kN</b>.
+              </p>
             </div>
           </div>
         </>

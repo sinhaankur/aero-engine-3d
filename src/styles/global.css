@@ -643,6 +643,15 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .el-stage-p { font-size: 8.5px; color: #6fb2ff; }
 @media (max-width: 760px) { .fly-engine { display: none; } }
 
+/* /simulate Engine tab */
+.sim-engine-conds { display: flex; flex-wrap: wrap; gap: 18px; margin: 4px 0 14px; }
+.sim-engine-conds label { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.sim-engine-conds input[type=range] { width: 150px; accent-color: var(--accent); }
+.sim-engine-conds b { color: var(--ink); min-width: 64px; }
+.sim-engine-panel { max-width: 460px; }
+.sim-engine-note { margin-top: 12px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+.sim-engine-note b { color: var(--ink); }
+
 /* Tower ATC radio panel */
 .fly-atc { position: absolute; top: 14px; left: 14px; width: min(360px, 42vw); background: rgba(8,10,13,0.86); border: 1px solid var(--border-2); border-radius: 8px; backdrop-filter: blur(5px); overflow: hidden; }
 .fly-atc-head { display: flex; align-items: center; gap: 7px; padding: 7px 10px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--accent); border-bottom: 1px solid var(--border); background: rgba(216,255,62,0.05); }
