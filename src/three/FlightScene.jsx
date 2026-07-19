@@ -209,23 +209,37 @@ function AircraftModel({ url, simRef, groupRef }) {
   const { scene } = useGLTF(withBase(url))
   const cloned = useMemo(() => scene.clone(true), [scene])
 
-  // Ground clearance: the render wraps the raw GLB (nose −X, span ±Y, up −Z per
-  // glb-axis-convention) with y=−π/2 then x=+π/2 so it stands upright. To sit
-  // the gear exactly on the runway we need the *upright* model's lowest point,
-  // so we replicate the wrapper on a temp group and measure its world box.
+  // The GLB already carries landing gear (built by generate_airframe_hd.py).
+  // The bounding-box minimum, though, is the wingtip/nacelle — lower than the
+  // wheels in the upright frame — so seating on it makes the jet rest on a
+  // wingtip with the wheels hovering. Instead we find the lowest geometry near
+  // the centreline (|x| within a fraction of span): that's the gear/wheels, the
+  // true contact point. We measure it in the same upright wrapper the scene uses.
   const H0 = useMemo(() => {
     const probe = new THREE.Group()
     const inner = new THREE.Group(); inner.rotation.y = -Math.PI / 2
     const inner2 = new THREE.Group(); inner2.rotation.x = Math.PI / 2
-    const m = cloned.clone(true)
-    inner2.add(m); inner.add(inner2); probe.add(inner)
+    inner2.add(cloned.clone(true)); inner.add(inner2); probe.add(inner)
     probe.updateWorldMatrix(true, true)
-    const box = new THREE.Box3().setFromObject(probe)
-    // gear reference sits on the ground, so lift the group by the belly depth
-    return -box.min.y
+    const full = new THREE.Box3().setFromObject(probe)
+    const span = full.max.x - full.min.x
+    const bandX = span * 0.14 // centreline band that captures nose+main gear
+    let wheelMinY = Infinity
+    const v = new THREE.Vector3()
+    probe.traverse((o) => {
+      if (!o.isMesh || !o.geometry?.attributes?.position) return
+      const pos = o.geometry.attributes.position
+      o.updateWorldMatrix(true, false)
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld)
+        if (Math.abs(v.x) <= bandX && v.y < wheelMinY) wheelMinY = v.y
+      }
+    })
+    // fall back to the full box if we found nothing near the centreline
+    const contact = isFinite(wheelMinY) ? wheelMinY : full.min.y
+    return -contact
   }, [cloned])
 
-  // expose the model's true ground clearance to the sim (camera/spawn scaling)
   useEffect(() => { if (simRef.current) simRef.current.groundClear = H0 }, [H0, simRef])
 
   useFrame(() => {
@@ -235,7 +249,6 @@ function AircraftModel({ url, simRef, groupRef }) {
     g.position.set(s.x, s.h + H0, s.z)
     g.rotation.order = 'YXZ'
     g.rotation.set(s.theta, -s.psi, -s.phi)
-    // stall buffet: a visible airframe shudder
     if (s.buffet > 0.02) {
       g.position.y += Math.sin(s.t * 43) * 0.12 * s.buffet
       g.rotation.z += Math.sin(s.t * 37) * 0.01 * s.buffet
