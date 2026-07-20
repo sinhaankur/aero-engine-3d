@@ -207,6 +207,9 @@ export function createState(ac, rwy = RUNWAY, coldDark = false) {
     // descent → approach → landed
     phase: 'parked', airborneOnce: false,
 
+    // navigation: distance flown along the route (nm) + live groundspeed
+    flownNm: 0, gsKt: 0,
+
     // --- engines: master switches, run state + spool (N1 fraction 0..1) ---
     // `started` = the engine has lit and is self-sustaining at/above idle.
     eng1Master: running, eng2Master: running,
@@ -426,6 +429,11 @@ export function stepFlight(s, ac, controls, wx, dt) {
   s.x += vx * dt
   s.z += vz * dt
   s.h = Math.max(0, s.h + vy * dt)
+
+  // horizontal groundspeed + distance flown along the route (nm), only counted
+  // once airborne so ground manoeuvring doesn't burn the leg down
+  s.gsKt = Math.hypot(vx, vz) / KT
+  if (s.airborneOnce && !s.onGround) s.flownNm += (s.gsKt / 3600) * dt
 
   // --- touchdown / crash ---
   if (!s.onGround && s.h <= 0.01) {

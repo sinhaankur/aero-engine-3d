@@ -81,3 +81,32 @@ export function bearingDeg(a, b) {
 export function etaHours(a, b, gsKt = 470) {
   return distanceNm(a, b) / gsKt
 }
+
+/** Point at fraction f (0..1) along the great circle from a → b. */
+export function interpGC(a, b, f) {
+  const φ1 = rad(a.lat), λ1 = rad(a.lon), φ2 = rad(b.lat), λ2 = rad(b.lon)
+  const d = distanceNm(a, b) / R_EARTH_NM // angular distance (rad)
+  if (d < 1e-6) return { lat: a.lat, lon: a.lon }
+  const A = Math.sin((1 - f) * d) / Math.sin(d)
+  const B = Math.sin(f * d) / Math.sin(d)
+  const x = A * Math.cos(φ1) * Math.cos(λ1) + B * Math.cos(φ2) * Math.cos(λ2)
+  const y = A * Math.cos(φ1) * Math.sin(λ1) + B * Math.cos(φ2) * Math.sin(λ2)
+  const z = A * Math.sin(φ1) + B * Math.sin(φ2)
+  return { lat: deg(Math.atan2(z, Math.hypot(x, y))), lon: deg(Math.atan2(y, x)) }
+}
+
+/**
+ * Progress along a flown leg. `flownNm` is the distance covered so far
+ * (accumulated from real groundspeed). Returns distance-to-go, percent,
+ * current lat/lon on the great circle, live ETA at the given groundspeed, and
+ * whether we've arrived.
+ */
+export function legProgress(from, to, flownNm, gsKt) {
+  const total = distanceNm(from, to)
+  const flown = Math.max(0, Math.min(total, flownNm))
+  const toGo = total - flown
+  const frac = total > 0 ? flown / total : 1
+  const pos = interpGC(from, to, frac)
+  const etaH = gsKt > 20 ? toGo / gsKt : Infinity
+  return { total, flown, toGo, frac, pos, etaH, arrived: toGo < 1 }
+}

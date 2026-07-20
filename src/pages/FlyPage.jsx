@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { FAMILIES, getAircraftForFamily, getAircraft } from '../data/index.js'
 import { WEATHER, deriveAircraft, createState, runwayFor } from '../sim/flight/model.js'
-import { AIRPORTS, AIRPORT_BY_CODE, distanceNm, bearingDeg, etaHours } from '../data/airports.js'
+import { AIRPORTS, AIRPORT_BY_CODE, distanceNm, bearingDeg, etaHours, legProgress } from '../data/airports.js'
 import PFD from '../sim/flight/PFD.jsx'
 import Cockpit from '../sim/flight/Cockpit.jsx'
 import { updateAtc, callsignFor } from '../sim/flight/atc.js'
@@ -196,6 +196,8 @@ export default function FlyPage() {
   const c = simRef.current.controls
   // live startup checklist (only meaningful when spawned cold & dark)
   const checklist = checklistProgress(s)
+  // live leg progress: distance flown → distance-to-go / ETA / % along the route
+  const leg = legProgress(from, to, s.flownNm, s.gsKt)
 
   return (
     <div className={`fly-page ${mode === 'deck' ? 'has-deck' : ''}`}>
@@ -258,13 +260,19 @@ export default function FlyPage() {
           )}
         </Suspense>
 
-        {/* route strip: real departure → destination */}
+        {/* route strip: live leg progress from departure → destination */}
         <div className="fly-route">
           <span className="fly-route-ap">{from.code}</span>
-          <span className="fly-route-city">{from.city} · RWY {from.rwy.id} · {from.rwy.lenM.toLocaleString()} m</span>
-          <span className="fly-route-line">— {route.nm.toLocaleString()} nm · {route.brg}° · ~{route.eta.toFixed(1)} h →</span>
+          <span className="fly-route-prog">
+            <span className="fly-route-fill" style={{ width: `${(leg.frac * 100).toFixed(1)}%` }} />
+            <span className="fly-route-plane" style={{ left: `${(leg.frac * 100).toFixed(1)}%` }}>✈</span>
+          </span>
           <span className="fly-route-ap">{to.code}</span>
-          <span className="fly-route-city">{to.city}</span>
+          <span className="fly-route-line">
+            {leg.arrived
+              ? <b className="arr">ARRIVED · {to.city}</b>
+              : <>{Math.round(leg.toGo).toLocaleString()} nm to go · GS {Math.round(s.gsKt)} kt · ETE {isFinite(leg.etaH) ? `${Math.floor(leg.etaH)}h ${Math.round((leg.etaH % 1) * 60)}m` : '—'}</>}
+          </span>
         </div>
 
         {/* startup checklist — shown when cold & dark until the flow is done */}

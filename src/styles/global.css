@@ -649,7 +649,12 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .fly-route-ap { color: var(--accent); font-weight: 700; font-size: 13px; letter-spacing: 0.04em; }
 .fly-route-city { color: var(--ink); font-size: 11px; white-space: nowrap; }
 .fly-route-line { color: var(--muted); font-size: 11px; white-space: nowrap; }
-@media (max-width: 700px) { .fly-route-city { display: none; } }
+.fly-route-line .arr { color: var(--accent); }
+/* live great-circle progress track with a plane marker */
+.fly-route-prog { position: relative; width: 160px; height: 3px; background: #2a2f38; border-radius: 2px; }
+.fly-route-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 2px; transition: width 0.4s linear; }
+.fly-route-plane { position: absolute; top: 50%; transform: translate(-50%, -55%); font-size: 11px; color: var(--accent); transition: left 0.4s linear; }
+@media (max-width: 700px) { .fly-route-prog { width: 90px; } }
 
 /* Live engine + fuel panel */
 .fly-engine { position: absolute; right: 14px; bottom: 14px; width: 340px; max-width: 46vw; }
