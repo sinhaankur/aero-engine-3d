@@ -294,12 +294,16 @@ function AircraftModel({ url, simRef, groupRef }) {
   const anim = useMemo(() => {
     const fans = []
     const gear = []
+    const flaps = []      // hinged Flap_* surfaces (deflect down with flap setting)
+    const ailerons = []   // hinged Aileron_* surfaces (antisymmetric with roll)
     const box = new THREE.Box3().setFromObject(cloned)
     const height = box.max.z - box.min.z   // vertical extent (raw up = ±z)
     const c = new THREE.Vector3()
     cloned.traverse((o) => {
       if (!o.isMesh) return
       if (/FanBlades|Spinner/i.test(o.name)) { fans.push(o); return }
+      if (/^Flap_/i.test(o.name)) { flaps.push({ o, side: /R$/i.test(o.name) ? 1 : -1, z0: o.rotation.z }); return }
+      if (/^Aileron_/i.test(o.name)) { ailerons.push({ o, side: /R$/i.test(o.name) ? 1 : -1, z0: o.rotation.z }); return }
       // gear struts/wheels/hubs are the generic Cylinder*/Torus* nodes that sit
       // below the belly (raw down = +z), away from the engine cylinders up top
       if (/Cylinder|Torus/i.test(o.name)) {
@@ -307,7 +311,7 @@ function AircraftModel({ url, simRef, groupRef }) {
         if (c.z > box.max.z - height * 0.5) gear.push({ o, z0: o.position.z })
       }
     })
-    return { fans, gear, retractDist: height * 0.42 }
+    return { fans, gear, flaps, ailerons, retractDist: height * 0.42 }
   }, [cloned])
 
   useFrame((_, dt) => {
@@ -331,6 +335,24 @@ function AircraftModel({ url, simRef, groupRef }) {
       const target = s.gear ? 0 : -anim.retractDist
       for (const gm of anim.gear) {
         gm.o.position.z += ((gm.z0 + target) - gm.o.position.z) * Math.min(1, dt * 2.5)
+      }
+    }
+    // flaps deflect DOWN with the flap setting (0..3 → up to ~40°); the hinge is
+    // the spanwise (Z) axis, and the per-side sign makes both trailing edges drop
+    if (anim.flaps.length) {
+      const flapDefl = (s.flap / 3) * 0.7 // rad, ~40° at FULL
+      for (const fp of anim.flaps) {
+        const target = fp.z0 + flapDefl * fp.side
+        fp.o.rotation.z += (target - fp.o.rotation.z) * Math.min(1, dt * 2)
+      }
+    }
+    // ailerons deflect antisymmetrically with roll command (right roll → right
+    // aileron up, left down); driven by the smoothed control input
+    if (anim.ailerons.length) {
+      const roll = simRef.current?.controls?.roll || 0
+      for (const al of anim.ailerons) {
+        const target = al.z0 + roll * 0.35 * al.side
+        al.o.rotation.z += (target - al.o.rotation.z) * Math.min(1, dt * 6)
       }
     }
   })

@@ -29,6 +29,7 @@ import json
 import math
 import sys
 import os
+import mathutils
 from mathutils import Vector
 
 TAU = math.tau
@@ -289,6 +290,9 @@ def build_wing(spec, materials, side, fuse):
     # a couple of flap-track fairings under the trailing edge
     objs += build_flap_fairings(spec, materials, side, x_le_root, z_root,
                                 span, sweep, dihedral, root_chord, y_root, R)
+    # hinged flap + aileron surfaces (animated by the sim)
+    objs += build_control_surfaces(spec, materials, side, x_le_root, z_root,
+                                   span, sweep, dihedral, root_chord, y_root)
     return objs
 
 
@@ -354,6 +358,63 @@ def build_flap_fairings(spec, materials, side, x_le_root, z_root, span,
         assign(fr, materials["wing"])
         shade_smooth(fr, True)
         objs.append(fr)
+    return objs
+
+
+def build_control_surfaces(spec, materials, side, x_le_root, z_root, span,
+                           sweep, dihedral, root_chord, y_root):
+    """Hinged trailing-edge surfaces the sim can deflect: an inboard FLAP and an
+    outboard AILERON per wing. Each is a thin panel whose ORIGIN is on the hinge
+    line (the wing trailing edge) so the viewer rotates it about that hinge.
+    """
+    objs = []
+
+    def te_at(f):
+        z = z_root + (span - z_root) * f
+        le_x = x_le_root + math.tan(sweep) * (z - z_root)
+        chord = root_chord * ([1.0, 0.94, 0.72, 0.52, 0.37, 0.26][min(5, int(f * 5))])
+        te_x = le_x + chord
+        y = y_root + math.tan(dihedral) * (z - z_root)
+        return te_x, y, z
+
+    def panel(name, f0, f1, chord_frac):
+        # build a flat quad-strip panel hinged at the trailing edge, extending aft
+        x0, y0, z0 = te_at(f0)
+        x1, y1, z1 = te_at(f1)
+        depth0 = root_chord * chord_frac
+        depth1 = root_chord * chord_frac * 0.8
+        bm = bmesh.new()
+        # a thin slab: top + bottom quads at ±th, hinge edge at the TE, aft edge
+        # deflectable. Built as a closed box so it has volume and normals.
+        th = root_chord * 0.01
+        top = [
+            bm.verts.new((x0, y0 + th, z0 * side)),
+            bm.verts.new((x1, y1 + th, z1 * side)),
+            bm.verts.new((x1 + depth1, y1 + th, z1 * side)),
+            bm.verts.new((x0 + depth0, y0 + th, z0 * side)),
+        ]
+        bot = [
+            bm.verts.new((x0, y0 - th, z0 * side)),
+            bm.verts.new((x1, y1 - th, z1 * side)),
+            bm.verts.new((x1 + depth1, y1 - th, z1 * side)),
+            bm.verts.new((x0 + depth0, y0 - th, z0 * side)),
+        ]
+        bm.faces.new(top)
+        bm.faces.new(list(reversed(bot)))
+        for i in range(4):
+            j = (i + 1) % 4
+            bm.faces.new([top[i], top[j], bot[j], bot[i]])
+        ob = obj_from_bm(bm, name, materials["wing"], smooth=False)
+        # set the object origin to the hinge midpoint so rotation.z pivots the TE
+        hinge = ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2 * side)
+        bpy.context.view_layer.update()
+        ob.data.transform(mathutils.Matrix.Translation((-hinge[0], -hinge[1], -hinge[2])))
+        ob.location = hinge
+        return ob
+
+    tag = 'R' if side > 0 else 'L'
+    objs.append(panel(f"Flap_{tag}", 0.14, 0.52, 0.22))       # inboard flap
+    objs.append(panel(f"Aileron_{tag}", 0.60, 0.92, 0.16))    # outboard aileron
     return objs
 
 
