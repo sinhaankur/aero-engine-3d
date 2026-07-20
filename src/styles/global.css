@@ -559,7 +559,21 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .explore-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
 
 /* /fly — cockpit-level flight sim */
-.fly-page { display: flex; flex-direction: column; gap: 10px; }
+/* The flight view should dominate the screen — the world is the point. Drop the
+   app's bottom padding on the fly page and lock the page to the viewport so the
+   3D stage flexes to fill everything but the thin control strip + help row —
+   the view ends up well over 80% of the screen. */
+.app:has(.fly-page) { padding-bottom: 6px; }
+/* pull the site nav tight to the top on the fly page so the world gets the room */
+.app:has(.fly-page) .topbar { margin-bottom: 6px; padding: 6px 0; }
+.fly-page { display: flex; flex-direction: column; gap: 5px; height: calc(100vh - 58px); }
+.fly-page .fly-stage { flex: 1 1 auto; height: auto; }
+/* compact the control strip + help so the view stays >80% of the screen */
+.fly-topbar { row-gap: 5px; }
+.fly-page .fly-help { font-size: 10.5px; gap: 12px; }
+/* on shorter screens the fixed chrome eats too much — drop the help row so the
+   world stays >80%. The key bindings are also shown in the on-screen coach. */
+@media (max-height: 820px) { .fly-page .fly-help { display: none; } .fly-page { height: calc(100vh - 46px); } }
 /* Cockpit mode goes end-to-end: lock the page to the viewport and let the
    flight stage flex down so the flight-deck panel always fits below it. */
 .fly-page.has-deck { height: calc(100vh - 24px); gap: 8px; }
@@ -570,7 +584,7 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .fly-reset:hover { border-color: var(--accent); color: var(--accent); }
 .fly-reset.on { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
 .fly-blurb { color: var(--muted); font-size: 12.5px; }
-.fly-stage { position: relative; height: calc(100vh - 240px); min-height: 480px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #0d1117; }
+.fly-stage { position: relative; min-height: 360px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #0d1117; }
 .fly-stage canvas { display: block; }
 
 .fly-hud { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); pointer-events: none; filter: drop-shadow(0 6px 22px rgba(0, 0, 0, 0.55)); }
