@@ -81,17 +81,49 @@ export const WEATHER = {
 }
 
 /**
- * Wind vector at altitude: power-law growth off the surface value plus a
- * slow direction veer with height, gusts as a bounded random walk.
+ * Wind vector at height, with a real atmospheric boundary layer.
+ *
+ * The reported `windKt` is the free-stream (≈10 m reference) value. This builds
+ * the vertical profile around it:
+ *  • Boundary layer: a log-law from the surface roughness up to the BL top
+ *    (~600 m over open terrain), so wind is near-zero on the deck and reaches
+ *    the free-stream by the top — real wind shear you fly through on approach.
+ *  • Above the BL: a gentle power-law increase to ~2× by cruise + a direction
+ *    veer with height (Ekman/thermal-wind turning).
+ *  • Turbulence: mechanical (rotor) turbulence is STRONGEST near the ground and
+ *    decays with height; add an extra kick when low over the runway/buildings.
+ *
+ * Terrain enters through `terrain`: {roughness, gustBoost} — rougher ground
+ * (buildings, hills) gives a fatter log profile and more low-level turbulence.
  */
-export function windAt(hM, wx, t) {
-  const scale = Math.pow(Math.max(hM, 2) / 10, 0.14) // ~×2 by cruise
-  const veer = Math.min(hM / 1000, 12) * 2 // deg of veer per km, capped
+export function windAt(hM, wx, t, terrain = null) {
+  const z0 = terrain?.roughness ?? 0.3   // surface roughness length (m): 0.03 open, 1+ urban
+  const blTop = 600                        // boundary-layer top (m AGL)
+  const h = Math.max(hM, z0 * 1.1)
+
+  // fraction of free-stream from the log law, saturating at the BL top
+  const logFrac = Math.min(1, Math.log(h / z0) / Math.log(blTop / z0))
+  // above the BL, a mild power-law increase toward cruise
+  const aloft = hM > blTop ? Math.pow(hM / blTop, 0.11) : 1
+  const profile = logFrac * aloft
+
+  // direction veers right with height (northern-hemisphere convention)
+  const veer = Math.min(hM / 1000, 12) * 8 * (1 - logFrac * 0.4)
   const dir = ((wx.windDir + veer) * Math.PI) / 180
-  const gust = wx.gustKt * (Math.sin(t * 0.9) * 0.5 + Math.sin(t * 2.7 + 1.3) * 0.3 + Math.sin(t * 0.23) * 0.2)
-  const spd = (wx.windKt * scale + gust) * KT
+
+  // turbulence intensity: high near the surface, decaying through the BL
+  const surfTurb = Math.max(0, 1 - hM / blTop)                 // 1 on the deck → 0 at BL top
+  const terrKick = (terrain?.gustBoost ?? 0) * surfTurb
+  const gustAmp = wx.gustKt * (0.4 + surfTurb * 1.1 + terrKick)
+  const gust = gustAmp * (Math.sin(t * 0.9) * 0.5 + Math.sin(t * 2.7 + 1.3) * 0.3 + Math.sin(t * 0.23) * 0.2)
+
+  const spd = (wx.windKt * profile + gust) * KT
   // meteorological "from" direction → velocity vector it pushes toward
-  return { x: -Math.sin(dir) * spd, z: Math.cos(dir) * spd, spdKt: spd / KT, dirDeg: (wx.windDir + veer + 360) % 360 }
+  return {
+    x: -Math.sin(dir) * spd, z: Math.cos(dir) * spd,
+    spdKt: spd / KT, dirDeg: (wx.windDir + veer + 360) % 360,
+    shear: 1 - logFrac, // 0 aloft, →1 near the deck: how much shear you're in
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -248,10 +280,21 @@ export function stepFlight(s, ac, controls, wx, dt) {
   dt = Math.min(dt, 0.05)
   s.t += dt
   const atm = isa(s.h, wx.isaDev)
-  const wind = windAt(s.h, wx, s.t)
+
+  // Terrain under the aircraft: rougher + gustier near the airport (buildings
+  // within ~2.5 km of the field) than out over open country. Drives the wind
+  // boundary layer and low-level (mechanical/rotor) turbulence.
+  const nearField = Math.hypot(s.x, Math.abs(s.z) - 1500) < 2500
+  const terrain = nearField
+    ? { roughness: 0.8, gustBoost: 0.6 }   // built-up airport environment
+    : { roughness: 0.2, gustBoost: 0.15 }  // open terrain
+  const wind = windAt(s.h, wx, s.t, terrain)
 
   // --- controls → attitude rates ---
-  const turb = wx.turb * (Math.sin(s.t * 5.1) * 0.4 + Math.sin(s.t * 11.7 + 2) * 0.35 + Math.sin(s.t * 2.3 + 5) * 0.25)
+  // Base turbulence from the weather, amplified low down where mechanical
+  // turbulence off the terrain is strongest (wind.shear → 1 near the deck).
+  const lowLevel = 1 + wind.shear * (1.2 + (terrain.gustBoost * 2))
+  const turb = wx.turb * lowLevel * (Math.sin(s.t * 5.1) * 0.4 + Math.sin(s.t * 11.7 + 2) * 0.35 + Math.sin(s.t * 2.3 + 5) * 0.25)
   s.throttle = controls.throttle
   s.flap = controls.flap
   s.gear = controls.gear

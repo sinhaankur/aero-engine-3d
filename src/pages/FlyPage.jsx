@@ -330,6 +330,9 @@ export default function FlyPage() {
             <div><span>OAT</span><b>{hud.atm.oatC.toFixed(0)} °C</b></div>
             <div><span>ρ/ρ₀</span><b>{hud.atm.sigma.toFixed(2)}</b></div>
             <div><span>Wind</span><b>{Math.round(hud.wind.dirDeg)}° / {Math.round(hud.wind.spdKt)} kt</b></div>
+            {hud.wind.shear > 0.35 && (
+              <div><span>Shear</span><b className="on">LOW-LVL {Math.round(hud.wind.shear * 100)}%</b></div>
+            )}
             <div><span>TAS</span><b>{Math.round(hud.tasKt)} kt</b></div>
             <div><span>Fuel</span><b>{Math.round(s.fuelKg)} kg</b></div>
             <div><span>Thrust</span><b>{Math.round(hud.T / 1000)} kN</b></div>
