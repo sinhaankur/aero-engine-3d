@@ -353,8 +353,18 @@ export function stepFlight(s, ac, controls, wx, dt) {
     s.phi = 0
   }
 
-  // AoA: pitch input commands alpha (FBW-flavoured), turbulence jitters it
-  const alphaCmd = 0.06 + controls.pitch * (s.onGround ? 0.16 : 0.14)
+  // AoA: pitch input commands alpha (FBW-flavoured), turbulence jitters it.
+  // On the ground the gear pins the deck angle low until you rotate: alpha is
+  // held near the ground-run value and only builds when you pull back AT/after
+  // VR (nose-up authority grows with speed), so the jet flies off near VR the
+  // way it should — not 50 kt late.
+  let alphaCmd
+  if (s.onGround) {
+    const canRotate = s.v > ac.vr * 0.92 ? 1 : Math.max(0, (s.v - ac.vr * 0.6) / (ac.vr * 0.32))
+    alphaCmd = 0.015 + Math.max(0, controls.pitch) * 0.19 * canRotate
+  } else {
+    alphaCmd = 0.06 + controls.pitch * 0.14
+  }
   s.alpha += (alphaCmd - s.alpha) * Math.min(1, dt * 2.5) + turb * 0.01
   const effStall = ac.alphaStall + (flap.dCl > 0 ? 0.02 : 0)
 
@@ -386,10 +396,11 @@ export function stepFlight(s, ac, controls, wx, dt) {
     s.gamma = 0
     // nosewheel steering below 60 kt, rudder above
     s.psi += controls.yaw * (s.v < 30 ? 0.35 : 0.06) * dt * Math.min(s.v / 8, 1)
-    // rotation & liftoff
-    if (L > W && s.v > ac.vr * 0.9 && s.alpha > 0.03) {
+    // rotation & liftoff: once past VR with the nose coming up and lift beating
+    // weight, the gear leaves the ground and we establish a shallow initial climb
+    if (L > W * 0.98 && s.v > ac.vr * 0.95 && s.alpha > 0.05) {
       s.onGround = false
-      s.gamma = 0.03
+      s.gamma = 0.04
     }
   } else {
     const vDot = (T * Math.cos(s.alpha) - D) / ac.mass - G * Math.sin(s.gamma)
@@ -397,7 +408,12 @@ export function stepFlight(s, ac, controls, wx, dt) {
     const psiDot = (L * Math.sin(s.phi)) / (ac.mass * Math.max(s.v, 30) * Math.cos(s.gamma || 0.001))
     s.v = Math.max(20, s.v + vDot * dt)
     s.gamma += gammaDot * dt + turb * 0.004
-    s.gamma = Math.max(-0.5, Math.min(0.42, s.gamma))
+    // Energy limit: a jet can't climb steeper than its excess thrust allows —
+    // sustained climb angle ≈ (T − D)/W. Cap gamma to that (plus a little for
+    // trading kinetic energy) so full-alpha pulls give a realistic ~10–15°
+    // climb that bleeds speed, not a 7000 fpm rocket. Descent isn't power-limited.
+    const gammaMax = Math.min(0.18, Math.max(0.02, (T - D) / W * 0.7 + 0.04))
+    s.gamma = Math.max(-0.35, Math.min(gammaMax, s.gamma))
     s.psi += psiDot * dt
   }
   s.theta = s.gamma + s.alpha
