@@ -118,7 +118,12 @@ export function deriveAircraft(aircraft) {
     clMaxClean: 1.5,
     mmo: d.cruiseMach + 0.04,
     ceilingM: d.ceilingM,
-    vr: 1.12 * Math.sqrt((2 * mass * G) / (RHO0 * S * 2.1)), // rotate speed w/ T-O flap
+    // takeoff reference speeds (m/s TAS≈IAS at sea level). Vs at T-O flap
+    // (CLmax≈2.1); VR≈1.12·Vs, V1 just below VR, V2 the safe climb-out speed.
+    get vsTO() { return Math.sqrt((2 * mass * G) / (RHO0 * S * 2.1)) },
+    vr: 1.12 * Math.sqrt((2 * mass * G) / (RHO0 * S * 2.1)),
+    v1: 1.08 * Math.sqrt((2 * mass * G) / (RHO0 * S * 2.1)),
+    v2: 1.20 * Math.sqrt((2 * mass * G) / (RHO0 * S * 2.1)),
     flaps: [
       { name: 'UP', dCl: 0, dCd: 0 },
       { name: '1', dCl: 0.35, dCd: 0.012 },
@@ -141,7 +146,10 @@ export function runwayFor(lenM = 3200) {
   return { halfLen, width: 45, heading: 0, threshold: halfLen - 100 }
 }
 
-export function createState(ac, rwy = RUNWAY) {
+export function createState(ac, rwy = RUNWAY, coldDark = false) {
+  // Two start states: "ready" (engines running, cleared to roll — the quick
+  // default) or "cold & dark" (everything off; you run the real startup flow).
+  const running = !coldDark
   return {
     // position of the gear/CG reference over the world, h = gear height AGL.
     // Spawn on the runway threshold, on the centreline, lined up down −z.
@@ -161,20 +169,24 @@ export function createState(ac, rwy = RUNWAY) {
     crashed: false, landedHard: false, touchdownVs: null,
     t: 0,
     fuelKg: ac ? ac.mass * 0.12 : 8000,
+    coldDark,
 
     // flight phase for ATC / coaching: parked → takeoff → climb → cruise →
     // descent → approach → landed
     phase: 'parked', airborneOnce: false,
 
-    // --- engines: master switches + spool state (N1 fraction 0..1) ---
-    eng1Master: true, eng2Master: true,
-    eng1N1: 0.2, eng2N1: 0.2,   // idle at start; ATHR/throttle drives them up
-    engStartValve: false,        // overhead ENG start selector engaged
+    // --- engines: master switches, run state + spool (N1 fraction 0..1) ---
+    // `started` = the engine has lit and is self-sustaining at/above idle.
+    eng1Master: running, eng2Master: running,
+    eng1Started: running, eng2Started: running,
+    eng1N1: running ? 0.2 : 0, eng2N1: running ? 0.2 : 0,
+    eng1StartTimer: 0, eng2StartTimer: 0, // seconds since start initiated
+    engStartValve: false,                 // overhead ENG start selector (mode SEL)
 
     // --- overhead systems ---
-    apuMaster: false, apuRunning: false,
-    beacon: true, navLights: true, strobe: false, landingLights: true,
-    fuelPump1: true, fuelPump2: true,
+    apuMaster: !coldDark, apuRunning: !coldDark,
+    beacon: running, navLights: running, strobe: false, landingLights: running,
+    fuelPump1: running, fuelPump2: running,
     seatbeltSign: true,
 
     // --- autopilot / FCU (Airbus flight control unit) ---
@@ -248,14 +260,42 @@ export function stepFlight(s, ac, controls, wx, dt) {
 
   const flap = ac.flaps[s.flap]
 
-  // --- engine spool: N1 chases a commanded value per running engine ---
-  // A dead master (or no start) means that engine can't make thrust; N1 decays.
-  const engCmd = (running) => running ? (0.2 + s.throttle * 0.78) : 0
-  const spool = (n1, target) => n1 + (target - n1) * Math.min(1, dt / (target > n1 ? 2.2 : 3.5))
-  const e1run = s.eng1Master
-  const e2run = s.eng2Master
-  s.eng1N1 = Math.max(0, spool(s.eng1N1, engCmd(e1run)))
-  s.eng2N1 = Math.max(0, spool(s.eng2N1, engCmd(e2run)))
+  // --- engine start + spool ---
+  // A real start needs: master ON, fuel to that side, and a bleed-air source to
+  // spin the starter — the APU, or the OTHER engine already running (cross-bleed).
+  // With that, the engine lights and self-sustains at idle after a short crank;
+  // then N1 follows the throttle. No start source ⇒ the engine can't run.
+  const spool = (n1, target, up) => n1 + (target - n1) * Math.min(1, dt / (up ? 2.2 : 3.5))
+  const stepEngine = (masterK, fuelOK, startedK, timerK, n1K, otherStarted) => {
+    const master = s[masterK]
+    const started = s[startedK]
+    const bleed = s.apuRunning || otherStarted   // APU or cross-bleed
+    if (!master || !fuelOK) {
+      // shutdown / no fuel: spool down to zero and mark not started
+      s[startedK] = false; s[timerK] = 0
+      s[n1K] = Math.max(0, spool(s[n1K], 0, false))
+      return
+    }
+    if (!started) {
+      if (bleed) {
+        // cranking: starter drags N1 up; light-off ~8 s, idle by ~25 s
+        s[timerK] += dt
+        const crank = Math.min(0.2, (s[timerK] / 25) * 0.2)
+        s[n1K] = Math.max(s[n1K], crank)
+        if (s[timerK] > 25) s[startedK] = true
+      } else {
+        // no start source — windmill only, decays
+        s[timerK] = 0
+        s[n1K] = Math.max(0, spool(s[n1K], 0, false))
+      }
+      return
+    }
+    // running: N1 follows the thrust lever above idle
+    const target = 0.2 + s.throttle * 0.78
+    s[n1K] = Math.max(0, spool(s[n1K], target, target > s[n1K]))
+  }
+  stepEngine('eng1Master', s.fuelPump1, 'eng1Started', 'eng1StartTimer', 'eng1N1', s.eng2Started)
+  stepEngine('eng2Master', s.fuelPump2, 'eng2Started', 'eng2StartTimer', 'eng2N1', s.eng1Started)
   // fraction of installed thrust actually available (average of live engines)
   const perEng = ac.thrustMax / Math.max(ac.engineCount, 1)
   const liveN1 = [s.eng1N1, s.eng2N1].reduce((a, b) => a + Math.max(0, (b - 0.2) / 0.78), 0)

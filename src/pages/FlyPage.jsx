@@ -8,6 +8,7 @@ import Cockpit from '../sim/flight/Cockpit.jsx'
 import { updateAtc, callsignFor } from '../sim/flight/atc.js'
 import { FlightAudio } from '../sim/flight/audio.js'
 import EngineLive from '../sim/flight/EngineLive.jsx'
+import { checklistProgress } from '../sim/flight/procedures.js'
 
 const FlightScene = lazy(() => import('../three/FlightScene.jsx'))
 
@@ -44,6 +45,7 @@ export default function FlyPage() {
   const atcMem = useRef(null)
   const [sound, setSound] = useState(false)
   const [showEngine, setShowEngine] = useState(false)
+  const [coldDark, setColdDark] = useState(false)
   const audioRef = useRef(null)
   if (audioRef.current == null) audioRef.current = new FlightAudio()
   const [, forceTick] = useState(0)
@@ -68,11 +70,12 @@ export default function FlyPage() {
   // Mutable sim container shared with the Canvas loop — no re-renders per frame.
   const simRef = useRef(null)
   if (simRef.current == null) {
+    const st = createState(ac, rwy, coldDark)
     simRef.current = {
-      state: createState(ac, rwy),
+      state: st,
       ac,
       weather,
-      controls: { pitch: 0, roll: 0, yaw: 0, throttle: 0, flap: 1, gear: true, brakes: false, speedbrake: 0 },
+      controls: { pitch: 0, roll: 0, yaw: 0, throttle: 0, flap: st.flap, gear: true, brakes: st.brakes, speedbrake: 0 },
       out: null,
       paused: false,
     }
@@ -81,14 +84,15 @@ export default function FlyPage() {
   simRef.current.weather = weather
 
   const reset = () => {
-    simRef.current.state = createState(ac, rwy)
-    simRef.current.controls = { pitch: 0, roll: 0, yaw: 0, throttle: 0, flap: 1, gear: true, brakes: false, speedbrake: 0 }
+    const st = createState(ac, rwy, coldDark)
+    simRef.current.state = st
+    simRef.current.controls = { pitch: 0, roll: 0, yaw: 0, throttle: 0, flap: st.flap, gear: true, brakes: st.brakes, speedbrake: 0 }
     simRef.current.out = null
     forceTick((n) => n + 1)
   }
 
-  // variant change → fresh state
-  useEffect(() => { reset() }, [acKey, fromCode]) // eslint-disable-line react-hooks/exhaustive-deps
+  // variant / departure / start-state change → fresh state
+  useEffect(() => { reset() }, [acKey, fromCode, coldDark]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- keyboard ----
   useEffect(() => {
@@ -190,6 +194,8 @@ export default function FlyPage() {
 
   const s = simRef.current.state
   const c = simRef.current.controls
+  // live startup checklist (only meaningful when spawned cold & dark)
+  const checklist = checklistProgress(s)
 
   return (
     <div className={`fly-page ${mode === 'deck' ? 'has-deck' : ''}`}>
@@ -231,6 +237,9 @@ export default function FlyPage() {
         <button className={`fly-reset ${showEngine ? 'on' : ''}`} onClick={() => setShowEngine((v) => !v)} title="Live engine + fuel panel">
           ⚙ Engine
         </button>
+        <button className={`fly-reset ${coldDark ? 'on' : ''}`} onClick={() => setColdDark((v) => !v)} title="Start cold & dark and run the real startup checklist">
+          {coldDark ? '❄ Cold & dark' : '✈ Ready'}
+        </button>
         <button className="fly-reset" onClick={reset}>↺ Reset</button>
         <span className="fly-blurb">{weather.blurb}</span>
       </div>
@@ -257,6 +266,25 @@ export default function FlyPage() {
           <span className="fly-route-ap">{to.code}</span>
           <span className="fly-route-city">{to.city}</span>
         </div>
+
+        {/* startup checklist — shown when cold & dark until the flow is done */}
+        {coldDark && !checklist.complete && (
+          <div className="fly-checklist">
+            <div className="fly-ckl-head">
+              STARTUP · {checklist.done}/{checklist.total}
+              <span className="fly-ckl-bar"><span style={{ width: `${(checklist.done / checklist.total) * 100}%` }} /></span>
+            </div>
+            <div className="fly-ckl-next">
+              <b>NEXT · {checklist.nextPhase}</b>
+              <span>{checklist.nextItem?.label} — {checklist.nextItem?.hint}</span>
+            </div>
+          </div>
+        )}
+        {coldDark && checklist.complete && s.onGround && s.v < 3 && (
+          <div className="fly-checklist done">
+            <b>✓ Checklist complete</b> — both engines running, cleared to roll.
+          </div>
+        )}
 
         {/* cockpit window framing */}
         {view === 'cockpit' && (
@@ -310,12 +338,13 @@ export default function FlyPage() {
           </div>
         )}
 
-        {/* takeoff coach */}
-        {s.onGround && s.v < 3 && !s.crashed && (
+        {/* takeoff coach — respects cold & dark (engines must be running first) */}
+        {s.onGround && s.v < 3 && !s.crashed && !(coldDark && !checklist.complete) && (
           <div className="fly-coach">
-            <b>{shortName(aircraft.name)}</b> lined up on runway 27 — {weather.name}.
-            {c.brakes ? <> Release the park brake <kbd>B</kbd>, then hold <kbd>W</kbd> for takeoff thrust.</> :
-              <> Hold <kbd>W</kbd> for full thrust, rotate <kbd>↑</kbd> at V<sub>R</sub> ≈ {Math.round(ac.vr / 0.514444)} kt,
+            <b>{shortName(aircraft.name)}</b> lined up on {from.code} runway {from.rwy.id} — {weather.name}.
+            {(!s.eng1Started || !s.eng2Started) ? <> Start both engines before you can make takeoff thrust.</> :
+              c.brakes ? <> Release the park brake <kbd>B</kbd>, then hold <kbd>W</kbd> for takeoff thrust. V<sub>1</sub> {Math.round(ac.v1 / 0.514444)} · V<sub>R</sub> {Math.round(ac.vr / 0.514444)} · V<sub>2</sub> {Math.round(ac.v2 / 0.514444)} kt.</> :
+              <> Hold <kbd>W</kbd> for full thrust. V<sub>1</sub> {Math.round(ac.v1 / 0.514444)} · rotate <kbd>↑</kbd> at V<sub>R</sub> {Math.round(ac.vr / 0.514444)} · climb V<sub>2</sub> {Math.round(ac.v2 / 0.514444)} kt,
               gear up <kbd>G</kbd>, flaps up <kbd>V</kbd> as you accelerate.</>}
           </div>
         )}
