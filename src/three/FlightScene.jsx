@@ -28,32 +28,78 @@ const SKIES = {
   cold: { bg: '#a9c2d9', sun: 1.2, hemi: 0.7, ground: '#c8d3da' },
 }
 
+// Land-cover palettes per weather/season. Earthlike patchwork of fields,
+// forest, bare soil, water — not a single flat green lawn.
+const LANDCOVER = {
+  day:  { base: '#33452a', fields: ['#3d5228', '#4a5c2e', '#5b6b34', '#6d7a3c', '#7c8347'], soil: '#6b5636', forest: '#22331c', water: '#2a4a63' },
+  haze: { base: '#5a4e2e', fields: ['#6b5a30', '#7a6838', '#8a7742', '#9a854c', '#a8925a'], soil: '#8a6a3c', forest: '#4a4326', water: '#4a5a5a' },
+  storm:{ base: '#26302a', fields: ['#2c3a26', '#33422b', '#3c4a30', '#455236', '#4d5a3c'], soil: '#4a4232', forest: '#1c261e', water: '#22303a' },
+  cold: { base: '#cdd6dc', fields: ['#d6dee3', '#c4d0d8', '#dce4e8', '#b8c6d0', '#e2e8ec'], soil: '#a8b0b4', forest: '#8a9aa0', water: '#7a94a6' },
+}
+
 function useGroundTexture(skyId) {
   return useMemo(() => {
+    const SZ = 1024
     const c = document.createElement('canvas')
-    c.width = c.height = 256
+    c.width = c.height = SZ
     const ctx = c.getContext('2d')
-    const base = SKIES[skyId]?.ground || '#22301f'
-    ctx.fillStyle = base
-    ctx.fillRect(0, 0, 256, 256)
-    // pseudo-random field patches for motion cues (deterministic)
-    let seed = 42
+    const pal = LANDCOVER[skyId] || LANDCOVER.day
+    let seed = 1337
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    for (let i = 0; i < 26; i++) {
-      const x = rnd() * 256, y = rnd() * 256, w = 20 + rnd() * 60, h = 16 + rnd() * 50
-      ctx.fillStyle = `rgba(${skyId === 'cold' ? '255,255,255' : '120,140,60'},${0.05 + rnd() * 0.1})`
-      ctx.fillRect(x, y, w, h)
+
+    ctx.fillStyle = pal.base
+    ctx.fillRect(0, 0, SZ, SZ)
+
+    // large soft regions of forest / open land (value-noise blobs)
+    for (let i = 0; i < 40; i++) {
+      const x = rnd() * SZ, y = rnd() * SZ, r = 60 + rnd() * 220
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+      const col = rnd() < 0.4 ? pal.forest : pal.fields[(rnd() * pal.fields.length) | 0]
+      g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = g; ctx.globalAlpha = 0.5 + rnd() * 0.3
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
     }
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)'
-    ctx.lineWidth = 2
-    for (let i = 0; i <= 256; i += 64) {
-      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke()
-      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke()
+    ctx.globalAlpha = 1
+
+    // agricultural field mosaic — rotated rectangular parcels in varied greens
+    for (let i = 0; i < 260; i++) {
+      const x = rnd() * SZ, y = rnd() * SZ
+      const w = 24 + rnd() * 90, h = 18 + rnd() * 70
+      ctx.save(); ctx.translate(x, y); ctx.rotate((rnd() - 0.5) * 0.9)
+      ctx.fillStyle = pal.fields[(rnd() * pal.fields.length) | 0]
+      ctx.globalAlpha = 0.55 + rnd() * 0.4
+      ctx.fillRect(-w / 2, -h / 2, w, h)
+      // occasional bare-soil parcel
+      if (rnd() < 0.18) { ctx.fillStyle = pal.soil; ctx.fillRect(-w / 2, -h / 2, w, h) }
+      ctx.restore()
     }
+    ctx.globalAlpha = 1
+
+    // a meandering river + a couple of lakes
+    ctx.strokeStyle = pal.water; ctx.lineWidth = 6 + rnd() * 6; ctx.lineCap = 'round'
+    ctx.beginPath()
+    let rx = rnd() * SZ, ry = 0
+    ctx.moveTo(rx, ry)
+    while (ry < SZ) { rx += (rnd() - 0.5) * 120; ry += 30 + rnd() * 40; ctx.lineTo(rx, ry) }
+    ctx.stroke()
+    ctx.fillStyle = pal.water
+    for (let i = 0; i < 5; i++) {
+      const x = rnd() * SZ, y = rnd() * SZ, r = 12 + rnd() * 34
+      ctx.beginPath(); ctx.ellipse(x, y, r, r * (0.5 + rnd() * 0.5), rnd() * 6, 0, Math.PI * 2); ctx.fill()
+    }
+
+    // fine speckle for texture at low altitude
+    for (let i = 0; i < 4000; i++) {
+      ctx.fillStyle = `rgba(0,0,0,${rnd() * 0.05})`
+      ctx.fillRect(rnd() * SZ, rnd() * SZ, 1.5, 1.5)
+    }
+
     const tex = new THREE.CanvasTexture(c)
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-    tex.repeat.set(240, 240)
-    tex.anisotropy = 4
+    // repeat only a handful of times across the 64 km sheet so the varied land
+    // reads as different places, not a stamped tile
+    tex.repeat.set(12, 12)
+    tex.anisotropy = 8
     return tex
   }, [skyId])
 }
