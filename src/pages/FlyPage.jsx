@@ -288,15 +288,26 @@ export default function FlyPage() {
 
         {/* cockpit window framing */}
         {view === 'cockpit' && (
-          <>
-            <div className="cockpit-pillar left" />
-            <div className="cockpit-pillar right" />
-            <div className="cockpit-glareshield" />
-          </>
+          <div className="deck-frame" aria-hidden>
+            {/* windscreen posts: centre + two raked side posts frame the view */}
+            <svg className="deck-svg" viewBox="0 0 100 60" preserveAspectRatio="none">
+              {/* dark cockpit surround (everything outside the two windows) */}
+              <path d="M0,0 H100 V60 H0 Z
+                       M4,6 L44,4 L47,30 L8,34 Z
+                       M56,4 L96,6 L92,34 L53,30 Z"
+                    fill="#0a0c10" fillRule="evenodd" />
+              {/* window frame highlights */}
+              <path d="M4,6 L44,4 L47,30 L8,34 Z" fill="none" stroke="#2a2f38" strokeWidth="0.6" />
+              <path d="M56,4 L96,6 L92,34 L53,30 Z" fill="none" stroke="#2a2f38" strokeWidth="0.6" />
+            </svg>
+            <div className="deck-post-c" />
+            <div className="deck-glareshield" />
+            <div className="deck-eyebrow" />
+          </div>
         )}
 
-        {/* instruments */}
-        <div className={`fly-hud ${view === 'cockpit' ? 'big' : 'mini'}`}>
+        {/* instruments — mounted in the glareshield in cockpit view */}
+        <div className={`fly-hud ${view === 'cockpit' ? 'deck' : 'mini'}`}>
           <PFD out={hud} state={s} ac={ac} weatherName={weather.name} />
         </div>
 

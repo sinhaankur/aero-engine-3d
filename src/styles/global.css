@@ -576,6 +576,9 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .fly-hud { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); pointer-events: none; filter: drop-shadow(0 6px 22px rgba(0, 0, 0, 0.55)); }
 .fly-hud.big .pfd { width: min(500px, 44vw); }
 .fly-hud.mini .pfd { width: 280px; opacity: 0.94; }
+/* mounted in the glareshield: sits low-centre over the dark coaming, z above the deck frame */
+.fly-hud.deck { bottom: 2%; z-index: 3; }
+.fly-hud.deck .pfd { width: min(440px, 40vw); border-radius: 6px; box-shadow: 0 0 0 3px #05070a, 0 -2px 14px rgba(0,0,0,0.7); }
 .pfd { display: block; height: auto; }
 
 .fly-readout { position: absolute; top: 14px; right: 14px; display: grid; gap: 4px; background: rgba(13, 17, 23, 0.82); border: 1px solid var(--border-2); border-radius: 6px; padding: 10px 12px; min-width: 168px; backdrop-filter: blur(4px); }
@@ -596,11 +599,22 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .fly-help { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 12px; align-items: center; }
 .fly-help .dim { margin-left: auto; font-family: var(--mono); }
 
-/* cockpit framing */
-.cockpit-pillar { position: absolute; top: 0; bottom: 0; width: 13%; pointer-events: none; z-index: 2; }
-.cockpit-pillar.left { left: 0; background: linear-gradient(105deg, #05070a 18%, rgba(5, 7, 10, 0.85) 42%, transparent 78%); }
-.cockpit-pillar.right { right: 0; background: linear-gradient(-105deg, #05070a 18%, rgba(5, 7, 10, 0.85) 42%, transparent 78%); }
-.cockpit-glareshield { position: absolute; left: 0; right: 0; bottom: 0; height: 26%; pointer-events: none; z-index: 1; background: linear-gradient(to top, #05070a 30%, rgba(5, 7, 10, 0.92) 62%, transparent 100%); }
+/* flight-deck windscreen: you look OUT of a real cockpit interior */
+.deck-frame { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.deck-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* centre windscreen post between the two windows */
+.deck-post-c { position: absolute; top: 3%; bottom: 42%; left: 50%; width: 2.6%; transform: translateX(-50%);
+  background: linear-gradient(180deg, #14181e, #090b0f); border-left: 1px solid #2a2f38; border-right: 1px solid #05070a; }
+/* dark glareshield coaming across the bottom third, where the instruments sit */
+.deck-glareshield { position: absolute; left: 0; right: 0; bottom: 0; height: 42%;
+  background: linear-gradient(to top, #05060a 0%, #0a0c11 55%, #0d1016 78%, transparent 100%); }
+.deck-glareshield::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 10px;
+  background: linear-gradient(#1b2028, #0a0c10); border-top: 1px solid #262b33; border-radius: 40% 40% 0 0 / 100% 100% 0 0; }
+/* soft eyebrow shadow along the top of the windscreen */
+.deck-eyebrow { position: absolute; top: 0; left: 0; right: 0; height: 12%;
+  background: linear-gradient(to bottom, #05070a 20%, transparent 100%); }
+
+.fly-mode-hint { color: var(--accent); font-size: 11.5px; }
 
 .fly-mode-hint { color: var(--accent); font-size: 11.5px; }
 .fly-arrow { color: var(--muted); font-family: var(--mono); }
