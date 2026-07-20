@@ -107,13 +107,30 @@ function useGroundTexture(skyId) {
 // Shared markings material so the many white boxes batch under one material.
 const paintMat = new THREE.MeshStandardMaterial({ color: '#d7dde3', roughness: 0.8 })
 const asphaltMat = new THREE.MeshStandardMaterial({ color: '#21252b', roughness: 0.96 })
+const unitBox = new THREE.BoxGeometry(1, 1, 1)
+const unitSphere = new THREE.SphereGeometry(0.5, 6, 5)
 
-function Marking({ x = 0, z, w, l, y = 0.06, mat = paintMat }) {
-  return (
-    <mesh position={[x, y, z]} material={mat}>
-      <boxGeometry args={[w, 0.02, l]} />
-    </mesh>
-  )
+/**
+ * Render many identical-material boxes as ONE InstancedMesh (one draw call).
+ * `items` is [{x,y,z,w,h,l}]; the whole runway's paint + lights collapse from
+ * hundreds of meshes to a handful of instanced batches.
+ */
+function InstancedBoxes({ items, material, geometry = unitBox }) {
+  const ref = useRef()
+  useEffect(() => {
+    const m = ref.current
+    if (!m) return
+    const mat = new THREE.Matrix4()
+    items.forEach((b, i) => {
+      mat.makeScale(b.w ?? 1, b.h ?? 0.02, b.l ?? 1)
+      mat.setPosition(b.x ?? 0, b.y ?? 0.06, b.z ?? 0)
+      m.setMatrixAt(i, mat)
+    })
+    m.count = items.length
+    m.instanceMatrix.needsUpdate = true
+    m.computeBoundingSphere()
+  }, [items])
+  return <instancedMesh ref={ref} args={[geometry, material, items.length]} frustumCulled={false} />
 }
 
 /**
@@ -122,107 +139,82 @@ function Marking({ x = 0, z, w, l, y = 0.06, mat = paintMat }) {
  * lights, a PAPI on the approach, an approach-light bar out past the threshold,
  * and a taxiway. Geometry mirrors sim RUNWAY (±1600 m, 45 m wide).
  */
+const twyLineMat = new THREE.MeshStandardMaterial({ color: '#d7b53a', roughness: 0.8 })
+
 function Runway({ night, halfLen = 1600 }) {
   const HL = halfLen
-  const centreline = useMemo(() => {
-    const arr = []
-    for (let z = -(HL - 160); z <= HL - 160; z += 60) arr.push(z)
-    return arr
-  }, [HL])
-  const edgeZ = useMemo(() => {
-    const arr = []
-    for (let z = -(HL - 40); z <= HL - 40; z += 60) arr.push(z)
-    return arr
-  }, [HL])
   const lightMat = useMemo(() => new THREE.MeshStandardMaterial({
     color: '#fff2c8', emissive: '#ffd97a', emissiveIntensity: night ? 3.2 : 1.4,
   }), [night])
   const redMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ff5a4d', emissive: '#ff2a1a', emissiveIntensity: 2.6 }), [])
   const whiteMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#eef4ff', emissive: '#cfe0ff', emissiveIntensity: 2.6 }), [])
 
-  // piano-key threshold bars at each end
   const keys = [-18, -13.5, -9, -4.5, 4.5, 9, 13.5, 18]
+  const thr = HL - 40, aim = HL - 450, tdz1 = HL - 300, tdz2 = HL - 600
 
-  const thr = HL - 40      // threshold bar position
-  const aim = HL - 450     // aiming point ~400 m in
-  const tdz1 = HL - 300, tdz2 = HL - 600
-  const twyZ = useMemo(() => { const a = []; for (let z = -(HL - 400); z <= HL - 400; z += 40) a.push(z); return a }, [HL])
+  // Build every marking / light group as flat instance lists once, then draw
+  // each material with a single InstancedMesh (paint, twy dashes, edge lights,
+  // threshold/approach lights, PAPI). ~200 meshes → ~6 draw calls.
+  const paint = useMemo(() => {
+    const a = []
+    a.push({ x: -21, w: 0.6, l: HL * 2 - 80 }, { x: 21, w: 0.6, l: HL * 2 - 80 })      // side stripes
+    for (let z = -(HL - 160); z <= HL - 160; z += 60) a.push({ z, w: 0.9, l: 30 })       // centreline
+    for (const end of [1, -1]) {
+      for (const x of keys) a.push({ x, z: end * (thr - 5), w: 1.8, l: 40 })              // piano keys
+      a.push({ x: -6, z: end * aim, w: 4.5, l: 45 }, { x: 6, z: end * aim, w: 4.5, l: 45 }) // aiming
+      for (const zz of [tdz1, tdz2]) { a.push({ x: -9, z: end * zz, w: 3, l: 22 }, { x: 9, z: end * zz, w: 3, l: 22 }) }
+    }
+    return a
+  }, [HL])
+  const twyDashes = useMemo(() => {
+    const a = []
+    for (let z = -(HL - 400); z <= HL - 400; z += 40) a.push({ x: 75, y: 0.055, z, w: 0.5, l: 20 })
+    return a
+  }, [HL])
+  const edgeLights = useMemo(() => {
+    const a = []
+    for (let z = -(HL - 40); z <= HL - 40; z += 60) { a.push({ x: -23, y: 0.35, z, w: 0.64, h: 0.64, l: 0.64 }, { x: 23, y: 0.35, z, w: 0.64, h: 0.64, l: 0.64 }) }
+    return a
+  }, [HL])
+  const whiteLights = useMemo(() => {
+    const a = []
+    for (const x of keys.concat([-22, 22])) a.push({ x, y: 0.3, z: thr, w: 0.7, h: 0.4, l: 0.4 })   // threshold
+    for (let i = 0; i < 6; i++) a.push({ x: 0, y: 0.3, z: thr + 50 + i * 60, w: 0.8 + i * 0.3, h: 0.3, l: 0.4 }) // approach
+    a.push({ x: -32, y: 0.6, z: aim, w: 1.4, h: 1, l: 1.4 }, { x: -32, y: 0.6, z: aim + 3, w: 1.4, h: 1, l: 1.4 }) // PAPI whites
+    return a
+  }, [HL])
+  const redLights = useMemo(() => ([
+    { x: -32, y: 0.6, z: aim + 6, w: 1.4, h: 1, l: 1.4 }, { x: -32, y: 0.6, z: aim + 9, w: 1.4, h: 1, l: 1.4 },
+  ]), [HL])
+
   return (
     <group>
-      {/* asphalt + shoulders */}
-      <mesh position={[0, 0.02, 0]} material={asphaltMat}>
-        <boxGeometry args={[45, 0.04, HL * 2]} />
-      </mesh>
-      <mesh position={[0, 0.015, 0]}>
-        <boxGeometry args={[62, 0.03, HL * 2 + 40]} />
-        <meshStandardMaterial color="#2b3a24" roughness={1} />
-      </mesh>
+      {/* asphalt + shoulders (2 static meshes) */}
+      <mesh position={[0, 0.02, 0]} material={asphaltMat}><boxGeometry args={[45, 0.04, HL * 2]} /></mesh>
+      <mesh position={[0, 0.015, 0]}><boxGeometry args={[62, 0.03, HL * 2 + 40]} /><meshStandardMaterial color="#2b3a24" roughness={1} /></mesh>
 
-      {/* side stripes (runway edge line) */}
-      <Marking x={-21} z={0} w={0.6} l={HL * 2 - 80} />
-      <Marking x={21} z={0} w={0.6} l={HL * 2 - 80} />
+      {/* all paint markings in one instanced batch */}
+      <InstancedBoxes items={paint} material={paintMat} />
+      {/* runway lights, batched by colour */}
+      <InstancedBoxes items={edgeLights} material={lightMat} geometry={unitSphere} />
+      <InstancedBoxes items={whiteLights} material={whiteMat} />
+      <InstancedBoxes items={redLights} material={redMat} />
 
-      {/* dashed centreline */}
-      {centreline.map((z) => <Marking key={z} z={z} w={0.9} l={30} />)}
-
-      {/* threshold piano keys, aiming points, TDZ bars at each end */}
-      {[1, -1].map((end) => (
-        <group key={end}>
-          {keys.map((x) => <Marking key={x} x={x} z={end * (thr - 5)} w={1.8} l={40} />)}
-          <Marking x={-6} z={end * aim} w={4.5} l={45} />
-          <Marking x={6} z={end * aim} w={4.5} l={45} />
-          {[tdz1, tdz2].map((zz) => (
-            <group key={zz}>
-              <Marking x={-9} z={end * zz} w={3} l={22} />
-              <Marking x={9} z={end * zz} w={3} l={22} />
-            </group>
-          ))}
-        </group>
-      ))}
-
-      {/* edge lights */}
-      {edgeZ.map((z) => (
-        <group key={z}>
-          <mesh position={[-23, 0.35, z]} material={lightMat}><sphereGeometry args={[0.32, 6, 5]} /></mesh>
-          <mesh position={[23, 0.35, z]} material={lightMat}><sphereGeometry args={[0.32, 6, 5]} /></mesh>
-        </group>
-      ))}
-
-      {/* threshold lights at the near end */}
-      {keys.concat([-22, 22]).map((x) => (
-        <mesh key={`g${x}`} position={[x, 0.3, thr]} material={whiteMat}><boxGeometry args={[0.7, 0.4, 0.4]} /></mesh>
-      ))}
-
-      {/* PAPI — off the left of the touchdown zone */}
-      {[0, 1, 2, 3].map((i) => (
-        <mesh key={i} position={[-32, 0.6, aim + i * 3]} material={i < 2 ? whiteMat : redMat}>
-          <boxGeometry args={[1.4, 1, 1.4]} />
-        </mesh>
-      ))}
-
-      {/* approach lighting: bars running out past the near threshold */}
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <mesh key={i} position={[0, 0.3, thr + 50 + i * 60]} material={whiteMat}><boxGeometry args={[0.8 + i * 0.3, 0.3, 0.4]} /></mesh>
-      ))}
-
-      {/* parallel taxiway */}
-      <mesh position={[75, 0.018, 0]} material={asphaltMat}>
-        <boxGeometry args={[22, 0.036, HL * 1.6]} />
-      </mesh>
-      {twyZ.map((z) => (
-        <mesh key={z} position={[75, 0.055, z]}>
-          <boxGeometry args={[0.5, 0.02, 20]} />
-          <meshStandardMaterial color="#d7b53a" roughness={0.8} />
-        </mesh>
-      ))}
-      <mesh position={[47, 0.018, thr - 160]} material={asphaltMat}>
-        <boxGeometry args={[60, 0.036, 22]} />
-      </mesh>
+      {/* taxiway (2 static asphalt meshes + one instanced dash batch) */}
+      <mesh position={[75, 0.018, 0]} material={asphaltMat}><boxGeometry args={[22, 0.036, HL * 1.6]} /></mesh>
+      <mesh position={[47, 0.018, thr - 160]} material={asphaltMat}><boxGeometry args={[60, 0.036, 22]} /></mesh>
+      <InstancedBoxes items={twyDashes} material={twyLineMat} />
     </group>
   )
 }
 
+// Buildings as a single InstancedMesh — one draw call for the whole skyline
+// instead of 60. A unit box is scaled per instance via the instance matrix.
+const buildingGeo = new THREE.BoxGeometry(1, 1, 1)
+const buildingMat = new THREE.MeshStandardMaterial({ color: '#2d333b', roughness: 0.9 })
+
 function Buildings() {
+  const ref = useRef()
   const items = useMemo(() => {
     let seed = 7
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
@@ -237,16 +229,22 @@ function Buildings() {
     }
     return arr
   }, [])
-  return (
-    <group>
-      {items.map((b, i) => (
-        <mesh key={i} position={[b.x, b.h / 2, b.z]}>
-          <boxGeometry args={[b.w, b.h, b.d]} />
-          <meshStandardMaterial color="#2d333b" roughness={0.9} />
-        </mesh>
-      ))}
-    </group>
-  )
+
+  useEffect(() => {
+    const m = ref.current
+    if (!m) return
+    const mat = new THREE.Matrix4()
+    items.forEach((b, i) => {
+      mat.makeScale(b.w, b.h, b.d)
+      mat.setPosition(b.x, b.h / 2, b.z)
+      m.setMatrixAt(i, mat)
+    })
+    m.count = items.length
+    m.instanceMatrix.needsUpdate = true
+    m.computeBoundingSphere()
+  }, [items])
+
+  return <instancedMesh ref={ref} args={[buildingGeo, buildingMat, items.length]} frustumCulled={false} />
 }
 
 function AircraftModel({ url, simRef, groupRef }) {
