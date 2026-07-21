@@ -841,6 +841,13 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .comp-card dd { margin: 0; font-size: 13px; line-height: 1.5; color: var(--fg); }
 .comp-cost { color: var(--accent) !important; font-family: var(--mono); }
 .comp-note { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); font-style: italic; border-top: 1px solid var(--border); padding-top: 10px; }
+/* how each part is designed + the math (aerospace-newcomer teaching layer) */
+.comp-design { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); display: grid; gap: 9px; }
+.comp-design-head { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--accent); }
+.comp-design-row { display: grid; gap: 2px; }
+.comp-design-row > span { font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.comp-design-row p { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--fg); }
+.comp-eq { font-family: var(--mono) !important; font-size: 11.5px !important; color: #86b7ff !important; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 7px 9px; line-height: 1.7 !important; }
 
 .spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 3px; overflow: hidden; margin: 0; }
 .spec-grid.compact { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }

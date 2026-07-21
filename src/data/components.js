@@ -25,6 +25,19 @@ export const COMPONENTS = [
     suppliers: ['Airbus Broughton (UK)', 'Spirit AeroSystems', 'Boeing Composite Wing Center (Everett)'],
     usedOn: 'Every variant in the archive — the single most valuable structure on the aircraft.',
     note: 'The wing box doubles as the main fuel tank, which is why sealant application (fay-surface + fillet) is a certified trade of its own.',
+    design: {
+      driver:
+        'The wing is sized to carry the whole aircraft weight as LIFT, then multiplied by the ' +
+        'limit load factor (2.5 g for airliners, CS-25.337) and again by 1.5 for ultimate load. ' +
+        'Bending at the wing root — weight × span — is the load case that sets spar thickness.',
+      equation:
+        'Lift  L = ½ ρ V² S CL  (must equal n·W).  Wing loading  W/S sets stall + cruise speed.  ' +
+        'Root bending moment  M ≈ (n·W/2) · (b/4)  →  spar cap stress σ = M·c / I.',
+      example:
+        'A320: W ≈ 73,500 kg, S = 122.6 m² → wing loading W/S ≈ 600 kg/m². At the 2.5 g limit the ' +
+        'wing lifts 2.5·73.5 t ≈ 184 t; each half (~92 t) acts ~9 m out, so root bending M ≈ 92,000·9.81·9 ' +
+        '≈ 8.1 MN·m — carried by the spar caps, then ×1.5 for ultimate. That is why the root skin is ~cm-thick plate.',
+    },
   },
   {
     id: 'fuselage-barrel',
@@ -39,6 +52,19 @@ export const COMPONENTS = [
     suppliers: ['Premium Aerotec (DE)', 'Spirit AeroSystems (Wichita)', 'Leonardo (IT)', 'KHI/MHI (JP)'],
     usedOn: 'All variants; the E2 and A220 keep metal fuselages with composite empennages.',
     note: 'Pressurisation cycles size everything: a short-haul 737/A320 fuselage sees ~40,000+ cycles in a life — fatigue, not strength, drives the design.',
+    design: {
+      driver:
+        'The fuselage is a pressure vessel. Cabin altitude is held near 8,000 ft while the aircraft ' +
+        'cruises at 40,000 ft, so the skin carries a pressure difference every flight. Fatigue from ' +
+        '~40,000 pressurise/depressurise CYCLES — not a single overload — sets skin thickness + crack-stopping frames.',
+      equation:
+        'Hoop stress in a thin cylinder  σθ = p·R / t   (this is the big one).  ' +
+        'Longitudinal stress  σx = p·R / (2t)  — exactly half. Fatigue life ~ (stress range)^−m.',
+      example:
+        'A320: cabin Δp ≈ 0.58 bar = 58 kPa, fuselage radius R ≈ 1.98 m. For a skin t ≈ 2 mm, ' +
+        'hoop stress σθ = 58,000·1.98 / 0.002 ≈ 57 MPa per cycle. Aluminium yields ~300 MPa, so it is ' +
+        'strong enough once — but 40,000 cycles is why doublers, bonded frames and crack-arrest straps exist.',
+    },
   },
   {
     id: 'empennage',
@@ -51,6 +77,19 @@ export const COMPONENTS = [
     suppliers: ['Airbus Stade (DE)', 'Aernnova (ES)', 'Embraer Évora (PT)'],
     usedOn: 'All variants in the archive.',
     note: 'The horizontal stabiliser is also a trim fuel tank on long-haul Airbus types — CG control in cruise cuts drag.',
+    design: {
+      driver:
+        'The tail is sized for CONTROL and STABILITY, not to carry weight. The fin must hold the ' +
+        'aircraft straight after an engine fails on takeoff (max yaw); the horizontal stabiliser must ' +
+        'keep it stable and trimmable across the whole CG range. Both are set by "tail volume".',
+      equation:
+        'Tail volume coefficient  V̄H = (SH · lH) / (S · c̄)  and  V̄V = (SV · lV) / (S · b).  ' +
+        'Bigger tail area SH/SV or longer arm l → more authority. Airliners: V̄H ≈ 0.9–1.2, V̄V ≈ 0.06–0.09.',
+      example:
+        'A320: horizontal tail SH ≈ 31 m², arm lH ≈ 13.5 m, wing S = 122.6 m², MAC c̄ ≈ 4.29 m → ' +
+        'V̄H = (31·13.5)/(122.6·4.29) ≈ 0.80. That number — not a load — is what a designer tunes first, ' +
+        'trading a bigger tail (weight + drag) against a longer, heavier fuselage to reach the same arm.',
+    },
   },
   {
     id: 'landing-gear',
@@ -63,6 +102,19 @@ export const COMPONENTS = [
     suppliers: ['Safran Landing Systems', 'Collins Aerospace', 'Héroux-Devtek'],
     usedOn: 'All variants; the 737\'s short legs are why its LEAP-1B fan is smaller than the A320neo\'s.',
     note: 'Gear is designed for a hard landing at max landing weight and full fuel jettison failure — it is the most over-engineered structure on board.',
+    design: {
+      driver:
+        'The shock strut is sized to absorb the KINETIC ENERGY of a hard landing at max landing weight ' +
+        'and the certification sink rate (3.05 m/s ≈ 600 fpm, CS-25.723) without exceeding a set g on the ' +
+        'airframe. Energy, not static weight, sets the oleo stroke and gas pressure.',
+      equation:
+        'Vertical energy at touchdown  E = ½ · m · Vsink².  Absorbed over stroke s at load factor n:  ' +
+        'E ≈ n · m · g · (s · η)  (η ≈ 0.8 oleo efficiency)  →  solve for stroke s.',
+      example:
+        'A320 max landing ~64,500 kg at Vsink = 3.05 m/s: E = ½·64,500·3.05² ≈ 300 kJ — a small car at ' +
+        '~55 km/h, in the last 0.3 s of the flight. To hold ~2 g through the airframe the oleo needs a ' +
+        'stroke around s ≈ E/(n·m·g·η) ≈ 300,000/(2·64,500·9.81·0.8) ≈ 0.30 m of compressing gas + oil.',
+    },
   },
   {
     id: 'radome',
@@ -75,6 +127,19 @@ export const COMPONENTS = [
     suppliers: ['Collins Aerospace', 'Airbus Composites España'],
     usedOn: 'All variants.',
     note: 'A repainted radome with too many paint layers can blind the weather radar — thickness is controlled to fractions of the radar wavelength.',
+    design: {
+      driver:
+        'The radome is an RF WINDOW first, structure second: it must pass the X-band weather radar ' +
+        'through it with minimal reflection, while surviving a bird strike at cruise. The wall thickness ' +
+        'is tuned to the radar wavelength so the reflections cancel.',
+      equation:
+        'Radar wavelength  λ = c / f.  A "half-wave wall" is transparent when  t = N · λ / (2·√εr)  ' +
+        '(N integer, εr = dielectric constant). Bird-strike energy  E = ½ m v² sets the skin/core.',
+      example:
+        'Weather radar at f ≈ 9.4 GHz → λ = 3e8/9.4e9 ≈ 32 mm. With a composite εr ≈ 4, a half-wave wall ' +
+        'is t = 32/(2·√4) ≈ 8 mm — which is why adding a few coats of paint (each a fraction of a mm at the ' +
+        'wrong dielectric) measurably degrades the radar. A 1.8 kg bird at 150 m/s also carries ~20 kJ it must take.',
+    },
   },
 
   /* ---------------- Propulsion ---------------- */

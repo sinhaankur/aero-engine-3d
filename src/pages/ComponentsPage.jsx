@@ -30,6 +30,14 @@ function ComponentCard({ c, focused }) {
         <div><dt>Used on</dt><dd>{c.usedOn}</dd></div>
       </dl>
       <p className="comp-note">{c.note}</p>
+      {c.design && (
+        <div className="comp-design">
+          <div className="comp-design-head">How it's designed · the math</div>
+          <div className="comp-design-row"><span>Design driver</span><p>{c.design.driver}</p></div>
+          <div className="comp-design-row"><span>Governing math</span><p className="comp-eq">{c.design.equation}</p></div>
+          <div className="comp-design-row"><span>Worked example</span><p>{c.design.example}</p></div>
+        </div>
+      )}
     </article>
   )
 }
