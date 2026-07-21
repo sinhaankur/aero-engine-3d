@@ -164,6 +164,22 @@ export default function EngineExplorer({ engineId }) {
                 <li key={i}>{s}</li>
               ))}
             </ul>
+            {selected.design && (
+              <div className="ee-design">
+                <div className="ee-design-row">
+                  <span className="ee-design-k">Design driver</span>
+                  <p>{selected.design.driver}</p>
+                </div>
+                <div className="ee-design-row">
+                  <span className="ee-design-k">Governing math</span>
+                  <p className="ee-eq">{selected.design.equation}</p>
+                </div>
+                <div className="ee-design-row">
+                  <span className="ee-design-k">Worked example</span>
+                  <p>{selected.design.example}</p>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <p className="ee-hint">Hover or tap a part to isolate it in 3D and read what it does.</p>

@@ -897,6 +897,12 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .ee-specs { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
 .ee-specs li { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 3px 11px; font-size: 12px; color: var(--muted); }
 .ee-hint { margin-top: 12px; color: var(--muted); font-size: 13px; }
+/* how each part is designed + the math behind it (aerospace-newcomer layer) */
+.ee-design { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); display: grid; gap: 10px; }
+.ee-design-row { display: grid; gap: 3px; }
+.ee-design-k { font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); font-family: var(--mono); }
+.ee-design-row p { margin: 0; color: var(--ink); font-size: 13px; line-height: 1.6; }
+.ee-eq { font-family: var(--mono) !important; font-size: 12px !important; color: #86b7ff !important; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; line-height: 1.7 !important; }
 
 /* Engine explorer — controls + how-it-works cycle */
 .ee-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }

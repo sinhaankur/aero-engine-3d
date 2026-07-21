@@ -14,6 +14,10 @@
  * @property {number} offset
  * @property {string} function
  * @property {string[]} specs
+ * @property {Object} [design] — how the part is sized + the math behind it
+ * @property {string} design.driver   what physically sizes / governs the part
+ * @property {string} design.equation the key governing relationship (plain text)
+ * @property {string} design.example  a worked example with real numbers
  */
 
 /**
@@ -36,6 +40,19 @@ function partsTemplate(overrides = {}) {
         'The single most important part for thrust. The fan accelerates a large ' +
         'mass of air; most of it bypasses the core to make thrust efficiently.',
       specs: ['Main thrust producer', 'Sets the bypass ratio'],
+      design: {
+        driver:
+          'Thrust needed at takeoff sets how much air the fan must move; efficiency ' +
+          'pushes you to move MORE air a LITTLE faster (high bypass), which sets the ' +
+          'fan diameter. Blade tip speed is capped near the speed of sound.',
+        equation:
+          'Thrust  F = ṁ · (Vexit − Vinlet).  Airflow ṁ = ρ · A · V = ρ · (π/4)·D² · V.  ' +
+          'Tip speed  Utip = π · D · (RPM/60) — kept below ~1.4× the speed of sound.',
+        example:
+          'CFM56-5B: fan D ≈ 1.73 m, so A = (π/4)·1.73² ≈ 2.35 m². At takeoff it swallows ' +
+          '≈ 400 kg/s of air. To make ~120 kN it adds roughly F/ṁ ≈ 120000/400 ≈ 300 m/s ' +
+          'to that airflow. At ~5000 fan RPM, Utip = π·1.73·(5000/60) ≈ 453 m/s — about Mach 1.3 hot day.',
+      },
     },
     inletLip: {
       node: '01b_Inlet_Lip', name: 'Inlet lip', stage: 'Nacelle', offset: 2.8,
@@ -50,6 +67,18 @@ function partsTemplate(overrides = {}) {
         'The structural ring around the fan, and a containment case: if a blade ' +
         'fails it must trap the debris so it cannot cut into the airframe.',
       specs: ['Blade-off containment', 'Holds fan tip clearance', 'Mounts acoustics'],
+      design: {
+        driver:
+          'Certification requires the case to CONTAIN a released fan blade (FAR/CS 33.94). ' +
+          'The design load is the kinetic energy of one blade let go at redline RPM — the ' +
+          'case (Kevlar wrap or hardened metal) must absorb it without perforating.',
+        equation:
+          'Blade energy  E = ½ · m · Vtip².  Tip speed  Vtip = π · D · (RPM/60).',
+        example:
+          'A ~7 kg blade at Vtip ≈ 450 m/s carries E = ½·7·450² ≈ 0.71 MJ — roughly a small ' +
+          'car at 100 km/h, released in milliseconds. The Kevlar/aramid containment wrap is ' +
+          'sized to soak that up; this is why the fan case is one of the heaviest single parts.',
+      },
     },
     nacelle: {
       node: '01_Nacelle_Cowl', name: 'Nacelle & cowl', stage: 'Nacelle', offset: 2.0,
@@ -64,6 +93,19 @@ function partsTemplate(overrides = {}) {
         'Multi-stage compressors squeeze the core airflow to very high pressure ' +
         'before combustion. This gas generator ultimately drives the fan.',
       specs: ['High-pressure compressor', 'High overall pressure ratio', 'Titanium / nickel alloys'],
+      design: {
+        driver:
+          'Efficiency (fuel burn) rises with overall pressure ratio (OPR), so you add ' +
+          'compressor stages. Each stage can only raise pressure so much before the flow ' +
+          'stalls, which sets the STAGE COUNT. Later stages get hot, so titanium gives way to nickel.',
+        equation:
+          'Overall pressure ratio  OPR = P3/P2 = Πstage (stage pressure ratios).  ' +
+          'Compression heats the air:  T3/T2 = (P3/P2)^((γ−1)/γ),  γ ≈ 1.4.',
+        example:
+          'CFM56 OPR ≈ 32:1. Starting near ISA 15 °C (288 K): T3 = 288 · 32^(0.4/1.4) ≈ 288 · 2.65 ≈ ' +
+          '763 K ≈ 490 °C — before any fuel is burned. That is why the rear compressor + case run ' +
+          'hot enough to need nickel superalloys, not aluminium.',
+      },
     },
     combustor: {
       node: '06_Combustor', name: 'Combustor', stage: 'Core', offset: -1.4,
@@ -71,6 +113,19 @@ function partsTemplate(overrides = {}) {
         'Fuel is injected and burned with the compressed air here, raising gas ' +
         'temperature dramatically to drive the turbine.',
       specs: ['Burns Jet-A fuel', 'Very high gas temperature'],
+      design: {
+        driver:
+          'How much fuel you can add is capped by the turbine inlet temperature the blades ' +
+          'downstream can survive. The combustor is sized to burn fully and mix the gas to an ' +
+          'even temperature so no hot streak cooks a turbine blade.',
+        equation:
+          'Energy balance:  ṁfuel · LHV = ṁair · cp · (T4 − T3).  ' +
+          'Jet-A LHV ≈ 43 MJ/kg, cp ≈ 1.15 kJ/kg·K in the hot section.',
+        example:
+          'To raise ~90 kg/s of core air from 490 °C (763 K) to a 1450 °C (1723 K) turbine inlet: ' +
+          'ṁfuel = 90 · 1.15 · (1723−763) / 43000 ≈ 2.3 kg/s ≈ 8,300 kg/h. That is the fuel flow the ' +
+          'nozzles + FADEC meter at takeoff thrust.',
+      },
     },
     turbine: {
       node: '07_Turbine', name: 'Turbine', stage: 'Core', offset: -2.8,
@@ -78,6 +133,19 @@ function partsTemplate(overrides = {}) {
         'The hot gas spins the turbine, which drives the compressor and fan up ' +
         'front. Blades run hotter than their melting point and rely on cooling + coatings.',
       specs: ['Drives compressor + fan', 'Internally air-cooled', 'Superalloy blades'],
+      design: {
+        driver:
+          'The turbine must extract exactly the power the compressor + fan demand (they share a ' +
+          'shaft). It is limited by material temperature: gas enters hotter than the blade melts, ' +
+          'so blades are single-crystal nickel, film-cooled, and coated with a thermal barrier.',
+        equation:
+          'Power balance:  Wturbine = Wcompressor.  Shaft power  W = ṁ · cp · ΔT.  ' +
+          'Blade centrifugal stress  σ = ρ · Utip² (≈ how close to the material limit you run).',
+        example:
+          'Gas enters the HP turbine at ~1450 °C but nickel superalloys soften by ~1100 °C — the ' +
+          '~350 °C gap is bridged by ~15–20% of compressor air routed through internal cooling ' +
+          'passages + a ceramic thermal-barrier coating. Miss it by seconds and the blades creep.',
+      },
     },
     nozzle: {
       node: '08_Exhaust_Nozzle', name: 'Exhaust nozzle', stage: 'Exhaust', offset: -4.2,
@@ -85,6 +153,18 @@ function partsTemplate(overrides = {}) {
         'Shapes and accelerates the hot core exhaust into a fast jet that adds to ' +
         'total thrust.',
       specs: ['Accelerates core exhaust', 'Sets back-pressure', 'Heat-resistant alloy'],
+      design: {
+        driver:
+          'The exit area sets how much the hot gas expands and therefore its jet velocity — ' +
+          'and the back-pressure the turbine sees. Too small chokes the core; too large wastes ' +
+          'pressure. On a high-bypass fan the exit is a fixed convergent nozzle.',
+        equation:
+          'Mass flow through the throat  ṁ = ρ · A · V.  Jet thrust  Fjet = ṁ · Vexit ' +
+          '(+ (Pexit − Pambient)·A if not fully expanded).',
+        example:
+          'The core exhaust adds only ~20% of a high-bypass engine’s thrust — the fan makes the ' +
+          'rest. If ~90 kg/s leaves at ~400 m/s, the core jet gives ≈ 90·400 ≈ 36 kN of a ~120 kN engine.',
+      },
     },
     plug: {
       node: '09_Exhaust_Plug', name: 'Exhaust plug (tail cone)', stage: 'Exhaust', offset: -5.6,
@@ -99,6 +179,19 @@ function partsTemplate(overrides = {}) {
         'The strut that hangs the engine from the wing, carrying all thrust and ' +
         'weight into the airframe and routing fuel, air and wiring.',
       specs: ['Carries thrust & weight', 'Routes fuel/air/wiring', 'Fuse-pin safety mounts'],
+      design: {
+        driver:
+          'Sized by the worst combined load: full takeoff thrust forward, engine weight + inertia ' +
+          'down (up to ~engine mass × several g in a hard landing/gust), plus the certification case ' +
+          'of a seized/lost engine. Fuse pins are designed to shear so a departing engine won’t take the wing.',
+        equation:
+          'Thrust load  Fthrust (into the wing box).  Inertial load  Finertia = m_engine · n · g ' +
+          '(n = load factor).  The mount is sized to the vector sum, with a 1.5 safety factor.',
+        example:
+          'A ~2,500 kg CFM56 at a 3.75 g emergency-landing load pulls ≈ 2500·3.75·9.81 ≈ 92 kN down, ' +
+          'while pushing ~120 kN forward in thrust — the pylon carries both into a few forged fittings, ' +
+          'then ×1.5 for ultimate load.',
+      },
     },
   }
   // apply overrides keyed by the same short keys
