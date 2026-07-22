@@ -244,6 +244,19 @@ export const COMPONENTS = [
     suppliers: ['Thales', 'Honeywell', 'Collins Aerospace', 'GE Aerospace (avionics)'],
     usedOn: 'All variants; the E2 runs Honeywell Primus Epic 2, Airbus mixes Thales/Honeywell IMA.',
     note: 'The avionics live in the E/E bay under the cockpit floor — X-ray it in Explore mode. Dual/triple dissimilar redundancy everywhere.',
+    design: {
+      driver:
+        'Flight-critical systems are sized by a SAFETY TARGET, not performance: a catastrophic failure ' +
+        'must be "extremely improbable" — no worse than 1e−9 per flight hour (CS-25.1309). No single ' +
+        'computer meets that, so you use several dissimilar ones and the ARCHITECTURE, not the part, delivers the number.',
+      equation:
+        'Redundant (parallel) failure prob  P = p1 · p2 · … (if truly independent).  ' +
+        'Target ≤ 1e−9/h  →  two channels each ~1e−5/h give 1e−10, three give margin + dispatch after one fails.',
+      example:
+        'An A320 has multiple flight-control computers (ELAC/SEC/FCDC) from different suppliers running ' +
+        'different code, so a design bug in one cannot take the others. Two independent 1e−5/h channels ' +
+        'multiply to 1e−10/h — inside the 1e−9 target — which is WHY the deck is triple, not single.',
+    },
   },
   {
     id: 'flight-controls',
@@ -256,6 +269,19 @@ export const COMPONENTS = [
     suppliers: ['Moog', 'Parker Meggitt', 'Liebherr Aerospace', 'Safran Electronics'],
     usedOn: 'All Airbus/E2 (full FBW); 737 keeps cable-driven controls with hydraulic boost — compare in /systems.',
     note: 'An A320 elevator actuator responds to a computer command in milliseconds and can override a jammed partner — that architecture is the heart of FBW.',
+    design: {
+      driver:
+        'Fly-by-wire is designed around CONTROL LAWS + PROTECTIONS: the sidestick commands a g-load / ' +
+        'roll-rate target (not a surface angle), and the computer moves the surface to achieve it while ' +
+        'refusing to exceed limits. The actuator is sized by hinge moment — the aero force on the surface × its arm.',
+      equation:
+        'Hinge moment  H = Ch · ½ρV² · Sf · c̄f   (Ch = hinge-moment coefficient, Sf surface area).  ' +
+        'Actuator force × arm ≥ H, with rate fast enough for the control law bandwidth (~a few Hz).',
+      example:
+        'Normal Law holds +2.5 g / −1 g and 67° bank as hard limits — pull full aft stick and the jet ' +
+        'gives 2.5 g and STOPS, so you cannot overstress the wing sized earlier. Hinge moment rises with V²: ' +
+        'at 250 kt (~129 m/s) an elevator sees ~4× the load it does at 125 kt, which sizes the hydraulic actuator.',
+    },
   },
   {
     id: 'fuel-system',
@@ -280,6 +306,19 @@ export const COMPONENTS = [
     suppliers: ['Safran Electrical & Power', 'Collins', 'Eaton', 'Parker'],
     usedOn: 'All variants — the /systems page animates the A320\'s green/blue/yellow hydraulics and the electrical bus tree.',
     note: 'Lose both engines and the RAT (a pop-out wind turbine the size of a bar stool) keeps flight controls and instruments alive.',
+    design: {
+      driver:
+        'Power systems are sized by the WORST-CASE load with a source failed: every essential user must ' +
+        'still be fed after losing an engine (and its generator/pump). That is why there are three ' +
+        'independent hydraulic circuits (green/blue/yellow) and multiple generators + the RAT.',
+      equation:
+        'Hydraulic power  P = Δp · Q  (pressure × flow).  Higher Δp → thinner pipes for the same power:  ' +
+        'pipe wall  t = p·d/(2σ), so 5,000 psi vs 3,000 psi cuts pipe/fluid weight for the same actuation.',
+      example:
+        'The A380/A350 run 5,000 psi instead of the classic 3,000 psi: for the same actuator power P = Δp·Q, ' +
+        'raising Δp lets Q (and pipe bore) shrink, saving ~tonnes of pipe + fluid over a widebody. The trade is ' +
+        'thicker walls + tighter seals — a direct t = pd/2σ pressure-vessel calc on every line.',
+    },
   },
 
   /* ---------------- Interior ---------------- */
