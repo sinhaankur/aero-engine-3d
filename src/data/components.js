@@ -156,6 +156,19 @@ export const COMPONENTS = [
     suppliers: ['Safran/Albany (Commercy, Rochester)', 'Rolls-Royce (Barnoldswick)', 'Pratt & Whitney'],
     usedOn: 'LEAP-1A/1B (A320neo, 737 MAX), Trent XWB (A350), PW1100G/1500G/1900G (neo, A220, E2).',
     note: 'A fan blade-off event must be contained — the certification test destroys a full engine on purpose (see the fan case).',
+    design: {
+      driver:
+        'A fan blade is sized by the CENTRIFUGAL load trying to rip it off the disc — not the air load. ' +
+        'At redline the tip runs near the speed of sound and the root carries the pull of the whole blade. ' +
+        'That is why blades are hollow titanium or woven carbon: lower mass ρ → lower pull for the same shape.',
+      equation:
+        'Root pull  Fc = m · ω² · r   (ω = 2π·RPM/60).  Tip speed  Utip = ω · R.  ' +
+        'Root stress  σ = Fc / Aroot — kept under the material limit with a fat fatigue margin.',
+      example:
+        'A ~7 kg blade with its CG ~0.6 m out at 5,000 RPM (ω ≈ 524 rad/s): Fc = 7·524²·0.6 ≈ 1.15 MN — ' +
+        'about 120 tonnes hanging off one blade root the size of your hand. Every blade pulls that hard, ' +
+        'every second of every flight — so a single blade shed is a truck’s worth of energy (see fan case).',
+    },
   },
   {
     id: 'fan-case',
@@ -168,6 +181,19 @@ export const COMPONENTS = [
     suppliers: ['Safran Aircraft Engines', 'GE Batesville', 'GKN Aerospace'],
     usedOn: 'All engines in the catalogue.',
     note: 'Containment is why fan cases weigh what a small car does: the released blade carries the energy of a truck at highway speed.',
+    design: {
+      driver:
+        'The case is sized to CONTAIN a blade released at full RPM (CS-33.94): trap it inside the nacelle ' +
+        'so it cannot slice a fuel line, the fuselage or the other engine. The design load is the kinetic ' +
+        'energy of one blade at tip speed — the Kevlar/steel wrap must absorb it without perforating.',
+      equation:
+        'Blade energy  E = ½ · m · Vtip².  Tip speed  Vtip = π · D · RPM/60.  ' +
+        'Wrap thickness scales with E / (material toughness × case circumference).',
+      example:
+        'A 7 kg blade at Vtip ≈ 450 m/s: E = ½·7·450² ≈ 0.71 MJ — a small car at ~100 km/h, dumped into the ' +
+        'case in a few milliseconds. The aramid wrap is layered to soak that, which is why a fan case weighs ' +
+        'as much as a motorbike and is the single heaviest ring on the engine.',
+    },
   },
   {
     id: 'hpt-blade',
@@ -182,6 +208,19 @@ export const COMPONENTS = [
     suppliers: ['PCC Airfoils', 'Howmet Aerospace', 'Rolls-Royce Rotatives', 'Safran'],
     usedOn: 'Every turbofan in the catalogue.',
     note: 'These blades run in gas ~400 °C HOTTER than their own melting point, kept alive purely by film cooling and the ceramic coat.',
+    design: {
+      driver:
+        'The HP turbine blade is squeezed between two limits at once: it must survive gas HOTTER than it ' +
+        'melts, AND the centrifugal pull at ~10,000+ RPM, for thousands of hours without creeping. Hence a ' +
+        'single crystal (no grain boundaries to creep), film cooling, and a ceramic thermal-barrier coat.',
+      equation:
+        'Cooling gap  ΔT = Tgas − Tmetal, bridged by cooling air ṁc ≈ 15–20% of core flow.  ' +
+        'Creep life falls ~exponentially with metal temperature (Larson–Miller): every +25 °C ≈ ½ the life.',
+      example:
+        'Gas enters at ~1,450 °C; the nickel superalloy softens near ~1,100 °C — a ~350 °C gap bridged by ' +
+        'routing cooler compressor air through internal passages + a ~0.2 mm ceramic coat. Get the coating ' +
+        '25 °C wrong and you roughly HALVE the blade life — which is why each blade costs like a small car.',
+    },
   },
   {
     id: 'combustor',
@@ -194,6 +233,19 @@ export const COMPONENTS = [
     suppliers: ['GE Aviation', 'Safran', 'MTU Aero Engines'],
     usedOn: 'All engines; LEAP\'s TAPS II combustor is why it meets CAEP/8 NOx with margin.',
     note: 'The combustor is where the 3D-printing revolution entered jet engines: 20 parts became 1, 25% lighter, 5× more durable.',
+    design: {
+      driver:
+        'The combustor must burn the fuel COMPLETELY in a space the size of a bucket, in a few milliseconds, ' +
+        'and hand the turbine an even temperature (no hot streak). Modern lean-burn designs also fight NOx, ' +
+        'which forms exponentially with flame temperature — so the burner is tuned as much for emissions as heat.',
+      equation:
+        'Residence time  τ = V / (ṁair/ρ) ≈ a few ms.  Heat release  Q = ṁfuel · LHV.  ' +
+        'NOx forms ~ exp(−E/RTflame) → burn LEAN (excess air) to hold flame temperature down.',
+      example:
+        'Core air ~30 kg/s races through a ~30 L flame tube in τ ≈ V/(ṁ/ρ) ≈ 0.03/(30/5) ≈ 5 ms — the fuel ' +
+        'must find air, atomise and burn out in that blink. LEAP’s 3D-printed TAPS nozzles pre-mix lean to ' +
+        'drop the peak flame temperature, cutting NOx enough to clear CAEP/8 with margin.',
+    },
   },
   {
     id: 'gtf-gearbox',
@@ -206,6 +258,19 @@ export const COMPONENTS = [
     suppliers: ['Pratt & Whitney (with Fiat Avio heritage)'],
     usedOn: 'PW1100G (A320neo), PW1500G (A220), PW1900G (E190/195-E2).',
     note: 'The gear lets the fan spin ~3× slower than the turbine — each at its own best speed. That single idea is worth ~16% fuel burn.',
+    design: {
+      driver:
+        'The fan wants to turn SLOW (big diameter, tip stays subsonic, quiet + efficient) while the low ' +
+        'turbine wants to turn FAST (small, light, efficient). A reduction gearbox lets each run at its own ' +
+        'best speed. It is sized by the huge torque it must pass and the heat its tiny losses make.',
+      equation:
+        'Gear ratio  G = Nturbine / Nfan ≈ 3.  Torque  T = P / ω  (ω = 2π·RPM/60).  ' +
+        'Heat to reject  Qloss = P · (1 − η) — even at 99.5% efficiency, 0.5% of ~30,000 hp is large.',
+      example:
+        'Passing ~22 MW (~30,000 hp) at a fan turning ~3× slower means torque T = P/ω is ~3× higher on the ' +
+        'fan side — tens of kN·m through five star gears. At η = 99.5%, Qloss = 22 MW·0.005 ≈ 110 kW of heat ' +
+        '(a few electric heaters) that a dedicated oil cooler must dump — which is why the GTF has its own oil loop.',
+    },
   },
   {
     id: 'nacelle',
@@ -218,6 +283,19 @@ export const COMPONENTS = [
     suppliers: ['Safran Nacelles', 'Collins Aerospace (ex-Rohr)', 'Spirit AeroSystems'],
     usedOn: 'All variants; the A320neo offers two different nacelle/engine combos (LEAP vs GTF).',
     note: 'Those chevron-free smooth inlets on the neo/MAX are acoustically tuned — the nacelle is as much a silencer as a fairing.',
+    design: {
+      driver:
+        'The nacelle is an aerodynamic + ACOUSTIC part: it forms the bypass duct that makes most of the ' +
+        'thrust, and its liners are tuned to swallow the fan’s dominant noise — the blade-passing tone. The ' +
+        'liner cells are sized so their resonant frequency matches that tone at approach power.',
+      equation:
+        'Blade-passing frequency  BPF = (RPM/60) · Nblades.  A Helmholtz-liner cell resonates at ' +
+        'f = (c/2π)·√(A/(V·L)) — depth tuned so f ≈ BPF, cancelling that tone.',
+      example:
+        'A fan at 3,300 RPM with 18 blades → BPF = (3300/60)·18 ≈ 990 Hz. The inlet’s acoustic honeycomb is ' +
+        'sized so millions of sub-mm cells resonate near ~1 kHz and absorb it — which is why modern smooth ' +
+        'inlets are as much a silencer as a fairing, and why a damaged liner shows up on noise monitoring.',
+    },
   },
   {
     id: 'apu',
@@ -230,6 +308,19 @@ export const COMPONENTS = [
     suppliers: ['Honeywell (131-9 family)', 'Pratt & Whitney (APS3200)'],
     usedOn: 'All variants — it lives in the tailcone (see it in Explore mode) and supplies ground power + engine-start air.',
     note: 'ETOPS rules treat the APU as a backup generator over oceans — its reliability numbers are tracked like an engine\'s.',
+    design: {
+      driver:
+        'The APU is sized by its two jobs: supply enough bleed AIR to spin a main engine up to light-off, ' +
+        'and enough electrical POWER for the cabin on the ground — while being able to START itself at up ' +
+        'to 41,000 ft (thin air) for the over-water backup case. Altitude start capability drives the design.',
+      equation:
+        'Electrical load  P = Σ(loads).  Start air:  enough ṁ·Δp to crank the engine to self-sustaining N2.  ' +
+        'Air density falls with altitude  ρ = ρ0·(p/p0) — so a 41,000 ft start has ~¼ the sea-level air.',
+      example:
+        'A 131-9 APU makes ~90 kVA of electrical power and enough bleed to motor a CFM56 to ~20% N2 for start. ' +
+        'At 41,000 ft the air is ~¼ as dense (ρ ∝ pressure), so the APU’s own starter + fuel schedule are sized ' +
+        'for that thin-air light-off — the reason ETOPS tracks its start reliability like an engine’s.',
+    },
   },
 
   /* ---------------- Systems ---------------- */

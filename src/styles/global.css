@@ -841,13 +841,31 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .comp-card dd { margin: 0; font-size: 13px; line-height: 1.5; color: var(--fg); }
 .comp-cost { color: var(--accent) !important; font-family: var(--mono); }
 .comp-note { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); font-style: italic; border-top: 1px solid var(--border); padding-top: 10px; }
-/* how each part is designed + the math (aerospace-newcomer teaching layer) */
-.comp-design { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); display: grid; gap: 9px; }
-.comp-design-head { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--accent); }
-.comp-design-row { display: grid; gap: 2px; }
-.comp-design-row > span { font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
-.comp-design-row p { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--fg); }
-.comp-eq { font-family: var(--mono) !important; font-size: 11.5px !important; color: #86b7ff !important; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 7px 9px; line-height: 1.7 !important; }
+/* how each part is designed + the math (aerospace-newcomer teaching layer).
+   Styled as a distinct engineering callout so the design logic + formula READ as
+   a highlighted panel, not body text — you should feel the math at a glance. */
+.comp-design {
+  margin-top: 14px; display: grid; gap: 11px;
+  padding: 13px 14px; border: 1px solid var(--border-2); border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(216,255,62,0.035), transparent 40%), var(--bg);
+}
+.comp-design-head {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent);
+}
+.comp-design-head::before { content: 'ƒ'; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; background: var(--accent); color: #000; font-size: 11px; font-style: italic; }
+.comp-design-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border-2), transparent); }
+.comp-design-row { display: grid; gap: 3px; }
+.comp-design-row > span { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.comp-design-row p { margin: 0; font-size: 12.5px; line-height: 1.58; color: var(--fg); }
+/* the equation, rendered like a real formula callout */
+.comp-eq {
+  font-family: var(--mono) !important; font-size: 12px !important; color: #a6ccff !important;
+  background: #0a0e14; border: 1px solid var(--info-dim); border-radius: 5px;
+  padding: 9px 11px; line-height: 1.75 !important;
+  box-shadow: inset 0 0 0 1px rgba(134,183,255,0.06);
+}
 
 .spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 3px; overflow: hidden; margin: 0; }
 .spec-grid.compact { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
@@ -904,12 +922,23 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .ee-specs { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
 .ee-specs li { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 3px 11px; font-size: 12px; color: var(--muted); }
 .ee-hint { margin-top: 12px; color: var(--muted); font-size: 13px; }
-/* how each part is designed + the math behind it (aerospace-newcomer layer) */
-.ee-design { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); display: grid; gap: 10px; }
+/* how each part is designed + the math behind it (aerospace-newcomer layer).
+   Same engineering-callout treatment as /components .comp-design. */
+.ee-design {
+  margin-top: 14px; display: grid; gap: 10px;
+  padding: 13px 14px; border: 1px solid var(--border-2); border-left: 3px solid var(--accent); border-radius: 6px;
+  background: linear-gradient(180deg, rgba(216,255,62,0.035), transparent 40%), var(--bg);
+}
 .ee-design-row { display: grid; gap: 3px; }
-.ee-design-k { font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); font-family: var(--mono); }
+.ee-design-k { display: flex; align-items: center; gap: 7px; font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-family: var(--mono); }
+.ee-design-row:first-child .ee-design-k { color: var(--accent); }
 .ee-design-row p { margin: 0; color: var(--ink); font-size: 13px; line-height: 1.6; }
-.ee-eq { font-family: var(--mono) !important; font-size: 12px !important; color: #86b7ff !important; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; line-height: 1.7 !important; }
+.ee-eq {
+  font-family: var(--mono) !important; font-size: 12px !important; color: #a6ccff !important;
+  background: #0a0e14; border: 1px solid var(--info-dim); border-radius: 5px;
+  padding: 9px 11px; line-height: 1.75 !important;
+  box-shadow: inset 0 0 0 1px rgba(134,183,255,0.06);
+}
 
 /* Engine explorer — controls + how-it-works cycle */
 .ee-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
