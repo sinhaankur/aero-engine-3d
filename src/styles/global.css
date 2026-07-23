@@ -863,9 +863,14 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .comp-eq {
   font-family: var(--mono) !important; font-size: 12px !important; color: #a6ccff !important;
   background: #0a0e14; border: 1px solid var(--info-dim); border-radius: 5px;
-  padding: 9px 11px; line-height: 1.75 !important;
+  padding: 9px 11px; line-height: 1.9 !important;
   box-shadow: inset 0 0 0 1px rgba(134,183,255,0.06);
 }
+/* typeset the formula tokens: real super/subscripts, tidy spacing */
+.formula { font-family: var(--mono); }
+.formula sup, .formula sub { font-size: 0.72em; line-height: 0; }
+.formula sup { color: #cfe3ff; }
+.formula sub { color: #7fa8d8; }
 
 .spec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 3px; overflow: hidden; margin: 0; }
 .spec-grid.compact { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }

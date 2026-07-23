@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { COMPONENTS, COMPONENT_GROUPS } from '../data/components.js'
+import Formula from '../components/Formula.jsx'
 
 /**
  * /components — how each part of an airliner is built: material, process,
@@ -34,7 +35,7 @@ function ComponentCard({ c, focused }) {
         <div className="comp-design">
           <div className="comp-design-head">How it's designed · the math</div>
           <div className="comp-design-row"><span>Design driver</span><p>{c.design.driver}</p></div>
-          <div className="comp-design-row"><span>Governing math</span><p className="comp-eq">{c.design.equation}</p></div>
+          <div className="comp-design-row"><span>Governing math</span><p className="comp-eq"><Formula>{c.design.equation}</Formula></p></div>
           <div className="comp-design-row"><span>Worked example</span><p>{c.design.example}</p></div>
         </div>
       )}

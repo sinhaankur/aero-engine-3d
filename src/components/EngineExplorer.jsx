@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import EngineViewer from '../three/EngineViewer.jsx'
 import EngineBlueprint from '../three/EngineBlueprint.jsx'
+import Formula from './Formula.jsx'
 import {
   ENGINE_MODELS,
   ENGINE_PARTS_BY_MODEL,
@@ -172,7 +173,7 @@ export default function EngineExplorer({ engineId }) {
                 </div>
                 <div className="ee-design-row">
                   <span className="ee-design-k">Governing math</span>
-                  <p className="ee-eq">{selected.design.equation}</p>
+                  <p className="ee-eq"><Formula>{selected.design.equation}</Formula></p>
                 </div>
                 <div className="ee-design-row">
                   <span className="ee-design-k">Worked example</span>

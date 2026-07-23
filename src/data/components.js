@@ -424,6 +424,19 @@ export const COMPONENTS = [
     suppliers: ['Safran Seats', 'Collins Interiors', 'Recaro', 'Diehl Aviation'],
     usedOn: 'All variants — seat counts in each variant\'s data are the certified exit-limit and typical layouts.',
     note: 'A lie-flat seat has more certified mechanisms than the cockpit door — which is why one seat can cost as much as a house.',
+    design: {
+      driver:
+        'The cabin is sized by SURVIVABILITY, not comfort: every seat must hold a 16 g crash pulse ' +
+        '(CS-25.562), every material must resist fire (CS-25.853), and the whole cabin must EVACUATE in ' +
+        '90 seconds with half the exits blocked (CS-25.803). That 90 s rule is what caps how many seats fit.',
+      equation:
+        'Seat crash load  F = m · a = m · (16 · g).  Max seats  Nmax = evac_capacity(exits, 90 s) ' +
+        '— the number of people the available exits can pass in 90 seconds sets the certified limit.',
+      example:
+        'A 77 kg occupant in a 16 g pulse pulls F = 77 · 16 · 9.81 ≈ 12.1 kN through the seat into the floor ' +
+        'rails — over a tonne, which is why frames are aluminium/titanium and the floor track is a structural ' +
+        'part. An A320 is capped at 195 seats: not by space, but by how many its exits clear in 90 seconds.',
+    },
   },
 ]
 
