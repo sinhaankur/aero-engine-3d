@@ -1,7 +1,8 @@
-import { Suspense, useRef } from 'react'
+import { Suspense, useMemo, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Stage, useGLTF, Html, Float } from '@react-three/drei'
 import CanvasFallback from './CanvasFallback.jsx'
+import { collectParts, updateParts, demoSchedule } from './modelAnim.js'
 
 /**
  * The animated 3D plane that opens the home page. A slowly self-rotating,
@@ -17,12 +18,18 @@ function withBase(path) {
 
 function SpinningModel({ url }) {
   const { scene } = useGLTF(withBase(url))
+  // clone so we can animate parts without corrupting the shared useGLTF cache
+  const cloned = useMemo(() => scene.clone(true), [scene])
+  const parts = useMemo(() => collectParts(cloned), [cloned])
   const ref = useRef()
-  // continuous slow yaw so the plane is always in motion
+  const t = useRef(0)
   useFrame((_, dt) => {
-    if (ref.current) ref.current.rotation.y += dt * 0.35
+    if (ref.current) ref.current.rotation.y += dt * 0.35 // continuous slow yaw
+    t.current += Math.min(dt, 0.05)
+    // gentle demo: spinning fan + slow flap sweep (no gear cycle on the hero)
+    updateParts(parts, Math.min(dt, 0.05), { ...demoSchedule(t.current), skipGear: true })
   })
-  return <primitive ref={ref} object={scene} />
+  return <primitive ref={ref} object={cloned} />
 }
 
 function Loader() {

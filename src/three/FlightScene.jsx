@@ -4,6 +4,7 @@ import { useGLTF, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import CanvasFallback from './CanvasFallback.jsx'
 import { stepFlight, autoflight } from '../sim/flight/model.js'
+import { collectParts, updateParts } from './modelAnim.js'
 
 /**
  * The /fly world: a 3200 m runway on an endless field grid, weather-driven
@@ -289,28 +290,7 @@ function AircraftModel({ url, simRef, groupRef }) {
   // raw frame here (nose −X, up −Z), so the fan axis is local X and "up into the
   // belly" is local +Z. Gear meshes are the unnamed cylinders/wheels sitting
   // below the fuselage centreline.
-  const anim = useMemo(() => {
-    const fans = []
-    const gear = []
-    const flaps = []      // hinged Flap_* surfaces (deflect down with flap setting)
-    const ailerons = []   // hinged Aileron_* surfaces (antisymmetric with roll)
-    const box = new THREE.Box3().setFromObject(cloned)
-    const height = box.max.z - box.min.z   // vertical extent (raw up = ±z)
-    const c = new THREE.Vector3()
-    cloned.traverse((o) => {
-      if (!o.isMesh) return
-      if (/FanBlades|Spinner/i.test(o.name)) { fans.push(o); return }
-      if (/^Flap_/i.test(o.name)) { flaps.push({ o, side: /R$/i.test(o.name) ? 1 : -1, y0: o.rotation.y }); return }
-      if (/^Aileron_/i.test(o.name)) { ailerons.push({ o, side: /R$/i.test(o.name) ? 1 : -1, y0: o.rotation.y }); return }
-      // gear struts/wheels/hubs are the generic Cylinder*/Torus* nodes that sit
-      // below the belly (raw down = +z), away from the engine cylinders up top
-      if (/Cylinder|Torus/i.test(o.name)) {
-        new THREE.Box3().setFromObject(o).getCenter(c)
-        if (c.z > box.max.z - height * 0.5) gear.push({ o, z0: o.position.z })
-      }
-    })
-    return { fans, gear, flaps, ailerons, retractDist: height * 0.42 }
-  }, [cloned])
+  const anim = useMemo(() => collectParts(cloned), [cloned])
 
   useFrame((_, dt) => {
     const g = groupRef.current
@@ -324,36 +304,12 @@ function AircraftModel({ url, simRef, groupRef }) {
       g.position.y += Math.sin(s.t * 43) * 0.12 * s.buffet
       g.rotation.z += Math.sin(s.t * 37) * 0.01 * s.buffet
     }
-    // spin the fans: N1 fraction → rev speed (raw fan axis is local X)
-    const n1 = out ? Math.max(0.04, out.n1 / 100) : 0.04
-    for (const f of anim.fans) f.rotation.x += n1 * 42 * dt
-    // gear retract/extend: lerp gear meshes up into the belly (local +z is down,
-    // so retracting means moving toward −z / into the hull)
-    if (anim.gear.length) {
-      const target = s.gear ? 0 : -anim.retractDist
-      for (const gm of anim.gear) {
-        gm.o.position.z += ((gm.z0 + target) - gm.o.position.z) * Math.min(1, dt * 2.5)
-      }
-    }
-    // flaps deflect DOWN with the flap setting. The hinge runs SPANWISE (raw
-    // local Y), and the flap chord extends aft in +x, so trailing-edge-down is a
-    // rotation about Y. The per-side sign drops both trailing edges together.
-    if (anim.flaps.length) {
-      const flapDefl = (s.flap / 3) * 0.7 // rad, ~40° at FULL
-      for (const fp of anim.flaps) {
-        const target = fp.y0 + flapDefl * fp.side
-        fp.o.rotation.y += (target - fp.o.rotation.y) * Math.min(1, dt * 2)
-      }
-    }
-    // ailerons deflect antisymmetrically with roll command (right roll → right
-    // aileron up, left down) — also a hinge about the spanwise Y axis.
-    if (anim.ailerons.length) {
-      const roll = simRef.current?.controls?.roll || 0
-      for (const al of anim.ailerons) {
-        const target = al.y0 + roll * 0.4 * al.side
-        al.o.rotation.y += (target - al.o.rotation.y) * Math.min(1, dt * 6)
-      }
-    }
+    updateParts(anim, Math.min(dt, 0.05), {
+      n1: out ? out.n1 / 100 : 0.05,
+      flap: s.flap / 3,
+      gearDown: s.gear,
+      roll: simRef.current?.controls?.roll || 0,
+    })
   })
 
   return (

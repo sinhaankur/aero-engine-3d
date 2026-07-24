@@ -4,6 +4,7 @@ import { OrbitControls, Stage, useGLTF, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import ProceduralAircraft from './ProceduralAircraft.jsx'
 import CanvasFallback from './CanvasFallback.jsx'
+import { collectParts, updateParts, demoSchedule } from './modelAnim.js'
 
 /**
  * Resolve a model path against Vite's deploy base so it works both locally
@@ -25,7 +26,7 @@ function withBase(path) {
  * centre, like a parts diagram. The scene is cloned because useGLTF caches
  * per URL and other viewers (home hero, simulate showcase) share that cache.
  */
-function GltfModel({ url, exploded = 0 }) {
+function GltfModel({ url, exploded = 0, animate = true }) {
   const { scene } = useGLTF(withBase(url))
   const cloned = useMemo(() => scene.clone(true), [scene])
 
@@ -41,15 +42,28 @@ function GltfModel({ url, exploded = 0 }) {
     return list
   }, [cloned])
 
+  // moving parts (fan/flaps/gear) for the assembled demo animation
+  const moving = useMemo(() => collectParts(cloned), [cloned])
+  const t = useRef(0)
   const target = useRef(exploded)
   target.current = exploded
   const tmp = useMemo(() => new THREE.Vector3(), [])
 
-  useFrame(() => {
-    // ease every part toward its assembled/exploded position
-    for (const p of parts) {
-      tmp.copy(p.dir).multiplyScalar(target.current * 0.55).add(p.base)
-      p.o.position.lerp(tmp, 0.12)
+  useFrame((_, dt) => {
+    // when exploded, ease every part outward (gear demo would fight it, so skip)
+    if (target.current > 0.02) {
+      for (const p of parts) {
+        tmp.copy(p.dir).multiplyScalar(target.current * 0.55).add(p.base)
+        p.o.position.lerp(tmp, 0.12)
+      }
+      return
+    }
+    // assembled: pull explode offsets back to base, then run the demo animation
+    // (rotation-only — fan spin + flap sweep — so it can't fight the position lerp)
+    for (const p of parts) p.o.position.lerp(p.base, 0.15)
+    if (animate) {
+      t.current += Math.min(dt, 0.05)
+      updateParts(moving, Math.min(dt, 0.05), { ...demoSchedule(t.current), skipGear: true })
     }
   })
 
