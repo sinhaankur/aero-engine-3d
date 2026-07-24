@@ -37,6 +37,26 @@ export const COMPONENTS = [
         'A320: W ≈ 73,500 kg, S = 122.6 m² → wing loading W/S ≈ 600 kg/m². At the 2.5 g limit the ' +
         'wing lifts 2.5·73.5 t ≈ 184 t; each half (~92 t) acts ~9 m out, so root bending M ≈ 92,000·9.81·9 ' +
         '≈ 8.1 MN·m — carried by the spar caps, then ×1.5 for ultimate. That is why the root skin is ~cm-thick plate.',
+      calc: {
+        title: 'Wing loading & root bending',
+        inputs: [
+          { key: 'W', label: 'Aircraft weight', unit: 'kg', min: 40000, max: 90000, step: 500, value: 73500 },
+          { key: 'S', label: 'Wing area', unit: 'm²', min: 90, max: 160, step: 1, value: 122.6 },
+          { key: 'b', label: 'Wingspan', unit: 'm', min: 28, max: 40, step: 0.5, value: 35.8 },
+          { key: 'n', label: 'Limit load', unit: 'g', min: 2, max: 3.8, step: 0.1, value: 2.5 },
+        ],
+        compute: ({ W, S, b, n }) => {
+          const wl = W / S
+          const halfLift = (n * W) / 2 // kg
+          const arm = b / 4
+          const M = halfLift * 9.81 * arm // N·m
+          return [
+            { label: 'Wing loading W/S', value: wl.toFixed(0), unit: 'kg/m²' },
+            { label: 'Root bending M', value: (M / 1e6).toFixed(1), unit: 'MN·m', big: true },
+            { label: 'Ultimate (×1.5)', value: (M * 1.5 / 1e6).toFixed(1), unit: 'MN·m' },
+          ]
+        },
+      },
     },
   },
   {
@@ -64,6 +84,22 @@ export const COMPONENTS = [
         'A320: cabin Δp ≈ 0.58 bar = 58 kPa, fuselage radius R ≈ 1.98 m. For a skin t ≈ 2 mm, ' +
         'hoop stress σθ = 58,000·1.98 / 0.002 ≈ 57 MPa per cycle. Aluminium yields ~300 MPa, so it is ' +
         'strong enough once — but 40,000 cycles is why doublers, bonded frames and crack-arrest straps exist.',
+      calc: {
+        title: 'Fuselage skin hoop stress',
+        inputs: [
+          { key: 'dp', label: 'Cabin Δp', unit: 'kPa', min: 30, max: 90, step: 1, value: 58 },
+          { key: 'R', label: 'Fuselage radius', unit: 'm', min: 1.5, max: 3.5, step: 0.05, value: 1.98 },
+          { key: 't', label: 'Skin thickness', unit: 'mm', min: 1, max: 5, step: 0.1, value: 2 },
+        ],
+        compute: ({ dp, R, t }) => {
+          const hoop = (dp * 1000 * R) / (t / 1000) / 1e6 // MPa
+          return [
+            { label: 'Hoop stress σθ', value: hoop.toFixed(0), unit: 'MPa', big: true },
+            { label: 'Longitudinal σx', value: (hoop / 2).toFixed(0), unit: 'MPa', note: 'exactly half' },
+            { label: 'vs Al yield ~300', value: `${(hoop / 300 * 100).toFixed(0)}%`, unit: 'of yield', warn: hoop > 300 },
+          ]
+        },
+      },
     },
   },
   {
@@ -114,6 +150,23 @@ export const COMPONENTS = [
         'A320 max landing ~64,500 kg at Vsink = 3.05 m/s: E = ½·64,500·3.05² ≈ 300 kJ — a small car at ' +
         '~55 km/h, in the last 0.3 s of the flight. To hold ~2 g through the airframe the oleo needs a ' +
         'stroke around s ≈ E/(n·m·g·η) ≈ 300,000/(2·64,500·9.81·0.8) ≈ 0.30 m of compressing gas + oil.',
+      calc: {
+        title: 'Landing gear energy → oleo stroke',
+        inputs: [
+          { key: 'm', label: 'Landing weight', unit: 'kg', min: 40000, max: 90000, step: 500, value: 64500 },
+          { key: 'vs', label: 'Sink rate', unit: 'm/s', min: 1, max: 4, step: 0.05, value: 3.05 },
+          { key: 'n', label: 'Load factor limit', unit: 'g', min: 1.5, max: 3, step: 0.1, value: 2 },
+        ],
+        compute: ({ m, vs, n }) => {
+          const E = 0.5 * m * vs * vs
+          const s = E / (n * m * 9.81 * 0.8)
+          return [
+            { label: 'Touchdown energy E', value: (E / 1000).toFixed(0), unit: 'kJ', big: true },
+            { label: 'Sink rate', value: (vs / 0.3048 * 60).toFixed(0), unit: 'fpm', note: '600 fpm is the cert case' },
+            { label: 'Oleo stroke needed', value: (s * 100).toFixed(0), unit: 'cm' },
+          ]
+        },
+      },
     },
   },
   {
@@ -168,6 +221,24 @@ export const COMPONENTS = [
         'A ~7 kg blade with its CG ~0.6 m out at 5,000 RPM (ω ≈ 524 rad/s): Fc = 7·524²·0.6 ≈ 1.15 MN — ' +
         'about 120 tonnes hanging off one blade root the size of your hand. Every blade pulls that hard, ' +
         'every second of every flight — so a single blade shed is a truck’s worth of energy (see fan case).',
+      calc: {
+        title: 'Fan blade root pull',
+        inputs: [
+          { key: 'm', label: 'Blade mass', unit: 'kg', min: 2, max: 20, step: 0.5, value: 7 },
+          { key: 'rpm', label: 'Fan speed', unit: 'RPM', min: 2000, max: 8000, step: 100, value: 5000 },
+          { key: 'r', label: 'CG radius', unit: 'm', min: 0.2, max: 1.2, step: 0.05, value: 0.6 },
+        ],
+        // returns [{ label, value, unit, note }]
+        compute: ({ m, rpm, r }) => {
+          const w = (2 * Math.PI * rpm) / 60
+          const Fc = m * w * w * r
+          return [
+            { label: 'ω', value: w.toFixed(0), unit: 'rad/s' },
+            { label: 'Root pull Fc', value: (Fc / 1000).toFixed(0), unit: 'kN', big: true },
+            { label: '≈ mass hung', value: (Fc / 9.81 / 1000).toFixed(0), unit: 'tonnes', note: 'off one blade root' },
+          ]
+        },
+      },
     },
   },
   {

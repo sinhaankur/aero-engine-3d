@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { COMPONENTS, COMPONENT_GROUPS } from '../data/components.js'
 import Formula from '../components/Formula.jsx'
+import Calculator from '../components/Calculator.jsx'
 
 /**
  * /components — how each part of an airliner is built: material, process,
@@ -37,6 +38,7 @@ function ComponentCard({ c, focused }) {
           <div className="comp-design-row"><span>Design driver</span><p>{c.design.driver}</p></div>
           <div className="comp-design-row"><span>Governing math</span><p className="comp-eq"><Formula>{c.design.equation}</Formula></p></div>
           <div className="comp-design-row"><span>Worked example</span><p>{c.design.example}</p></div>
+          {c.design.calc && <Calculator calc={c.design.calc} />}
         </div>
       )}
     </article>
