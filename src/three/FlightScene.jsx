@@ -300,8 +300,8 @@ function AircraftModel({ url, simRef, groupRef }) {
     cloned.traverse((o) => {
       if (!o.isMesh) return
       if (/FanBlades|Spinner/i.test(o.name)) { fans.push(o); return }
-      if (/^Flap_/i.test(o.name)) { flaps.push({ o, side: /R$/i.test(o.name) ? 1 : -1, z0: o.rotation.z }); return }
-      if (/^Aileron_/i.test(o.name)) { ailerons.push({ o, side: /R$/i.test(o.name) ? 1 : -1, z0: o.rotation.z }); return }
+      if (/^Flap_/i.test(o.name)) { flaps.push({ o, side: /R$/i.test(o.name) ? 1 : -1, y0: o.rotation.y }); return }
+      if (/^Aileron_/i.test(o.name)) { ailerons.push({ o, side: /R$/i.test(o.name) ? 1 : -1, y0: o.rotation.y }); return }
       // gear struts/wheels/hubs are the generic Cylinder*/Torus* nodes that sit
       // below the belly (raw down = +z), away from the engine cylinders up top
       if (/Cylinder|Torus/i.test(o.name)) {
@@ -335,22 +335,23 @@ function AircraftModel({ url, simRef, groupRef }) {
         gm.o.position.z += ((gm.z0 + target) - gm.o.position.z) * Math.min(1, dt * 2.5)
       }
     }
-    // flaps deflect DOWN with the flap setting (0..3 → up to ~40°); the hinge is
-    // the spanwise (Z) axis, and the per-side sign makes both trailing edges drop
+    // flaps deflect DOWN with the flap setting. The hinge runs SPANWISE (raw
+    // local Y), and the flap chord extends aft in +x, so trailing-edge-down is a
+    // rotation about Y. The per-side sign drops both trailing edges together.
     if (anim.flaps.length) {
       const flapDefl = (s.flap / 3) * 0.7 // rad, ~40° at FULL
       for (const fp of anim.flaps) {
-        const target = fp.z0 + flapDefl * fp.side
-        fp.o.rotation.z += (target - fp.o.rotation.z) * Math.min(1, dt * 2)
+        const target = fp.y0 + flapDefl * fp.side
+        fp.o.rotation.y += (target - fp.o.rotation.y) * Math.min(1, dt * 2)
       }
     }
     // ailerons deflect antisymmetrically with roll command (right roll → right
-    // aileron up, left down); driven by the smoothed control input
+    // aileron up, left down) — also a hinge about the spanwise Y axis.
     if (anim.ailerons.length) {
       const roll = simRef.current?.controls?.roll || 0
       for (const al of anim.ailerons) {
-        const target = al.z0 + roll * 0.35 * al.side
-        al.o.rotation.z += (target - al.o.rotation.z) * Math.min(1, dt * 6)
+        const target = al.y0 + roll * 0.4 * al.side
+        al.o.rotation.y += (target - al.o.rotation.y) * Math.min(1, dt * 6)
       }
     }
   })
