@@ -93,6 +93,17 @@ export class FlightAudio {
 
   toggle() { this.on ? this.stop() : this.start() }
 
+  /** lazily build the persistent starter-motor whine (a filtered triangle). */
+  _startStarter() {
+    if (!this.ctx || this._starter) return
+    const osc = this.ctx.createOscillator(); osc.type = 'triangle'; osc.frequency.value = 240
+    const filt = this.ctx.createBiquadFilter(); filt.type = 'bandpass'; filt.frequency.value = 600; filt.Q.value = 3
+    const gain = this.ctx.createGain(); gain.gain.value = 0
+    osc.connect(filt); filt.connect(gain); gain.connect(this.nodes.master)
+    osc.start()
+    this._starter = { osc, gain }
+  }
+
   /** short filtered-noise burst for gear/flap clunks etc. */
   _clunk(freq = 180, dur = 0.12, gain = 0.5) {
     if (!this.ctx) return
@@ -124,6 +135,30 @@ export class FlightAudio {
     const n = this.nodes
     const t = this.ctx.currentTime
     const smooth = (param, val, tc = 0.08) => param.setTargetAtTime(val, t, tc)
+
+    // --- engine start: starter whine while cranking + a light-off whoomph ---
+    // an engine "cranks" when its master is on, fuel is flowing, but it hasn't
+    // yet self-sustained (started=false). Detect the light-off transition to
+    // fire a one-shot ignition transient.
+    const cranking =
+      (state.eng1Master && state.fuelPump1 && !state.eng1Started && (state.eng1N1 || 0) > 0.01) ||
+      (state.eng2Master && state.fuelPump2 && !state.eng2Started && (state.eng2N1 || 0) > 0.01)
+    if (cranking) {
+      // rising starter whine: pitch climbs with the cranking N1 of the lit engine
+      const crankN1 = Math.max(state.eng1N1 || 0, state.eng2N1 || 0)
+      const wHz = 220 + crankN1 * 900
+      if (!this._starter) this._startStarter()
+      if (this._starter) {
+        this._starter.osc.frequency.setTargetAtTime(wHz, t, 0.15)
+        this._starter.gain.gain.setTargetAtTime(0.06, t, 0.2)
+      }
+    } else if (this._starter) {
+      this._starter.gain.gain.setTargetAtTime(0, t, 0.25)
+    }
+    // light-off: either engine flips started false→true
+    const bothStarted = !!state.eng1Started + !!state.eng2Started
+    if (bothStarted > (this._prevStarted ?? bothStarted)) this._clunk(90, 0.4, 0.5) // combustor whoomph
+    this._prevStarted = bothStarted
 
     // engine N1 fraction (0..1), averaged across engines
     const n1 = out ? Math.max(0, Math.min(1.1, out.n1 / 100)) : 0
