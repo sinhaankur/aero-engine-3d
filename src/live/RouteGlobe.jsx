@@ -40,8 +40,39 @@ function slerpLL(aLL, bLL, f, out) {
   return out.copy(a).multiplyScalar(w1).addScaledVector(b, w2).normalize()
 }
 
+// A day/night Earth shader: the hemisphere facing the sun is lit ocean-blue
+// brightening to a bright sub-solar point, a warm gold band rides the terminator,
+// and the night side falls to deep blue-black with a faint city-light warmth.
+const SUN_DIR = new THREE.Vector3(0.6, 0.35, 0.7).normalize()
+const earthDayNightMat = () => new THREE.ShaderMaterial({
+  uniforms: { uSun: { value: SUN_DIR.clone() } },
+  vertexShader: `
+    varying vec3 vN; varying vec3 vP;
+    void main(){ vN = normalize(normalMatrix * normal); vP = normalize(position);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+  `,
+  fragmentShader: `
+    uniform vec3 uSun; varying vec3 vN; varying vec3 vP;
+    void main(){
+      float d = dot(normalize(vP), normalize(uSun));      // -1 night .. 1 subsolar
+      float day = smoothstep(-0.05, 0.5, d);
+      vec3 ocean = mix(vec3(0.03,0.09,0.16), vec3(0.10,0.32,0.52), day);
+      vec3 night = vec3(0.015,0.03,0.06);
+      vec3 col = mix(night, ocean, day);
+      // warm terminator band where day meets night
+      float term = 1.0 - abs(d) ; term = smoothstep(0.86, 1.0, term);
+      col += vec3(0.45,0.22,0.05) * term;
+      // faint city warmth on the deep night side
+      float nightSide = smoothstep(0.15, -0.3, d);
+      col += vec3(0.10,0.07,0.02) * nightSide;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+})
+
 function Earth() {
   const surface = (lat, lon, out) => toVec3(lat, lon, 0.002, out)
+  const earthMat = useMemo(earthDayNightMat, [])
   const coasts = useMemo(() => {
     const g = new THREE.BufferGeometry()
     const pts = []; const a = new THREE.Vector3(); const b = new THREE.Vector3()
@@ -65,12 +96,20 @@ function Earth() {
   }, [])
   return (
     <group>
-      <mesh><sphereGeometry args={[R, 96, 96]} /><meshStandardMaterial color="#101d29" roughness={0.9} metalness={0.15} /></mesh>
-      {/* inner + outer atmosphere for a cinematic rim glow */}
-      <mesh scale={1.02}><sphereGeometry args={[R, 64, 64]} /><meshBasicMaterial color="#2f7fbf" transparent opacity={0.12} side={THREE.BackSide} /></mesh>
-      <mesh scale={1.10}><sphereGeometry args={[R, 64, 64]} /><meshBasicMaterial color="#1e5f8c" transparent opacity={0.06} side={THREE.BackSide} /></mesh>
-      <lineSegments geometry={graticule}><lineBasicMaterial color="#22394b" transparent opacity={0.45} /></lineSegments>
-      <lineSegments geometry={coasts}><lineBasicMaterial color="#6ea6cf" transparent opacity={0.95} /></lineSegments>
+      <mesh geometry={undefined} material={earthMat}><sphereGeometry args={[R, 128, 128]} /></mesh>
+      {/* fresnel atmosphere rim glow (brighter on the sun side) */}
+      <mesh scale={1.06}>
+        <sphereGeometry args={[R, 64, 64]} />
+        <shaderMaterial
+          transparent
+          side={THREE.BackSide}
+          uniforms={{ uSun: { value: SUN_DIR.clone() } }}
+          vertexShader={`varying vec3 vN; varying vec3 vP; void main(){ vN=normalize(normalMatrix*normal); vP=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `}
+          fragmentShader={`uniform vec3 uSun; varying vec3 vN; varying vec3 vP; void main(){ float rim=pow(1.0-abs(dot(normalize(vN),vec3(0.0,0.0,1.0))),2.5); float lit=smoothstep(-0.2,0.6,dot(normalize(vP),normalize(uSun))); vec3 c=mix(vec3(0.10,0.30,0.55),vec3(0.35,0.6,0.9),lit); gl_FragColor=vec4(c, rim*0.55);} `}
+        />
+      </mesh>
+      <lineSegments geometry={graticule}><lineBasicMaterial color="#2b485c" transparent opacity={0.35} /></lineSegments>
+      <lineSegments geometry={coasts}><lineBasicMaterial color="#8fc0e0" transparent opacity={0.85} /></lineSegments>
     </group>
   )
 }
