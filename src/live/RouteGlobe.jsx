@@ -302,8 +302,10 @@ function ProgressDriver({ live, previewing, secs, out }) {
   return null
 }
 
-export default function RouteGlobe({ from, to, progress = 0, height = 560, cinematic = true }) {
-  const [previewing, setPreviewing] = useState(false)
+export default function RouteGlobe({ from, to, progress = 0, height = 560, cinematic = true, autoPreview = false }) {
+  // auto-start the flyover on open when nothing's really flying, so the globe is
+  // immediately cinematic; the user can stop it any time
+  const [previewing, setPreviewing] = useState(autoPreview && progress < 0.001)
   const progressRef = useRef(progress)
   if (!from || !to) return null
   // "flying" = a preview or a live leg is underway → cinematic camera owns it;
