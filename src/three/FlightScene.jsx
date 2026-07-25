@@ -357,6 +357,19 @@ function CameraRig({ simRef, groupRef, view, dims }) {
       camera.position.copy(tmp.a)
       camera.lookAt(tmp.b)
       if (camera.fov !== 65) { camera.fov = 65; camera.updateProjectionMatrix() }
+    } else if (view === 'wing') {
+      // passenger window: eye at a left-side cabin window over the wing, looking
+      // outboard + slightly down/aft so the wing and the world below fill the view
+      const eye = eyeH * 0.62
+      tmp.a.set(-L * 0.04, eye, L * 0.02)        // just inboard of the window line
+      g.localToWorld(tmp.a)
+      tmp.b.set(-L * 0.9, eye - L * 0.10, L * 0.14) // look out over the left wing
+      g.localToWorld(tmp.b)
+      tmp.c.set(0, 1, 0).applyQuaternion(g.quaternion)
+      camera.up.copy(tmp.c)
+      camera.position.copy(tmp.a)
+      camera.lookAt(tmp.b)
+      if (camera.fov !== 70) { camera.fov = 70; camera.updateProjectionMatrix() }
     } else if (view === 'chase') {
       const fx = Math.sin(s.psi)
       const fz = -Math.cos(s.psi)

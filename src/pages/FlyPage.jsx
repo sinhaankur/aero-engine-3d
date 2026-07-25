@@ -18,6 +18,7 @@ const shortName = (name) => name.replace(/^(Airbus|Boeing|Embraer) /, '')
 const VIEWS = [
   { id: 'cockpit', name: 'Cockpit' },
   { id: 'chase', name: 'Chase' },
+  { id: 'wing', name: 'Window' },
   { id: 'tower', name: 'Tower' },
   { id: 'globe', name: 'Globe' },
 ]
@@ -341,6 +342,14 @@ export default function FlyPage() {
             <div className="deck-post-c" />
             <div className="deck-glareshield" />
             <div className="deck-eyebrow" />
+          </div>
+        )}
+
+        {/* passenger window frame — a rounded cabin-window vignette */}
+        {view === 'wing' && (
+          <div className="cabin-window" aria-hidden>
+            <div className="cabin-window-hole" />
+            <div className="cabin-window-shade" />
           </div>
         )}
 
