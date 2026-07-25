@@ -42,15 +42,33 @@ def reset_scene():
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
 
-def mat(name, rgba, metallic=0.2, roughness=0.5):
+def _set(bsdf, key, val):
+    # Principled BSDF socket names drift across Blender versions; set safely.
+    if key in bsdf.inputs:
+        bsdf.inputs[key].default_value = val
+
+
+def mat(name, rgba, metallic=0.2, roughness=0.5, coat=0.0, ior=1.45, transmission=0.0):
+    """Physically-based material. `coat` adds a clearcoat (that painted-metal
+    sheen airliners have); `transmission` + `ior` make real tinted glass."""
     m = bpy.data.materials.get(name)
     if m is None:
         m = bpy.data.materials.new(name)
     m.use_nodes = True
     bsdf = m.node_tree.nodes.get("Principled BSDF")
-    bsdf.inputs["Base Color"].default_value = rgba
-    bsdf.inputs["Metallic"].default_value = metallic
-    bsdf.inputs["Roughness"].default_value = roughness
+    _set(bsdf, "Base Color", rgba)
+    _set(bsdf, "Metallic", metallic)
+    _set(bsdf, "Roughness", roughness)
+    # clearcoat — socket is "Coat Weight" (Blender 4.x) or "Clearcoat" (3.x)
+    if coat:
+        _set(bsdf, "Coat Weight", coat)
+        _set(bsdf, "Clearcoat", coat)
+        _set(bsdf, "Coat Roughness", 0.08)
+        _set(bsdf, "Clearcoat Roughness", 0.08)
+    if transmission:
+        _set(bsdf, "Transmission Weight", transmission)
+        _set(bsdf, "Transmission", transmission)
+        _set(bsdf, "IOR", ior)
     return m
 
 
@@ -81,24 +99,31 @@ def hex_to_rgba(h):
 
 def make_materials(spec):
     tail_rgba = hex_to_rgba(spec.get("tail_color", "#1f4fb0"))
+    # a slightly darker shade of the tail colour for the fuselage cheatline
+    cheat = tuple(c * 0.85 for c in tail_rgba[:3]) + (1.0,)
     return {
-        "skin": mat("HD_Fuselage", (0.90, 0.92, 0.95, 1), 0.30, 0.38),
-        "wing": mat("HD_Wing", (0.82, 0.85, 0.89, 1), 0.30, 0.45),
-        "sharklet": mat("HD_Sharklet", tail_rgba, 0.25, 0.45),
-        "tail": mat("HD_Tail", tail_rgba, 0.25, 0.45),
-        "nacelle": mat("HD_Nacelle", (0.66, 0.70, 0.74, 1), 0.65, 0.30),
-        "cowl_lip": mat("HD_CowlLip", (0.80, 0.82, 0.85, 1), 0.85, 0.18),
-        "fan": mat("HD_Fan", (0.20, 0.21, 0.23, 1), 0.75, 0.28),
-        "spinner": mat("HD_Spinner", (0.10, 0.10, 0.12, 1), 0.7, 0.3),
-        "hot": mat("HD_HotSection", (0.14, 0.14, 0.16, 1), 0.8, 0.35),
-        "pylon": mat("HD_Pylon", (0.58, 0.61, 0.65, 1), 0.45, 0.45),
-        "window": mat("HD_Window", (0.06, 0.09, 0.13, 1), 0.55, 0.12),
-        "cockpit": mat("HD_Cockpit", (0.05, 0.07, 0.10, 1), 0.7, 0.10),
-        "door": mat("HD_Door", (0.84, 0.86, 0.89, 1), 0.30, 0.42),
-        "gear": mat("HD_Gear", (0.30, 0.31, 0.33, 1), 0.6, 0.4),
-        "tyre": mat("HD_Tyre", (0.05, 0.05, 0.06, 1), 0.1, 0.8),
-        "hub": mat("HD_Hub", (0.55, 0.57, 0.60, 1), 0.7, 0.35),
-        "antenna": mat("HD_Antenna", (0.20, 0.22, 0.26, 1), 0.4, 0.5),
+        # polished aluminium/composite skin: bright, a touch metallic, with a
+        # clearcoat for the wet paint sheen a real airliner has
+        "skin": mat("HD_Fuselage", (0.93, 0.945, 0.965, 1), 0.55, 0.24, coat=0.5),
+        "belly": mat("HD_Belly", (0.72, 0.75, 0.79, 1), 0.6, 0.30),          # bare-metal underside
+        "cheatline": mat("HD_Cheat", cheat, 0.3, 0.35, coat=0.4),            # window-line accent stripe
+        "wing": mat("HD_Wing", (0.86, 0.88, 0.91, 1), 0.5, 0.30, coat=0.35),
+        "sharklet": mat("HD_Sharklet", tail_rgba, 0.3, 0.35, coat=0.4),
+        "tail": mat("HD_Tail", tail_rgba, 0.3, 0.35, coat=0.4),
+        "nacelle": mat("HD_Nacelle", (0.80, 0.83, 0.87, 1), 0.55, 0.22, coat=0.5),
+        "cowl_lip": mat("HD_CowlLip", (0.86, 0.88, 0.92, 1), 0.95, 0.10),    # chrome intake lip
+        "fan": mat("HD_Fan", (0.16, 0.17, 0.19, 1), 0.85, 0.22),
+        "spinner": mat("HD_Spinner", (0.08, 0.08, 0.10, 1), 0.75, 0.28),
+        "hot": mat("HD_HotSection", (0.12, 0.12, 0.14, 1), 0.85, 0.35),
+        "pylon": mat("HD_Pylon", (0.62, 0.65, 0.69, 1), 0.5, 0.40),
+        # real tinted cabin glass: transmissive, glossy, dark blue-grey
+        "window": mat("HD_Window", (0.04, 0.06, 0.09, 1), 0.0, 0.05, ior=1.5, transmission=0.6),
+        "cockpit": mat("HD_Cockpit", (0.03, 0.05, 0.08, 1), 0.1, 0.05, ior=1.5, transmission=0.5),
+        "door": mat("HD_Door", (0.88, 0.90, 0.93, 1), 0.4, 0.34, coat=0.3),
+        "gear": mat("HD_Gear", (0.34, 0.35, 0.37, 1), 0.7, 0.38),
+        "tyre": mat("HD_Tyre", (0.04, 0.04, 0.05, 1), 0.1, 0.85),
+        "hub": mat("HD_Hub", (0.60, 0.62, 0.65, 1), 0.85, 0.30),
+        "antenna": mat("HD_Antenna", (0.18, 0.20, 0.24, 1), 0.4, 0.5),
     }
 
 
