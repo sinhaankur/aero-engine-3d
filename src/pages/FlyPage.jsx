@@ -11,6 +11,7 @@ import EngineLive from '../sim/flight/EngineLive.jsx'
 import { checklistProgress } from '../sim/flight/procedures.js'
 
 const FlightScene = lazy(() => import('../three/FlightScene.jsx'))
+const RouteGlobe = lazy(() => import('../live/RouteGlobe.jsx'))
 
 const shortName = (name) => name.replace(/^(Airbus|Boeing|Embraer) /, '')
 
@@ -18,6 +19,7 @@ const VIEWS = [
   { id: 'cockpit', name: 'Cockpit' },
   { id: 'chase', name: 'Chase' },
   { id: 'tower', name: 'Tower' },
+  { id: 'globe', name: 'Globe' },
 ]
 
 // how the pilot flies: keyboard, or by clicking the real flight-deck controls
@@ -248,7 +250,9 @@ export default function FlyPage() {
 
       <div className="fly-stage">
         <Suspense fallback={<div className="viewport-loading" style={{ height: '100%' }}>Loading world…</div>}>
-          {flyable && (
+          {view === 'globe' ? (
+            <RouteGlobe from={from} to={to} progress={leg.frac} height="100%" cinematic />
+          ) : flyable && (
             <FlightScene
               simRef={simRef}
               modelUrl={aircraft.model}
