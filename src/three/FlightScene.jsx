@@ -462,6 +462,43 @@ function Loader() {
   )
 }
 
+// Cinematic rain: a box of streak particles that follows the camera and falls,
+// wrapping around so a few thousand points give the impression of heavy rain.
+function Rain({ count = 2500 }) {
+  const ref = useRef()
+  const { camera } = useThree()
+  const positions = useMemo(() => {
+    const a = new Float32Array(count * 3)
+    for (let i = 0; i < count; i++) {
+      a[i * 3] = (Math.random() - 0.5) * 120
+      a[i * 3 + 1] = Math.random() * 120
+      a[i * 3 + 2] = (Math.random() - 0.5) * 120
+    }
+    return a
+  }, [count])
+  const vel = useMemo(() => new Float32Array(count).map(() => 60 + Math.random() * 40), [count])
+  useFrame((_, dt) => {
+    const g = ref.current
+    if (!g) return
+    const p = g.geometry.attributes.position
+    const d = Math.min(dt, 0.05)
+    for (let i = 0; i < count; i++) {
+      let y = p.array[i * 3 + 1] - vel[i] * d
+      if (y < 0) { y += 120; p.array[i * 3] = (Math.random() - 0.5) * 120; p.array[i * 3 + 2] = (Math.random() - 0.5) * 120 }
+      p.array[i * 3 + 1] = y
+    }
+    p.needsUpdate = true
+    // keep the rain box centred on the camera
+    g.position.set(camera.position.x, camera.position.y - 60, camera.position.z)
+  })
+  return (
+    <points ref={ref} frustumCulled={false}>
+      <bufferGeometry><bufferAttribute attach="attributes-position" args={[positions, 3]} /></bufferGeometry>
+      <pointsMaterial color="#9fb4c4" size={0.5} sizeAttenuation transparent opacity={0.5} depthWrite={false} />
+    </points>
+  )
+}
+
 export default function FlightScene({ simRef, modelUrl, dims, weather, view, runwayHalfLen = 1600 }) {
   const sky = SKIES[weather.sky] || SKIES.day
   const groundTex = useGroundTexture(weather.sky)
@@ -491,6 +528,7 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
         <Suspense fallback={<Loader />}>
           <AircraftModel url={modelUrl} simRef={simRef} groupRef={groupRef} />
         </Suspense>
+        {weather.sky === 'storm' && <Rain />}
         <Runner simRef={simRef} />
         <CameraRig simRef={simRef} groupRef={groupRef} view={view} dims={dims} />
       </Canvas>
