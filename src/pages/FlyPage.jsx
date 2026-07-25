@@ -358,6 +358,19 @@ export default function FlyPage() {
           </div>
         )}
 
+        {/* control-tower cab framing: slanted glazing bars + console silhouette */}
+        {view === 'tower' && (
+          <div className="tower-cab" aria-hidden>
+            <svg className="tower-cab-svg" viewBox="0 0 100 60" preserveAspectRatio="none">
+              {/* raked tower glazing mullions */}
+              <path d="M0,0 L20,60 M50,0 L50,60 M100,0 L80,60" stroke="#0c0f13" strokeWidth="1.1" fill="none" opacity="0.8" />
+              {/* top sill shadow */}
+              <rect x="0" y="0" width="100" height="4" fill="#0a0c10" />
+            </svg>
+            <div className="tower-console" />
+          </div>
+        )}
+
         {/* instruments — mounted in the glareshield in cockpit view */}
         <div className={`fly-hud ${view === 'cockpit' ? 'deck' : 'mini'}`}>
           <PFD out={hud} state={s} ac={ac} weatherName={weather.name} />

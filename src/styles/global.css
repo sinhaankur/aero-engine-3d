@@ -647,6 +647,12 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 }
 @media (max-width: 640px) { .cabin-window-hole { left: 8%; right: 12%; } .cabin-window-shade { left: 8%; right: 12%; } }
 
+/* control-tower cab: subtle raked glazing bars + a console lip at the bottom */
+.tower-cab { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.tower-cab-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tower-console { position: absolute; left: 0; right: 0; bottom: 0; height: 12%;
+  background: linear-gradient(to top, #06080b 40%, rgba(6,8,11,0.5) 75%, transparent); }
+
 .fly-mode-hint { color: var(--accent); font-size: 11.5px; }
 
 /* photo mode: hide every overlay for a clean cinematic frame, keep the world +
