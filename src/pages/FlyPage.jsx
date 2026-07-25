@@ -49,6 +49,7 @@ export default function FlyPage() {
   const [sound, setSound] = useState(false)
   const [showEngine, setShowEngine] = useState(false)
   const [coldDark, setColdDark] = useState(false)
+  const [photo, setPhoto] = useState(false)
   const audioRef = useRef(null)
   if (audioRef.current == null) audioRef.current = new FlightAudio()
   const [, forceTick] = useState(0)
@@ -115,6 +116,7 @@ export default function FlyPage() {
         case 'KeyG': c.gear = !c.gear; break
         case 'KeyB': c.brakes = !c.brakes; break
         case 'KeyC': setView((v) => VIEWS[(VIEWS.findIndex((x) => x.id === v) + 1) % VIEWS.length].id); break
+        case 'KeyH': setPhoto((v) => !v); break
         case 'KeyA':
           s.apOn = !s.apOn
           if (s.apOn) {
@@ -245,11 +247,14 @@ export default function FlyPage() {
         <button className={`fly-reset ${coldDark ? 'on' : ''}`} onClick={() => setColdDark((v) => !v)} title="Start cold & dark and run the real startup checklist">
           {coldDark ? '❄ Cold & dark' : '✈ Ready'}
         </button>
+        <button className={`fly-reset ${photo ? 'on' : ''}`} onClick={() => setPhoto((v) => !v)} title="Hide all UI for a clean cinematic view (H)">
+          ⛶ Photo
+        </button>
         <button className="fly-reset" onClick={reset}>↺ Reset</button>
         <span className="fly-blurb">{weather.blurb}</span>
       </div>
 
-      <div className="fly-stage">
+      <div className={`fly-stage ${photo ? 'photo' : ''}`}>
         <Suspense fallback={<div className="viewport-loading" style={{ height: '100%' }}>Loading world…</div>}>
           {view === 'globe' ? (
             <RouteGlobe from={from} to={to} progress={leg.frac} height="100%" cinematic autoPreview />
