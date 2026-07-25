@@ -243,6 +243,43 @@ function Flyer({ from, to, progressRef, cinematic }) {
   )
 }
 
+// a glowing, fading contrail ribbon trailing just behind the aircraft along the
+// arc — the recent ~12% of the flown path, brightest at the plane, fading back
+function Contrail({ from, to, progressRef }) {
+  const ref = useRef()
+  const N = 40
+  const positions = useMemo(() => new Float32Array(N * 3), [])
+  const colors = useMemo(() => new Float32Array(N * 3), [])
+  const v = useMemo(() => new THREE.Vector3(), [])
+  const liftAt = (t) => 0.02 + Math.sin(t * Math.PI) * 0.16
+  const base = useMemo(() => new THREE.Color('#eaffb0'), [])
+  useFrame(() => {
+    const p = progressRef.current || 0
+    const span = 0.12
+    for (let i = 0; i < N; i++) {
+      const k = i / (N - 1)
+      const f = Math.max(0, p - span * (1 - k)) // oldest at i=0, newest (=p) at end
+      slerpLL([from.lat, from.lon], [to.lat, to.lon], f, v).multiplyScalar(R * (1 + liftAt(f)))
+      positions[i * 3] = v.x; positions[i * 3 + 1] = v.y; positions[i * 3 + 2] = v.z
+      const fade = k * k // brighter toward the plane
+      colors[i * 3] = base.r * fade; colors[i * 3 + 1] = base.g * fade; colors[i * 3 + 2] = base.b * fade
+    }
+    if (ref.current) {
+      ref.current.geometry.attributes.position.needsUpdate = true
+      ref.current.geometry.attributes.color.needsUpdate = true
+    }
+  })
+  return (
+    <line ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-color" args={[colors, 3]} />
+      </bufferGeometry>
+      <lineBasicMaterial vertexColors transparent opacity={0.9} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+    </line>
+  )
+}
+
 // drives an internal preview progress 0→1 over `secs` when previewing, else
 // tracks the live sim progress; writes into a shared ref read by arc + flyer
 function ProgressDriver({ live, previewing, secs, out }) {
@@ -276,6 +313,7 @@ export default function RouteGlobe({ from, to, progress = 0, height = 560, cinem
           <Beacon lat={to.lat} lon={to.lon} color="#3ec8ff" />
           <ProgressDriver live={progress} previewing={previewing} secs={22} out={progressRef} />
           <RouteArc from={from} to={to} progressRef={progressRef} />
+          <Contrail from={from} to={to} progressRef={progressRef} />
           <Flyer from={from} to={to} progressRef={progressRef} cinematic={cinematic} />
         </Canvas>
       </CanvasFallback>
