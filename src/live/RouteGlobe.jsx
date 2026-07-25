@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Stars, Html } from '@react-three/drei'
+import { Stars, Html, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import CanvasFallback from '../three/CanvasFallback.jsx'
 import COASTLINES from './coastlines.json'
@@ -302,22 +302,13 @@ function ProgressDriver({ live, previewing, secs, out }) {
   return null
 }
 
-// gentle idle auto-rotate of the whole globe when nothing is flying, so it's
-// always alive; stops as soon as a flight/preview is underway (camera takes over)
-function IdleDrift({ groupRef, progressRef }) {
-  useFrame((_, dt) => {
-    if (groupRef.current && (progressRef.current || 0) < 0.001) {
-      groupRef.current.rotation.y += dt * 0.06
-    }
-  })
-  return null
-}
-
 export default function RouteGlobe({ from, to, progress = 0, height = 560, cinematic = true }) {
   const [previewing, setPreviewing] = useState(false)
   const progressRef = useRef(progress)
-  const driftRef = useRef()
   if (!from || !to) return null
+  // "flying" = a preview or a live leg is underway → cinematic camera owns it;
+  // otherwise the user can drag to orbit and inspect the globe.
+  const flying = previewing || progress > 0.001
   return (
     <div style={{ position: 'relative', height, width: '100%', background: 'radial-gradient(120% 120% at 50% 25%, #0a1420, #05070b 70%)' }}>
       <CanvasFallback label="Globe needs WebGL — unavailable on this device">
@@ -325,16 +316,21 @@ export default function RouteGlobe({ from, to, progress = 0, height = 560, cinem
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 3, 5]} intensity={1.4} />
           <Stars radius={80} depth={40} count={2000} factor={2.4} fade speed={0.3} />
-          <group ref={driftRef}>
+          <group>
             <Earth />
             <Beacon lat={from.lat} lon={from.lon} color="#54ff8a" label={from.code} />
             <Beacon lat={to.lat} lon={to.lon} color="#3ec8ff" label={to.code} />
             <RouteArc from={from} to={to} progressRef={progressRef} />
             <Contrail from={from} to={to} progressRef={progressRef} />
-            <Flyer from={from} to={to} progressRef={progressRef} cinematic={cinematic} />
+            <Flyer from={from} to={to} progressRef={progressRef} cinematic={cinematic && flying} />
           </group>
           <ProgressDriver live={progress} previewing={previewing} secs={22} out={progressRef} />
-          <IdleDrift groupRef={driftRef} progressRef={progressRef} />
+          {!flying && (
+            <OrbitControls
+              enablePan={false} minDistance={2.6} maxDistance={9}
+              enableDamping autoRotate autoRotateSpeed={0.4} makeDefault
+            />
+          )}
         </Canvas>
       </CanvasFallback>
       <button className="globe-preview" onClick={() => setPreviewing((v) => !v)}>
