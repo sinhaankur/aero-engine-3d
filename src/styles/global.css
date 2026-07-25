@@ -635,6 +635,8 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 /* globe view: preview-flight (time-lapse) toggle */
 .globe-preview { position: absolute; top: 14px; right: 14px; z-index: 4; background: rgba(8,10,13,0.82); border: 1px solid var(--border-2); color: var(--accent); font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; padding: 7px 13px; border-radius: 20px; cursor: pointer; backdrop-filter: blur(5px); }
 .globe-preview:hover { border-color: var(--accent); background: var(--accent-wash); }
+/* floating airport code labels at the beacons */
+.globe-label { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; padding: 2px 7px; border: 1px solid; border-radius: 4px; background: rgba(6,10,14,0.7); white-space: nowrap; transform: translateY(-6px); pointer-events: none; }
 
 /* cinematic moving-map HUD (airline seatback style) on the globe view */
 .globe-hud { position: absolute; left: 14px; bottom: 14px; z-index: 4; min-width: 300px; background: linear-gradient(180deg, rgba(8,12,18,0.55), rgba(8,12,18,0.85)); border: 1px solid var(--border-2); border-radius: 10px; padding: 12px 16px; backdrop-filter: blur(6px); font-family: var(--mono); }
