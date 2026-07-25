@@ -152,7 +152,9 @@ body {
 /* /routes — single-screen route checker */
 .routes-page { display: flex; flex-direction: column; gap: 8px; }
 .routes-stage { display: flex; gap: 14px; height: calc(100vh - 200px); min-height: 480px; }
-.routes-map { flex: 1.7; min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: #0b0f14; cursor: crosshair; height: 100%; }
+.routes-mapwrap { position: relative; flex: 1.7; min-width: 0; display: flex; }
+.routes-map { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: #0b0f14; cursor: crosshair; height: 100%; width: 100%; }
+.routes-mapmode { position: absolute; top: 10px; left: 10px; z-index: 3; margin: 0; }
 .routes-ap { pointer-events: none; }
 .routes-rail { flex: 1; min-width: 330px; max-width: 430px; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); padding: 14px; }
 .routes-pick { display: flex; gap: 8px; align-items: center; }

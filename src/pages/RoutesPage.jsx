@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import coastlines from '../live/coastlines.json'
 import { FAMILIES, getAircraftForFamily } from '../data/index.js'
 import { isa } from '../sim/flight/model.js'
+
+const RouteGlobe = lazy(() => import('../live/RouteGlobe.jsx'))
 
 /**
  * /routes — a single-screen "can it fly this route?" experience.
@@ -106,6 +108,7 @@ export default function RoutesPage() {
   const [toIata, setTo] = useState('JFK')
   const [windKt, setWind] = useState(0) // + headwind, − tailwind
   const [tab, setTab] = useState('fit')
+  const [mapMode, setMapMode] = useState('2d') // 2d flat map | 3d cinematic globe
 
   const from = AIRPORTS.find((x) => x[0] === fromIata)
   const to = AIRPORTS.find((x) => x[0] === toIata)
@@ -149,6 +152,24 @@ export default function RoutesPage() {
   return (
     <div className="routes-page">
       <div className="routes-stage">
+        <div className="routes-mapwrap">
+          <div className="viewer-toggle routes-mapmode">
+            <button className={mapMode === '2d' ? 'on' : ''} onClick={() => setMapMode('2d')}>2D map</button>
+            <button className={mapMode === '3d' ? 'on' : ''} onClick={() => setMapMode('3d')}>3D globe</button>
+          </div>
+        {mapMode === '3d' ? (
+          <Suspense fallback={<div className="routes-map" style={{ display: 'grid', placeItems: 'center', color: 'var(--muted)' }}>Loading globe…</div>}>
+            <div className="routes-map" style={{ padding: 0, overflow: 'hidden' }}>
+              <RouteGlobe
+                from={{ lat: from[2], lon: from[3], code: from[0], city: from[1] }}
+                to={{ lat: to[2], lon: to[3], code: to[0], city: to[1] }}
+                progress={0}
+                height="100%"
+                cinematic
+              />
+            </div>
+          </Suspense>
+        ) : (
         <svg
           className="routes-map"
           viewBox="0 0 720 360"
@@ -177,6 +198,8 @@ export default function RoutesPage() {
           })}
           <path d={arcPath(from, to)} fill="none" stroke="#3fb950" strokeWidth="1.6" strokeDasharray="5 3" />
         </svg>
+        )}
+        </div>
 
         <div className="routes-rail">
           <div className="routes-pick">
