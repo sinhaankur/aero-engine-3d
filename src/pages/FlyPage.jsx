@@ -440,6 +440,7 @@ export default function FlyPage() {
         <span><kbd>B</kbd> brakes</span>
         <span><kbd>A</kbd> alt-hold AP</span>
         <span><kbd>C</kbd> camera</span>
+        <span><kbd>H</kbd> photo</span>
         <span><kbd>Space</kbd> pause</span>
         <span className="dim">Throttle {Math.round(c.throttle * 100)}%</span>
       </div>
