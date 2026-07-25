@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Stars } from '@react-three/drei'
 import * as THREE from 'three'
@@ -150,7 +150,7 @@ function Beacon({ lat, lon, color, label }) {
 // the great-circle route arc, lifted above the surface, with a bright leading
 // segment up to `progress` and a dim remainder
 const ARC_N = 128
-function RouteArc({ from, to, progress }) {
+function RouteArc({ from, to, progressRef }) {
   const flownRef = useRef()
   const geo = useMemo(() => {
     const pts = []
@@ -167,6 +167,7 @@ function RouteArc({ from, to, progress }) {
   }, [from, to])
   // the flown line uses the same geometry but only draws up to progress
   useFrame(() => {
+    const progress = progressRef.current || 0
     if (flownRef.current) flownRef.current.geometry.setDrawRange(0, Math.max(2, Math.round(progress * ARC_N) + 1))
   })
   return (
@@ -182,7 +183,7 @@ function RouteArc({ from, to, progress }) {
 }
 
 // the aircraft dart flying the arc + the cinematic camera
-function Flyer({ from, to, progress, cinematic }) {
+function Flyer({ from, to, progressRef, cinematic }) {
   const ref = useRef()
   const { camera } = useThree()
   const pos = useMemo(() => new THREE.Vector3(), [])
@@ -194,7 +195,7 @@ function Flyer({ from, to, progress, cinematic }) {
   const camUp = useMemo(() => new THREE.Vector3(0, 1, 0), [])
 
   useFrame(() => {
-    const f = THREE.MathUtils.clamp(progress, 0, 1)
+    const f = THREE.MathUtils.clamp(progressRef.current || 0, 0, 1)
     const liftAt = (t) => 0.02 + Math.sin(t * Math.PI) * 0.16
     slerpLL([from.lat, from.lon], [to.lat, to.lon], f, pos).multiplyScalar(R * (1 + liftAt(f)))
     slerpLL([from.lat, from.lon], [to.lat, to.lon], Math.min(1, f + 0.012), posAhead).multiplyScalar(R * (1 + liftAt(f + 0.012)))
@@ -242,10 +243,29 @@ function Flyer({ from, to, progress, cinematic }) {
   )
 }
 
+// drives an internal preview progress 0→1 over `secs` when previewing, else
+// tracks the live sim progress; writes into a shared ref read by arc + flyer
+function ProgressDriver({ live, previewing, secs, out }) {
+  const t = useRef(0)
+  useFrame((_, dt) => {
+    if (previewing) {
+      t.current = Math.min(1, t.current + dt / secs)
+      out.current = t.current
+      if (t.current >= 1) t.current = 0 // loop the flyover
+    } else {
+      t.current = 0
+      out.current = live
+    }
+  })
+  return null
+}
+
 export default function RouteGlobe({ from, to, progress = 0, height = 560, cinematic = true }) {
+  const [previewing, setPreviewing] = useState(false)
+  const progressRef = useRef(progress)
   if (!from || !to) return null
   return (
-    <div style={{ height, width: '100%', background: 'radial-gradient(120% 120% at 50% 25%, #0a1420, #05070b 70%)' }}>
+    <div style={{ position: 'relative', height, width: '100%', background: 'radial-gradient(120% 120% at 50% 25%, #0a1420, #05070b 70%)' }}>
       <CanvasFallback label="Globe needs WebGL — unavailable on this device">
         <Canvas camera={{ position: [0, 1.5, 6], fov: 40 }}>
           <ambientLight intensity={0.8} />
@@ -254,10 +274,14 @@ export default function RouteGlobe({ from, to, progress = 0, height = 560, cinem
           <Earth />
           <Beacon lat={from.lat} lon={from.lon} color="#54ff8a" />
           <Beacon lat={to.lat} lon={to.lon} color="#3ec8ff" />
-          <RouteArc from={from} to={to} progress={progress} />
-          <Flyer from={from} to={to} progress={progress} cinematic={cinematic} />
+          <ProgressDriver live={progress} previewing={previewing} secs={22} out={progressRef} />
+          <RouteArc from={from} to={to} progressRef={progressRef} />
+          <Flyer from={from} to={to} progressRef={progressRef} cinematic={cinematic} />
         </Canvas>
       </CanvasFallback>
+      <button className="globe-preview" onClick={() => setPreviewing((v) => !v)}>
+        {previewing ? '■ Stop flyover' : '▶ Preview flight'}
+      </button>
     </div>
   )
 }
