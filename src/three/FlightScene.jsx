@@ -360,13 +360,28 @@ function CameraRig({ simRef, groupRef, view, dims }) {
     } else if (view === 'chase') {
       const fx = Math.sin(s.psi)
       const fz = -Math.cos(s.psi)
-      const dist = L * 2.1
-      tmp.a.set(s.x - fx * dist, s.h + dist * 0.34, s.z - fz * dist)
-      camera.position.lerp(tmp.a, 0.09)
+      const altFt = s.h / 0.3048
+      // Cinematic moments: a dramatic low, close, tighter-lens angle during the
+      // rotation/liftoff window and on short final; the standard high chase
+      // otherwise. Everything eases so the transitions feel filmic.
+      const nearGround = altFt < 260 && s.v > 30
+      const rotating = !s.onGround && s.airborneOnce && altFt < 260
+      const onFinal = !s.onGround && s.phase === 'approach' && altFt < 300
+      const dramatic = nearGround && (rotating || onFinal)
+      const dist = L * (dramatic ? 1.5 : 2.1)
+      const lift = dramatic ? dist * 0.10 : dist * 0.34   // hug the ground for drama
+      const side = dramatic ? L * 0.5 : 0                  // slight off-axis angle
+      tmp.a.set(
+        s.x - fx * dist + Math.cos(s.psi) * side,
+        Math.max(s.h + lift, 3),
+        s.z - fz * dist + Math.sin(s.psi) * side,
+      )
+      camera.position.lerp(tmp.a, dramatic ? 0.06 : 0.09)
       camera.up.set(0, 1, 0)
       tmp.b.copy(g.position)
       camera.lookAt(tmp.b)
-      if (camera.fov !== 45) { camera.fov = 45; camera.updateProjectionMatrix() }
+      const fov = dramatic ? 38 : 45
+      if (Math.abs(camera.fov - fov) > 0.3) { camera.fov += (fov - camera.fov) * 0.1; camera.updateProjectionMatrix() }
     } else {
       // tower: fixed cab beside the runway, tracking the aircraft like ATC
       tmp.a.set(150, 40, 1650)
