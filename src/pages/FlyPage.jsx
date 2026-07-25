@@ -264,7 +264,8 @@ export default function FlyPage() {
           )}
         </Suspense>
 
-        {/* route strip: live leg progress from departure → destination */}
+        {/* route strip: live leg progress (globe view uses the richer HUD instead) */}
+        {view !== 'globe' && (
         <div className="fly-route">
           <span className="fly-route-ap">{from.code}</span>
           <span className="fly-route-prog">
@@ -278,6 +279,31 @@ export default function FlyPage() {
               : <>{Math.round(leg.toGo).toLocaleString()} nm to go · GS {Math.round(s.gsKt)} kt · ETE {isFinite(leg.etaH) ? `${Math.floor(leg.etaH)}h ${Math.round((leg.etaH % 1) * 60)}m` : '—'}</>}
           </span>
         </div>
+        )}
+
+        {/* cinematic moving-map HUD on the globe view */}
+        {view === 'globe' && (
+          <div className="globe-hud">
+            <div className="globe-hud-ends">
+              <div className="globe-hud-ap">
+                <span className="globe-hud-code">{from.code}</span>
+                <span className="globe-hud-city">{from.city}</span>
+              </div>
+              <span className="globe-hud-sep">✈ {Math.round(leg.frac * 100)}%</span>
+              <div className="globe-hud-ap end">
+                <span className="globe-hud-code">{to.code}</span>
+                <span className="globe-hud-city">{to.city}</span>
+              </div>
+            </div>
+            <div className="globe-hud-nums">
+              <div><b>{Math.round(leg.flown).toLocaleString()}</b><span>nm flown</span></div>
+              <div><b>{Math.round(leg.toGo).toLocaleString()}</b><span>nm to go</span></div>
+              <div><b>{Math.round(s.gsKt)}</b><span>kt GS</span></div>
+              <div><b>{Math.round((hud?.altFt || 0) / 100) * 100}</b><span>ft</span></div>
+              <div><b>{leg.arrived ? 'ARR' : (isFinite(leg.etaH) ? `${Math.floor(leg.etaH)}h${String(Math.round((leg.etaH % 1) * 60)).padStart(2, '0')}` : '—')}</b><span>ETE</span></div>
+            </div>
+          </div>
+        )}
 
         {/* startup checklist — shown when cold & dark until the flow is done */}
         {coldDark && !checklist.complete && (

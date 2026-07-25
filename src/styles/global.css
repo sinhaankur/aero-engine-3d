@@ -633,6 +633,20 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 /* globe view: preview-flight (time-lapse) toggle */
 .globe-preview { position: absolute; top: 14px; right: 14px; z-index: 4; background: rgba(8,10,13,0.82); border: 1px solid var(--border-2); color: var(--accent); font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; padding: 7px 13px; border-radius: 20px; cursor: pointer; backdrop-filter: blur(5px); }
 .globe-preview:hover { border-color: var(--accent); background: var(--accent-wash); }
+
+/* cinematic moving-map HUD (airline seatback style) on the globe view */
+.globe-hud { position: absolute; left: 14px; bottom: 14px; z-index: 4; min-width: 300px; background: linear-gradient(180deg, rgba(8,12,18,0.55), rgba(8,12,18,0.85)); border: 1px solid var(--border-2); border-radius: 10px; padding: 12px 16px; backdrop-filter: blur(6px); font-family: var(--mono); }
+.globe-hud-ends { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.globe-hud-ap { display: flex; flex-direction: column; }
+.globe-hud-ap.end { text-align: right; }
+.globe-hud-code { font-size: 22px; font-weight: 700; color: var(--accent); letter-spacing: 0.04em; line-height: 1; }
+.globe-hud-city { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.globe-hud-sep { font-size: 11px; color: #4fd1e0; letter-spacing: 0.06em; }
+.globe-hud-nums { display: flex; gap: 16px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border); }
+.globe-hud-nums div { display: flex; flex-direction: column; }
+.globe-hud-nums b { font-size: 14px; color: var(--ink); font-weight: 700; }
+.globe-hud-nums span { font-size: 8.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+@media (max-width: 640px) { .globe-hud { min-width: 0; left: 8px; right: 8px; } .globe-hud-nums { gap: 10px; flex-wrap: wrap; } }
 .fly-arrow { color: var(--muted); font-family: var(--mono); }
 
 /* startup checklist panel (cold & dark) */
