@@ -32,13 +32,13 @@ boots fullscreen over WiFi and auto-retries until the network is up.
 
 | App | Loads | Download |
 | --- | --- | --- |
-| **Live Aviation** | the [live flight tracker](https://sinhaankur.github.io/AirbusEngine3D/#/live) — 3D globe of aircraft currently in the air | [live-aviation.apk](https://sinhaankur.github.io/AirbusEngine3D/apk/live-aviation.apk) |
-| **Universe Engine** | [sinhaankur.com/tv](https://www.sinhaankur.com/tv/) — planets, the Sun, constellations, TV-first navigation | [universe-engine.apk](https://sinhaankur.github.io/AirbusEngine3D/apk/universe-engine.apk) |
+| **Live Aviation** | the [live flight tracker](https://sinhaankur.github.io/aero-engine-3d/#/live) — 3D globe of aircraft currently in the air | [live-aviation.apk](https://sinhaankur.github.io/aero-engine-3d/apk/live-aviation.apk) |
+| **Universe Engine** | [sinhaankur.com/tv](https://www.sinhaankur.com/tv/) — planets, the Sun, constellations, TV-first navigation | [universe-engine.apk](https://sinhaankur.github.io/aero-engine-3d/apk/universe-engine.apk) |
 
 **Install from a pendrive:** copy both APKs to a USB stick (FAT32), plug it into
 the projector, open the file manager, tap each APK and allow *Install from
 unknown sources*. Full steps live on the site's
-[Projector tab](https://sinhaankur.github.io/AirbusEngine3D/#/projector).
+[Projector tab](https://sinhaankur.github.io/aero-engine-3d/#/projector).
 
 **Rebuild:** `cd projector && ./gradlew assembleRelease` (needs JDK 17 +
 Android SDK 34; outputs land in `projector/app/build/outputs/apk/`).

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://sinhaankur.github.io/AirbusEngine3D/sitemap.xml
+Sitemap: https://sinhaankur.github.io/aero-engine-3d/sitemap.xml

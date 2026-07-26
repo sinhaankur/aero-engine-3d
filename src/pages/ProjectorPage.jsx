@@ -6,7 +6,7 @@ const APPS = [
     name: 'Live Aviation',
     pkg: 'com.sinhaankur.aviation',
     file: 'live-aviation.apk',
-    loads: 'sinhaankur.github.io/AirbusEngine3D/#/live',
+    loads: 'sinhaankur.github.io/aero-engine-3d/#/live',
     desc: 'Boots straight into the live flight tracker — a 3D globe of real aircraft currently in the air, streamed from airplanes.live.',
   },
   {

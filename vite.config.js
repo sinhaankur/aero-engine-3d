@@ -23,10 +23,10 @@ function spaFallback() {
 }
 
 // base is set to the repo name so assets resolve under
-// https://sinhaankur.github.io/AirbusEngine3D/
+// https://sinhaankur.github.io/aero-engine-3d/
 export default defineConfig({
   plugins: [react(), spaFallback()],
-  base: '/AirbusEngine3D/',
+  base: '/aero-engine-3d/',
   // Listen on all interfaces so other devices on the LAN (projector,
   // phone, tablet) can open the site via this machine's IP.
   server: {

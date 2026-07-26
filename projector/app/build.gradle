@@ -25,7 +25,7 @@ android {
             dimension 'experience'
             applicationId 'com.sinhaankur.aviation'
             resValue 'string', 'app_name', 'Live Aviation'
-            buildConfigField 'String', 'LAUNCH_URL', '"https://sinhaankur.github.io/AirbusEngine3D/#/live"'
+            buildConfigField 'String', 'LAUNCH_URL', '"https://sinhaankur.github.io/aero-engine-3d/#/live"'
         }
         universe {
             dimension 'experience'

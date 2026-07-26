@@ -8,7 +8,7 @@ import { collectParts, updateParts, demoSchedule } from './modelAnim.js'
 
 /**
  * Resolve a model path against Vite's deploy base so it works both locally
- * (base "/") and on GitHub Pages (base "/AirbusEngine3D/"). Data files store
+ * (base "/") and on GitHub Pages (base "/aero-engine-3d/"). Data files store
  * paths as "/models/x.glb"; we strip the leading slash and prepend BASE_URL.
  */
 function withBase(path) {

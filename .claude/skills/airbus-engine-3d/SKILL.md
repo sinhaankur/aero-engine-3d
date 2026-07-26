@@ -9,8 +9,9 @@ Interactive, data-driven encyclopedia of Airbus families (6 families, 18
 variants) that teaches how aircraft are designed and how each system works.
 North star: open-source aviation knowledge + tooling, framed as
 **Funds vs Market vs Safety** (see `docs/ROADMAP.md`). Presented as a
-marketing-style site. Deployed on GitHub Pages at
-`https://sinhaankur.github.io/AirbusEngine3D/`.
+marketing-style site. The GitHub repo was renamed to `aero-engine-3d`, so it
+deploys on GitHub Pages at `https://sinhaankur.github.io/aero-engine-3d/`
+(old `AirbusEngine3D` URL now 404s).
 
 ## Commands
 
@@ -65,7 +66,7 @@ at `~/Library/Android/sdk`.
   `run_a320.sh`. See `docs/cfd-pipeline.md` before touching.
 - `projector/` — Android project: one WebView kiosk codebase, two flavors →
   two ~11 KB APKs for the user's LQWELL/Magcubic HY300 projector (Android 11):
-  `aviation` → `…/AirbusEngine3D/#/live`, `universe` → `www.sinhaankur.com/tv/`
+  `aviation` → `…/aero-engine-3d/#/live`, `universe` → `www.sinhaankur.com/tv/`
   (the portfolio-2026 repo's TV shell). Built APKs are committed to
   `public/apk/` and downloadable from the site's `/#/projector` page.
 
@@ -74,7 +75,7 @@ at `~/Library/Android/sdk`.
 - `VITE_FLIGHT_API` = `https://ada-flight-proxy.sinhaankur827-f9c.workers.dev`
   — set in `.env.local` (dev) and hardcoded in `deploy.yml` (prod). Without it
   the live page shows "unconfigured".
-- Vite `base` is `/AirbusEngine3D/`; dev/preview listen on all interfaces
+- Vite `base` is `/aero-engine-3d/`; dev/preview listen on all interfaces
   (`host: true`) so LAN devices (projector, phone) can load the dev server.
 
 ## Hard-won gotchas — do not re-learn these
