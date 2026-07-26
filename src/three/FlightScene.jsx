@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useGLTF, Html } from '@react-three/drei'
+import { useGLTF, Html, Environment, Lightformer } from '@react-three/drei'
 import * as THREE from 'three'
 import CanvasFallback from './CanvasFallback.jsx'
 import { stepFlight, autoflight } from '../sim/flight/model.js'
@@ -529,6 +529,23 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
         <Atmosphere simRef={simRef} baseColor={sky.bg} visM={visM} />
         <hemisphereLight intensity={sky.hemi} color="#dfe9f2" groundColor="#3a4450" />
         <directionalLight position={[2500, 3800, 1200]} intensity={sky.sun} />
+        {/* Procedural reflection environment — the metallic fuselage/nacelles
+            need something to reflect or they read as flat chalk. Built from
+            Lightformers (no CDN HDRI fetch, so it works offline / on the
+            projector) tinted to the current sky: bright sun panel, warm-to-cool
+            sky gradient overhead, dark ground below. This is what gives the jet
+            its painted-aluminium sheen instead of the washed-out matte look. */}
+        <Environment resolution={128} frames={1}>
+          <color attach="background" args={['#000000']} />
+          {/* overhead sky dome */}
+          <Lightformer intensity={sky.hemi * 1.6} color={sky.bg} form="ring" scale={[20, 20, 1]} position={[0, 12, 0]} rotation={[Math.PI / 2, 0, 0]} />
+          {/* bright sun disc for a strong specular highlight */}
+          <Lightformer intensity={sky.sun * 3} color="#fff4e0" form="circle" scale={4} position={[10, 10, 6]} target={[0, 0, 0]} />
+          {/* soft fill from the opposite side */}
+          <Lightformer intensity={sky.hemi} color="#9fb8d8" form="rect" scale={[16, 8, 1]} position={[-14, 4, -8]} target={[0, 0, 0]} />
+          {/* dark ground so the belly picks up a grounded reflection, not glare */}
+          <Lightformer intensity={0.3} color={sky.ground} form="rect" scale={[24, 24, 1]} position={[0, -10, 0]} rotation={[-Math.PI / 2, 0, 0]} />
+        </Environment>
 
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
           <planeGeometry args={[64000, 64000]} />
