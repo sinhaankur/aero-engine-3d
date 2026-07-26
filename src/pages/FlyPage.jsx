@@ -207,6 +207,7 @@ export default function FlyPage() {
   return (
     <div className={`fly-page ${mode === 'deck' ? 'has-deck' : ''}`}>
       <div className="fly-topbar">
+        <a href="#/" className="fly-home" title="Back to the site" aria-label="Home">✈ Home</a>
         <select value={acKey} onChange={(e) => setAcKey(e.target.value)} aria-label="Aircraft">
           {FAMILIES.map((f) => (
             <optgroup key={f.id} label={f.name}>
