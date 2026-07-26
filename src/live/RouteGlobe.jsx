@@ -286,17 +286,26 @@ function Contrail({ from, to, progressRef }) {
 }
 
 // drives an internal preview progress 0→1 over `secs` when previewing, else
-// tracks the live sim progress; writes into a shared ref read by arc + flyer
-function ProgressDriver({ live, previewing, secs, out }) {
+// tracks the live sim progress; writes into a shared ref read by arc + flyer.
+// Live progress always wins once it's meaningfully underway, so a real leg that
+// starts moving takes the auto-preview's place instead of looping forever.
+function ProgressDriver({ live, previewing, secs, out, onLiveTakeover }) {
   const t = useRef(0)
+  const tookOver = useRef(false)
   useFrame((_, dt) => {
-    if (previewing) {
+    const liveActive = live > 0.001
+    if (previewing && !liveActive) {
       t.current = Math.min(1, t.current + dt / secs)
       out.current = t.current
       if (t.current >= 1) t.current = 0 // loop the flyover
     } else {
       t.current = 0
       out.current = live
+      // a live leg has begun — stop the preview so its camera/controls hand off
+      if (liveActive && previewing && !tookOver.current) {
+        tookOver.current = true
+        onLiveTakeover?.()
+      }
     }
   })
   return null
@@ -307,6 +316,9 @@ export default function RouteGlobe({ from, to, progress = 0, height = 560, cinem
   // immediately cinematic; the user can stop it any time
   const [previewing, setPreviewing] = useState(autoPreview && progress < 0.001)
   const progressRef = useRef(progress)
+  // keep the shared ref seeded with the latest live progress so the first frame
+  // (and any frame between renders) reads a current value, not the mount-time one
+  if (!previewing) progressRef.current = progress
   if (!from || !to) return null
   // "flying" = a preview or a live leg is underway → cinematic camera owns it;
   // otherwise the user can drag to orbit and inspect the globe.
@@ -326,7 +338,13 @@ export default function RouteGlobe({ from, to, progress = 0, height = 560, cinem
             <Contrail from={from} to={to} progressRef={progressRef} />
             <Flyer from={from} to={to} progressRef={progressRef} cinematic={cinematic && flying} />
           </group>
-          <ProgressDriver live={progress} previewing={previewing} secs={22} out={progressRef} />
+          <ProgressDriver
+            live={progress}
+            previewing={previewing}
+            secs={22}
+            out={progressRef}
+            onLiveTakeover={() => setPreviewing(false)}
+          />
           {!flying && (
             <OrbitControls
               enablePan={false} minDistance={2.6} maxDistance={9}

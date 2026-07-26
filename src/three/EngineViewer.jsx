@@ -46,24 +46,43 @@ function EngineModel({ url, parts, exploded, highlightNodes }) {
         if (!m.isMesh) return
         if (!m.userData._origMat) m.userData._origMat = m.material
         const orig = m.userData._origMat
+        // dispose the clone we made last time before swapping in a new one, so
+        // cycling stages doesn't leak a fresh material per frame. Never dispose
+        // _origMat — that's the shared authored material.
+        if (m.userData._appliedClone) {
+          m.userData._appliedClone.dispose()
+          m.userData._appliedClone = null
+        }
         if (hasHighlight && !isOn) {
           // dim the parts that aren't part of this stage / selection
           const dim = orig.clone()
           dim.transparent = true
           dim.opacity = 0.08
           m.material = dim
+          m.userData._appliedClone = dim
         } else if (hasHighlight && isOn) {
           // glow the active parts
           const glow = orig.clone()
           glow.emissive = new THREE.Color(0x2b6cff)
           glow.emissiveIntensity = 0.35
           m.material = glow
+          m.userData._appliedClone = glow
         } else {
           m.material = orig
         }
       })
     })
   }, [parts, exploded, highlight, root])
+
+  // free any highlight/dim clones still applied when the model unmounts
+  useEffect(() => () => {
+    root.traverse((m) => {
+      if (m.userData?._appliedClone) {
+        m.userData._appliedClone.dispose()
+        m.userData._appliedClone = null
+      }
+    })
+  }, [root])
 
   return <primitive object={root} />
 }

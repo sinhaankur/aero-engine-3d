@@ -22,6 +22,32 @@ function toVec3(lat, lon, altM = 0, out = new THREE.Vector3()) {
   return out
 }
 
+// Day/night Earth shader (shared look with the cinematic RouteGlobe): the
+// sun-facing hemisphere is lit ocean-blue, a warm band rides the terminator,
+// and the night side falls to deep blue-black with a faint city-light warmth.
+const SUN_DIR = new THREE.Vector3(0.6, 0.35, 0.7).normalize()
+const earthDayNightMat = () => new THREE.ShaderMaterial({
+  uniforms: { uSun: { value: SUN_DIR.clone() } },
+  vertexShader: `
+    varying vec3 vP;
+    void main(){ vP = normalize(position);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+  `,
+  fragmentShader: `
+    uniform vec3 uSun; varying vec3 vP;
+    void main(){
+      float d = dot(normalize(vP), normalize(uSun));
+      float day = smoothstep(-0.05, 0.5, d);
+      vec3 ocean = mix(vec3(0.03,0.09,0.16), vec3(0.10,0.32,0.52), day);
+      vec3 col = mix(vec3(0.015,0.03,0.06), ocean, day);
+      float term = smoothstep(0.86, 1.0, 1.0 - abs(d));
+      col += vec3(0.45,0.22,0.05) * term;
+      col += vec3(0.10,0.07,0.02) * smoothstep(0.15, -0.3, d);
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+})
+
 // altitude -> colour ramp (ground amber -> low green -> cruise cyan -> high white)
 function altColor(altM, onGround, out = new THREE.Color()) {
   if (onGround) return out.setHex(0xffb020)
@@ -86,16 +112,23 @@ function Earth() {
     return g
   }, [])
 
+  const earthMat = useMemo(earthDayNightMat, [])
+
   return (
     <group>
-      <mesh>
-        <sphereGeometry args={[GLOBE_R, 64, 64]} />
-        <meshStandardMaterial color="#16222e" roughness={0.85} metalness={0.1} />
+      <mesh material={earthMat}>
+        <sphereGeometry args={[GLOBE_R, 96, 96]} />
       </mesh>
-      {/* atmosphere rim */}
-      <mesh scale={1.035}>
+      {/* atmosphere rim — brighter on the sun side */}
+      <mesh scale={1.05}>
         <sphereGeometry args={[GLOBE_R, 48, 48]} />
-        <meshBasicMaterial color="#1e5f8c" transparent opacity={0.18} side={THREE.BackSide} />
+        <shaderMaterial
+          transparent
+          side={THREE.BackSide}
+          uniforms={{ uSun: { value: SUN_DIR.clone() } }}
+          vertexShader={`varying vec3 vN; varying vec3 vP; void main(){ vN=normalize(normalMatrix*normal); vP=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `}
+          fragmentShader={`uniform vec3 uSun; varying vec3 vN; varying vec3 vP; void main(){ float rim=pow(1.0-abs(dot(normalize(vN),vec3(0.0,0.0,1.0))),2.5); float lit=smoothstep(-0.2,0.6,dot(normalize(vP),normalize(uSun))); vec3 c=mix(vec3(0.10,0.30,0.55),vec3(0.35,0.6,0.9),lit); gl_FragColor=vec4(c, rim*0.5);} `}
+        />
       </mesh>
       <lineSegments geometry={graticule}>
         <lineBasicMaterial color="#2a3d4e" transparent opacity={0.5} />

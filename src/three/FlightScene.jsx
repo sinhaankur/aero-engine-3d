@@ -258,6 +258,11 @@ function AircraftModel({ url, simRef, groupRef }) {
   // wingtip with the wheels hovering. Instead we find the lowest geometry near
   // the centreline (|x| within a fraction of span): that's the gear/wheels, the
   // true contact point. We measure it in the same upright wrapper the scene uses.
+  //
+  // The gear is a handful of Cylinder/Torus meshes below the belly, so we scan
+  // only those meshes' vertices — not the whole 60–90k-tri airframe. That keeps
+  // a variant switch from stalling the main thread (was ~100k applyMatrix4 calls
+  // per model load; a visible freeze on the projector's WebView).
   const H0 = useMemo(() => {
     const probe = new THREE.Group()
     const inner = new THREE.Group(); inner.rotation.y = -Math.PI / 2
@@ -267,10 +272,17 @@ function AircraftModel({ url, simRef, groupRef }) {
     const full = new THREE.Box3().setFromObject(probe)
     const span = full.max.x - full.min.x
     const bandX = span * 0.14 // centreline band that captures nose+main gear
+    const midY = (full.max.y + full.min.y) / 2
     let wheelMinY = Infinity
     const v = new THREE.Vector3()
+    const box = new THREE.Box3()
     probe.traverse((o) => {
       if (!o.isMesh || !o.geometry?.attributes?.position) return
+      // gear candidates only: named Cylinder/Torus, sitting in the lower half.
+      // Skip the big skin/wing meshes entirely — that's where the cost was.
+      if (!/Cylinder|Torus/i.test(o.name)) return
+      box.setFromObject(o)
+      if (box.min.y > midY) return                 // not below the belly
       const pos = o.geometry.attributes.position
       o.updateWorldMatrix(true, false)
       for (let i = 0; i < pos.count; i++) {
@@ -278,7 +290,7 @@ function AircraftModel({ url, simRef, groupRef }) {
         if (Math.abs(v.x) <= bandX && v.y < wheelMinY) wheelMinY = v.y
       }
     })
-    // fall back to the full box if we found nothing near the centreline
+    // fall back to the full box if we found no gear geometry near the centreline
     const contact = isFinite(wheelMinY) ? wheelMinY : full.min.y
     return -contact
   }, [cloned])

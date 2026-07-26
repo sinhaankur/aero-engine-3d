@@ -278,7 +278,7 @@ function ExploreScene({ modelUrl, dims, cut, xray, labels, view, controlsRef }) 
       m.side = THREE.DoubleSide
       m.clippingPlanes = [clipPlane]
       o.material = m
-      list.push({ m, opacity: m.opacity, transparent: m.transparent, depthWrite: m.depthWrite })
+      list.push({ o, m, opacity: m.opacity, transparent: m.transparent, depthWrite: m.depthWrite })
     })
     return list
   }, [cloned, clipPlane])
@@ -295,6 +295,10 @@ function ExploreScene({ modelUrl, dims, cut, xray, labels, view, controlsRef }) 
       e.m.opacity = xray ? 0.16 : e.opacity
       e.m.depthWrite = xray ? false : e.depthWrite
       e.m.needsUpdate = true
+      // draw the translucent hull last so the opaque interior always shows
+      // through it — without this, order between the two transparent layers
+      // flips as you orbit and the cabin flickers behind the skin.
+      e.o.renderOrder = xray ? 10 : 0
     }
   }, [xray, mats])
 

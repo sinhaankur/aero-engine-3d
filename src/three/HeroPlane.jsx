@@ -55,12 +55,15 @@ export default function HeroPlane({ url = '/models/a320.glb', height = 340, tran
           style={{ background: 'transparent' }}
         >
           <Suspense fallback={<Loader />}>
-            {/* Float adds a subtle bob + pitch; SpinningModel adds the yaw. */}
-            <Float speed={1.4} rotationIntensity={0.15} floatIntensity={0.6}>
-              <Stage intensity={0.5} environment="city" adjustCamera={1.15}>
+            {/* Stage frames the static model first, THEN Float bobs it within
+                that frame. Float wrapping Stage makes Stage measure the animated
+                offset and re-frame the camera on load — a visible one-frame pop. */}
+            <Stage intensity={0.5} environment="city" adjustCamera={1.15}>
+              {/* Float adds a subtle bob + pitch; SpinningModel adds the yaw. */}
+              <Float speed={1.4} rotationIntensity={0.15} floatIntensity={0.6}>
                 <SpinningModel url={url} />
-              </Stage>
-            </Float>
+              </Float>
+            </Stage>
           </Suspense>
         </Canvas>
       </CanvasFallback>
