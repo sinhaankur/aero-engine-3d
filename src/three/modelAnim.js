@@ -19,17 +19,34 @@ export function collectParts(root) {
   const box = new THREE.Box3().setFromObject(root)
   const height = box.max.z - box.min.z
   const c = new THREE.Vector3()
+  const gb = new THREE.Box3()      // reused per-gear bbox
+  // track how far the LOWEST gear point sits below the fuselage belly, so we
+  // retract just enough to tuck the wheels into the belly — never so far that a
+  // wheel punches out the top of the hull (the old height*0.42 overshot badly,
+  // leaving a wheel floating above/beside the fuselage).
+  let gearLowZ = -Infinity        // largest z = lowest point (up is −z)
   root.traverse((o) => {
     if (!o.isMesh) return
     if (/FanBlades|Spinner/i.test(o.name)) { fans.push(o); return }
     if (/^Flap_/i.test(o.name)) { flaps.push({ o, side: /R$/i.test(o.name) ? 1 : -1, y0: o.rotation.y }); return }
     if (/^Aileron_/i.test(o.name)) { ailerons.push({ o, side: /R$/i.test(o.name) ? 1 : -1, y0: o.rotation.y }); return }
     if (/Cylinder|Torus/i.test(o.name)) {
-      new THREE.Box3().setFromObject(o).getCenter(c)
-      if (c.z > box.max.z - height * 0.5) gear.push({ o, z0: o.position.z })
+      gb.setFromObject(o); gb.getCenter(c)
+      if (c.z > box.max.z - height * 0.5) {
+        gear.push({ o, z0: o.position.z })
+        if (gb.max.z > gearLowZ) gearLowZ = gb.max.z
+      }
     }
   })
-  return { fans, flaps, ailerons, gear, retractDist: height * 0.42 }
+  // Retract only far enough to tuck the wheels up INTO the belly. Aiming the
+  // lowest gear point at ~belly-fairing depth keeps the wheels inside the hull;
+  // the old height*0.42 drove them clean through the crown and out the top (the
+  // "floating blob" beside the fuselage). 0.16·height lands a main wheel just
+  // inside the belly on the whole fleet (regional jet → widebody).
+  const bellyTuck = box.max.z - height * 0.16
+  const travel = Math.max(0, gearLowZ - bellyTuck)
+  const retractDist = isFinite(gearLowZ) ? travel : height * 0.16
+  return { fans, flaps, ailerons, gear, retractDist }
 }
 
 /**
