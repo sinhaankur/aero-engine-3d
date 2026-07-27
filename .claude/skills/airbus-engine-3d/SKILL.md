@@ -54,9 +54,16 @@ at `~/Library/Android/sdk`.
 - `src/sim/` — `AirfoilFlow` (2D intuition toy, NACA-4 math, stall at 15°),
   `FuelSystem` (interactive schematic), `WindTunnel` (plays the precomputed
   CFD videos from `public/media/cfd/`).
-- `worker/` — Cloudflare Worker `ada-flight-proxy`: sweeps ~30 airplanes.live
-  point-query tiles (250 nm each) in batches of 6, dedupes by hex, re-serves
-  OpenSky-shaped JSON with CORS, 15 s edge cache.
+- `worker/` — Cloudflare Worker `ada-flight-proxy`: full-globe ADS-B coverage.
+  A **cron** (every min) sweeps a 467-tile grid (250 nm each): all 31 HOT busy
+  corridors every run (low-lag) + 34 rotating COLD tiles (oceans/remote, full
+  rotation ~12 min, TTL 20 min). Merges into a **KV** snapshot (`FLIGHTS` ns);
+  user GETs read that snapshot (single KV read, ~80 ms, no upstream on the hot
+  path). Polite pacing (batch 3, 700 ms pauses) — airplanes.live rate-limits
+  bursts hard, so DON'T fan the whole grid out at once (gets ~70% rejected).
+  `/sweep` runs one step inline for warming/testing. Response is OpenSky-shaped
+  (idx 17-19 = reg/type/mach); client unchanged. Deploy needs
+  `CLOUDFLARE_ACCOUNT_ID=3f9c8ee4978248332bdbffa957684533` (two CF accounts).
 - `blender/` — `generate_airframe_hd.py` is the current generator (NACA-4
   wing sections, windows/doors/gear as real geometry, 60–90k tris);
   `generate_airframe.py` is the low-detail predecessor. All variant + engine
