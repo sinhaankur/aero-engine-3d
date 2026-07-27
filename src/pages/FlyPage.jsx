@@ -134,12 +134,27 @@ export default function FlyPage() {
       if (e.code.startsWith('Arrow')) e.preventDefault()
     }
     const up = (e) => keys.delete(e.code)
-    // 60 Hz key → control mapping (model applies its own smoothing)
+    // 60 Hz key → control mapping. Keyboard is binary (0/±1); ramping each axis
+    // toward its target instead of snapping gives a natural spring-loaded-stick
+    // feel — no more twitchy on/off pitch and roll. Release eases back to
+    // neutral. (The physics model still applies its own alpha/bank smoothing.)
+    const RAMP = 0.14, RETURN = 0.22
+    const ease = (cur, tgt) => {
+      const k = tgt === 0 ? RETURN : RAMP
+      return cur + (tgt - cur) * k
+    }
     const iv = setInterval(() => {
       const c = simRef.current.controls
-      c.pitch = (keys.has('ArrowUp') ? 1 : 0) - (keys.has('ArrowDown') ? 1 : 0)
-      c.roll = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0)
-      c.yaw = (keys.has('KeyE') ? 1 : 0) - (keys.has('KeyQ') ? 1 : 0)
+      const pTgt = (keys.has('ArrowUp') ? 1 : 0) - (keys.has('ArrowDown') ? 1 : 0)
+      const rTgt = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0)
+      const yTgt = (keys.has('KeyE') ? 1 : 0) - (keys.has('KeyQ') ? 1 : 0)
+      c.pitch = ease(c.pitch || 0, pTgt)
+      c.roll = ease(c.roll || 0, rTgt)
+      c.yaw = ease(c.yaw || 0, yTgt)
+      // snap tiny residuals to zero so controls fully centre
+      if (Math.abs(c.pitch) < 0.008) c.pitch = 0
+      if (Math.abs(c.roll) < 0.008) c.roll = 0
+      if (Math.abs(c.yaw) < 0.008) c.yaw = 0
       if (keys.has('KeyW')) c.throttle = Math.min(1, c.throttle + 0.012)
       if (keys.has('KeyS')) c.throttle = Math.max(0, c.throttle - 0.015)
       if (simRef.current.state.apOn && (keys.has('ArrowUp') || keys.has('ArrowDown'))) {

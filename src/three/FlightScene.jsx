@@ -339,9 +339,20 @@ function Runner({ simRef }) {
   useFrame((_, dt) => {
     const sim = simRef.current
     if (!sim || sim.paused || sim.state.crashed) return
-    // autopilot / autothrust overwrite the relevant control channels first
-    autoflight(sim.state, sim.ac, sim.controls, sim.out, Math.min(dt, 0.05))
-    sim.out = stepFlight(sim.state, sim.ac, sim.controls, sim.weather, dt)
+    // Fixed-step integration. A raw dt from a frame hitch (tab refocus, GC) used
+    // to be integrated in one giant leap, teleporting the aircraft — the visible
+    // "stutter". Instead accumulate real time and advance the physics in capped
+    // sub-steps, so a long frame catches up smoothly instead of lurching.
+    const STEP = 1 / 60
+    let acc = (sim._acc || 0) + Math.min(dt, 0.1)   // cap catch-up at 100 ms
+    let n = 0
+    while (acc >= STEP && n < 6) {                   // at most 6 sub-steps/frame
+      autoflight(sim.state, sim.ac, sim.controls, sim.out, STEP)
+      sim.out = stepFlight(sim.state, sim.ac, sim.controls, sim.weather, STEP)
+      acc -= STEP
+      n++
+    }
+    sim._acc = acc
   })
   return null
 }
