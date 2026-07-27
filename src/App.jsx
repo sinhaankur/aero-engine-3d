@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { getFamily, getAircraft, getEngine } from './data/index.js'
+import { hardReload } from './lib/hardReload.js'
 
 const BASE_TITLE = 'Aircraft Design Archive'
 const BASE_DESC =
@@ -172,6 +173,14 @@ export default function App() {
           <Link to="/components">Components</Link>
           <Link to="/projector">Projector</Link>
         </nav>
+        <button
+          type="button"
+          className="cache-clear"
+          onClick={hardReload}
+          title="Clear cached assets and reload the latest version"
+        >
+          ↻ Clear cache
+        </button>
       </header>
       <main className="content">
         <AnimatedOutlet />

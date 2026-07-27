@@ -9,6 +9,7 @@ import { updateAtc, callsignFor } from '../sim/flight/atc.js'
 import { FlightAudio } from '../sim/flight/audio.js'
 import EngineLive from '../sim/flight/EngineLive.jsx'
 import { checklistProgress } from '../sim/flight/procedures.js'
+import { hardReload } from '../lib/hardReload.js'
 
 const FlightScene = lazy(() => import('../three/FlightScene.jsx'))
 const RouteGlobe = lazy(() => import('../live/RouteGlobe.jsx'))
@@ -267,6 +268,7 @@ export default function FlyPage() {
           ⛶ Photo
         </button>
         <button className="fly-reset" onClick={reset}>↺ Reset</button>
+        <button className="fly-reset" onClick={hardReload} title="Clear cached assets and reload the latest version">↻ Clear cache</button>
         <span className="fly-blurb">{weather.blurb}</span>
       </div>
 

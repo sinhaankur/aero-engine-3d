@@ -1063,6 +1063,14 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .topnav { display: inline-flex; gap: 20px; margin-left: auto; }
 .topnav a { color: var(--muted); font-size: 15px; font-weight: 500; }
 .topnav a:hover { color: var(--ink); text-decoration: none; }
+/* clear-cache: subtle utility button at the end of the nav — force a fresh
+   build when a deploy is being masked by cached assets */
+.cache-clear {
+  background: none; border: 1px solid var(--border-2); border-radius: 3px;
+  color: var(--muted); cursor: pointer; padding: 5px 10px;
+  font-family: var(--mono); font-size: 11px; white-space: nowrap;
+}
+.cache-clear:hover { border-color: var(--accent); color: var(--accent); }
 
 /* System selector tabs */
 .sys-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 20px; }
