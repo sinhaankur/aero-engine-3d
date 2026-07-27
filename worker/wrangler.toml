@@ -1,10 +1,22 @@
-# Cloudflare Worker config for the OpenSky CORS proxy.
+# Cloudflare Worker config for the live ADS-B CORS proxy.
 # Deploy with:  npx wrangler deploy   (from this worker/ directory)
 name = "ada-flight-proxy"
 main = "src/worker.js"
 compatibility_date = "2024-11-01"
+account_id = "3f9c8ee4978248332bdbffa957684533"
 
-# No bindings required for anonymous OpenSky access. To use an OpenSky account
-# for higher rate limits, set secrets instead of putting them here:
-#   npx wrangler secret put OPENSKY_USER
-#   npx wrangler secret put OPENSKY_PASS
+# Full-globe coverage via a SLOW incremental sweep (airplanes.live rate-limits
+# bursts hard — ~250 nm radius cap, and a fan-out of the whole grid at once gets
+# ~70% of tiles rejected). Instead a cron fires every 30 s and sweeps the NEXT
+# few tiles; results accumulate in KV as one global aircraft map. User requests
+# just read that merged snapshot from KV — no upstream calls on the hot path, so
+# the map is instant and the sweep stays polite.
+[triggers]
+crons = ["*/1 * * * *"]   # every minute; the handler also self-paces sub-steps
+
+# KV namespace holding the accumulated global snapshot + sweep cursor.
+# Create it once with:  npx wrangler kv namespace create FLIGHTS
+# then paste the returned id below.
+[[kv_namespaces]]
+binding = "FLIGHTS"
+id = "72a35ba74c9944a185532557d917c722"
