@@ -1,8 +1,9 @@
-import { useMemo, useRef, useLayoutEffect } from 'react'
+import { Suspense, useMemo, useRef, useLayoutEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import CanvasFallback from '../three/CanvasFallback.jsx'
+import Earth from './Earth.jsx'
 import COASTLINES from './coastlines.json'
 
 const GLOBE_R = 2                        // globe radius in scene units
@@ -22,32 +23,6 @@ function toVec3(lat, lon, altM = 0, out = new THREE.Vector3()) {
   return out
 }
 
-// Day/night Earth shader (shared look with the cinematic RouteGlobe): the
-// sun-facing hemisphere is lit ocean-blue, a warm band rides the terminator,
-// and the night side falls to deep blue-black with a faint city-light warmth.
-const SUN_DIR = new THREE.Vector3(0.6, 0.35, 0.7).normalize()
-const earthDayNightMat = () => new THREE.ShaderMaterial({
-  uniforms: { uSun: { value: SUN_DIR.clone() } },
-  vertexShader: `
-    varying vec3 vP;
-    void main(){ vP = normalize(position);
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
-  `,
-  fragmentShader: `
-    uniform vec3 uSun; varying vec3 vP;
-    void main(){
-      float d = dot(normalize(vP), normalize(uSun));
-      float day = smoothstep(-0.05, 0.5, d);
-      vec3 ocean = mix(vec3(0.03,0.09,0.16), vec3(0.10,0.32,0.52), day);
-      vec3 col = mix(vec3(0.015,0.03,0.06), ocean, day);
-      float term = smoothstep(0.86, 1.0, 1.0 - abs(d));
-      col += vec3(0.45,0.22,0.05) * term;
-      col += vec3(0.10,0.07,0.02) * smoothstep(0.15, -0.3, d);
-      gl_FragColor = vec4(col, 1.0);
-    }
-  `,
-})
-
 // altitude -> colour ramp (ground amber -> low green -> cruise cyan -> high white)
 function altColor(altM, onGround, out = new THREE.Color()) {
   if (onGround) return out.setHex(0xffb020)
@@ -59,86 +34,6 @@ function altColor(altM, onGround, out = new THREE.Color()) {
   return out.copy(c)
 }
 
-/** The Earth: a dark sphere with real coastlines, a faint graticule and glow rim. */
-function Earth() {
-  // slightly above the sphere surface so lines never z-fight the globe
-  const surface = (lat, lon, out) => {
-    const phi = (90 - lat) * (Math.PI / 180)
-    const theta = (lon + 180) * (Math.PI / 180)
-    const r = GLOBE_R * 1.002
-    return out.set(
-      -r * Math.sin(phi) * Math.cos(theta),
-      r * Math.cos(phi),
-      r * Math.sin(phi) * Math.sin(theta),
-    )
-  }
-
-  const graticule = useMemo(() => {
-    const g = new THREE.BufferGeometry()
-    const pts = []
-    const v = new THREE.Vector3()
-    // parallels
-    for (let lat = -60; lat <= 60; lat += 30) {
-      for (let lon = -180; lon < 180; lon += 3) {
-        surface(lat, lon, v); pts.push(v.x, v.y, v.z)
-        surface(lat, lon + 3, v); pts.push(v.x, v.y, v.z)
-      }
-    }
-    // meridians
-    for (let lon = -180; lon < 180; lon += 30) {
-      for (let lat = -87; lat < 87; lat += 3) {
-        surface(lat, lon, v); pts.push(v.x, v.y, v.z)
-        surface(lat + 3, lon, v); pts.push(v.x, v.y, v.z)
-      }
-    }
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
-    return g
-  }, [])
-
-  // Natural Earth 110m coastlines (public domain) — what makes it read as Earth
-  const coasts = useMemo(() => {
-    const g = new THREE.BufferGeometry()
-    const pts = []
-    const a = new THREE.Vector3()
-    const b = new THREE.Vector3()
-    for (const line of COASTLINES) {
-      for (let i = 0; i < line.length - 1; i++) {
-        surface(line[i][1], line[i][0], a)
-        surface(line[i + 1][1], line[i + 1][0], b)
-        pts.push(a.x, a.y, a.z, b.x, b.y, b.z)
-      }
-    }
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
-    return g
-  }, [])
-
-  const earthMat = useMemo(earthDayNightMat, [])
-
-  return (
-    <group>
-      <mesh material={earthMat}>
-        <sphereGeometry args={[GLOBE_R, 96, 96]} />
-      </mesh>
-      {/* atmosphere rim — brighter on the sun side */}
-      <mesh scale={1.05}>
-        <sphereGeometry args={[GLOBE_R, 48, 48]} />
-        <shaderMaterial
-          transparent
-          side={THREE.BackSide}
-          uniforms={{ uSun: { value: SUN_DIR.clone() } }}
-          vertexShader={`varying vec3 vN; varying vec3 vP; void main(){ vN=normalize(normalMatrix*normal); vP=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `}
-          fragmentShader={`uniform vec3 uSun; varying vec3 vN; varying vec3 vP; void main(){ float rim=pow(1.0-abs(dot(normalize(vN),vec3(0.0,0.0,1.0))),2.5); float lit=smoothstep(-0.2,0.6,dot(normalize(vP),normalize(uSun))); vec3 c=mix(vec3(0.10,0.30,0.55),vec3(0.35,0.6,0.9),lit); gl_FragColor=vec4(c, rim*0.5);} `}
-        />
-      </mesh>
-      <lineSegments geometry={graticule}>
-        <lineBasicMaterial color="#2a3d4e" transparent opacity={0.5} />
-      </lineSegments>
-      <lineSegments geometry={coasts}>
-        <lineBasicMaterial color="#5f87a8" transparent opacity={0.9} />
-      </lineSegments>
-    </group>
-  )
-}
 
 // soft round sprite so the glow dots read as lights, not squares
 function makeDotTexture() {
@@ -362,7 +257,9 @@ export default function FlightGlobe({ flights, tracks, selected, onSelect, heigh
           <directionalLight position={[5, 3, 5]} intensity={1.2} />
           <Stars radius={60} depth={30} count={1200} factor={2} fade speed={0.4} />
           <group rotation={[0, 0, 0]}>
-            <Earth />
+            <Suspense fallback={null}>
+              <Earth radius={GLOBE_R} coastlines={COASTLINES} />
+            </Suspense>
             <Trails flights={flights} tracks={tracks} selected={selected} visible={showTrails} />
             <Planes flights={flights} onSelect={onSelect} />
             <SelectionMarker flight={selected} />

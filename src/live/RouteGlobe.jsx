@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState } from 'react'
+import { Suspense, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Stars, Html, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import CanvasFallback from '../three/CanvasFallback.jsx'
+import Earth from './Earth.jsx'
 import COASTLINES from './coastlines.json'
 
 /**
@@ -40,79 +41,8 @@ function slerpLL(aLL, bLL, f, out) {
   return out.copy(a).multiplyScalar(w1).addScaledVector(b, w2).normalize()
 }
 
-// A day/night Earth shader: the hemisphere facing the sun is lit ocean-blue
-// brightening to a bright sub-solar point, a warm gold band rides the terminator,
-// and the night side falls to deep blue-black with a faint city-light warmth.
-const SUN_DIR = new THREE.Vector3(0.6, 0.35, 0.7).normalize()
-const earthDayNightMat = () => new THREE.ShaderMaterial({
-  uniforms: { uSun: { value: SUN_DIR.clone() } },
-  vertexShader: `
-    varying vec3 vN; varying vec3 vP;
-    void main(){ vN = normalize(normalMatrix * normal); vP = normalize(position);
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
-  `,
-  fragmentShader: `
-    uniform vec3 uSun; varying vec3 vN; varying vec3 vP;
-    void main(){
-      float d = dot(normalize(vP), normalize(uSun));      // -1 night .. 1 subsolar
-      float day = smoothstep(-0.05, 0.5, d);
-      vec3 ocean = mix(vec3(0.03,0.09,0.16), vec3(0.10,0.32,0.52), day);
-      vec3 night = vec3(0.015,0.03,0.06);
-      vec3 col = mix(night, ocean, day);
-      // warm terminator band where day meets night
-      float term = 1.0 - abs(d) ; term = smoothstep(0.86, 1.0, term);
-      col += vec3(0.45,0.22,0.05) * term;
-      // faint city warmth on the deep night side
-      float nightSide = smoothstep(0.15, -0.3, d);
-      col += vec3(0.10,0.07,0.02) * nightSide;
-      gl_FragColor = vec4(col, 1.0);
-    }
-  `,
-})
-
-function Earth() {
-  const surface = (lat, lon, out) => toVec3(lat, lon, 0.002, out)
-  const earthMat = useMemo(earthDayNightMat, [])
-  const coasts = useMemo(() => {
-    const g = new THREE.BufferGeometry()
-    const pts = []; const a = new THREE.Vector3(); const b = new THREE.Vector3()
-    for (const line of COASTLINES) {
-      for (let i = 0; i < line.length - 1; i++) {
-        surface(line[i][1], line[i][0], a); surface(line[i + 1][1], line[i + 1][0], b)
-        pts.push(a.x, a.y, a.z, b.x, b.y, b.z)
-      }
-    }
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
-    return g
-  }, [])
-  const graticule = useMemo(() => {
-    const g = new THREE.BufferGeometry(); const pts = []; const v = new THREE.Vector3()
-    for (let lat = -60; lat <= 60; lat += 30)
-      for (let lon = -180; lon < 180; lon += 4) { surface(lat, lon, v); pts.push(v.x, v.y, v.z); surface(lat, lon + 4, v); pts.push(v.x, v.y, v.z) }
-    for (let lon = -180; lon < 180; lon += 30)
-      for (let lat = -84; lat < 84; lat += 4) { surface(lat, lon, v); pts.push(v.x, v.y, v.z); surface(lat + 4, lon, v); pts.push(v.x, v.y, v.z) }
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
-    return g
-  }, [])
-  return (
-    <group>
-      <mesh geometry={undefined} material={earthMat}><sphereGeometry args={[R, 128, 128]} /></mesh>
-      {/* fresnel atmosphere rim glow (brighter on the sun side) */}
-      <mesh scale={1.06}>
-        <sphereGeometry args={[R, 64, 64]} />
-        <shaderMaterial
-          transparent
-          side={THREE.BackSide}
-          uniforms={{ uSun: { value: SUN_DIR.clone() } }}
-          vertexShader={`varying vec3 vN; varying vec3 vP; void main(){ vN=normalize(normalMatrix*normal); vP=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `}
-          fragmentShader={`uniform vec3 uSun; varying vec3 vN; varying vec3 vP; void main(){ float rim=pow(1.0-abs(dot(normalize(vN),vec3(0.0,0.0,1.0))),2.5); float lit=smoothstep(-0.2,0.6,dot(normalize(vP),normalize(uSun))); vec3 c=mix(vec3(0.10,0.30,0.55),vec3(0.35,0.6,0.9),lit); gl_FragColor=vec4(c, rim*0.55);} `}
-        />
-      </mesh>
-      <lineSegments geometry={graticule}><lineBasicMaterial color="#2b485c" transparent opacity={0.35} /></lineSegments>
-      <lineSegments geometry={coasts}><lineBasicMaterial color="#8fc0e0" transparent opacity={0.85} /></lineSegments>
-    </group>
-  )
-}
+// Earth (real NASA day/night textures + live sun terminator) now lives in the
+// shared ./Earth.jsx so RouteGlobe and FlightGlobe render the identical planet.
 
 // airport beacon: a small glowing pillar + pulsing ring
 function Beacon({ lat, lon, color, label }) {
@@ -330,14 +260,16 @@ export default function RouteGlobe({ from, to, progress = 0, height = 560, cinem
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 3, 5]} intensity={1.4} />
           <Stars radius={80} depth={40} count={2000} factor={2.4} fade speed={0.3} />
-          <group>
-            <Earth />
-            <Beacon lat={from.lat} lon={from.lon} color="#54ff8a" label={from.code} />
-            <Beacon lat={to.lat} lon={to.lon} color="#3ec8ff" label={to.code} />
-            <RouteArc from={from} to={to} progressRef={progressRef} />
-            <Contrail from={from} to={to} progressRef={progressRef} />
-            <Flyer from={from} to={to} progressRef={progressRef} cinematic={cinematic && flying} />
-          </group>
+          <Suspense fallback={null}>
+            <group>
+              <Earth radius={R} coastlines={COASTLINES} />
+              <Beacon lat={from.lat} lon={from.lon} color="#54ff8a" label={from.code} />
+              <Beacon lat={to.lat} lon={to.lon} color="#3ec8ff" label={to.code} />
+              <RouteArc from={from} to={to} progressRef={progressRef} />
+              <Contrail from={from} to={to} progressRef={progressRef} />
+              <Flyer from={from} to={to} progressRef={progressRef} cinematic={cinematic && flying} />
+            </group>
+          </Suspense>
           <ProgressDriver
             live={progress}
             previewing={previewing}
