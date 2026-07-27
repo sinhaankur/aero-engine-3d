@@ -27,7 +27,27 @@ export function collectParts(root) {
   let gearLowZ = -Infinity        // largest z = lowest point (up is −z)
   root.traverse((o) => {
     if (!o.isMesh) return
-    if (/FanBlades|Spinner/i.test(o.name)) { fans.push(o); return }
+    if (/FanBlades|Spinner/i.test(o.name)) {
+      // The generator exports fan blades with their local origin at the model
+      // origin (0,0,0) instead of the blade centre, so a naive rotation.x sweeps
+      // the whole disc around the fuselage axis — the blades fly OUT of the
+      // nacelle. Re-centre the geometry on the spin axis (the blade's own centre
+      // in y/z) and shift the node back to compensate, so rotation.x now spins
+      // the fan in place inside the cowling. Idempotent via a userData guard.
+      if (!o.userData._fanCentred) {
+        o.updateWorldMatrix(true, false)
+        o.geometry.computeBoundingBox()
+        const bb = o.geometry.boundingBox
+        // spin axis is local x; recentre only the y/z the disc rotates in
+        const cy = (bb.min.y + bb.max.y) / 2
+        const cz = (bb.min.z + bb.max.z) / 2
+        o.geometry.translate(0, -cy, -cz)
+        o.position.y += cy
+        o.position.z += cz
+        o.userData._fanCentred = true
+      }
+      fans.push(o); return
+    }
     if (/^Flap_/i.test(o.name)) { flaps.push({ o, side: /R$/i.test(o.name) ? 1 : -1, y0: o.rotation.y }); return }
     if (/^Aileron_/i.test(o.name)) { ailerons.push({ o, side: /R$/i.test(o.name) ? 1 : -1, y0: o.rotation.y }); return }
     if (/Cylinder|Torus/i.test(o.name)) {
