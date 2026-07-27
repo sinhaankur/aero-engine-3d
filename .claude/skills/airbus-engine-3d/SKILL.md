@@ -58,9 +58,14 @@ at `~/Library/Android/sdk`.
   point-query tiles (250 nm each) in batches of 6, dedupes by hex, re-serves
   OpenSky-shaped JSON with CORS, 15 s edge cache.
 - `blender/` — `generate_airframe_hd.py` is the current generator (NACA-4
-  wing sections, windows/doors/gear as real geometry, 60–90k tris, 1–3 MB GLB,
-  no Draco); `generate_airframe.py` is the low-detail predecessor. All 18
-  variant GLBs + 5 engine GLBs live in `public/models/`.
+  wing sections, windows/doors/gear as real geometry, 60–90k tris);
+  `generate_airframe.py` is the low-detail predecessor. All variant + engine
+  GLBs live in `public/models/`, **Draco-compressed** (~80% smaller, ~130 KB
+  each) as a post-generation step via `npx @gltf-transform/cli draco`. The
+  decoder is vendored in `public/draco/` and wired once in `main.jsx`
+  (`useGLTF.setDecoderPath`) — self-hosted, not gstatic, so models decode
+  offline. Draco preserves node names, so the part-animation code is unaffected.
+  Re-run the compression after regenerating any GLB.
 - `cfd/` — FluidX3D case files only (FluidX3D is never vendored).
   `export_stl.py` (GLB→STL via Blender), `setup_a320_windtunnel.cpp`,
   `run_a320.sh`. See `docs/cfd-pipeline.md` before touching.

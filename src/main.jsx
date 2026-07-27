@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { createHashRouter, RouterProvider } from 'react-router-dom'
+import { useGLTF } from '@react-three/drei'
 import App from './App.jsx'
 import Home from './pages/Home.jsx'
 import FamilyPage from './pages/FamilyPage.jsx'
@@ -15,6 +16,12 @@ import FlyPage from './pages/FlyPage.jsx'
 import RoutesPage from './pages/RoutesPage.jsx'
 import ComponentsPage from './pages/ComponentsPage.jsx'
 import './styles/global.css'
+
+// All aircraft/engine GLBs are Draco-compressed geometry (~80% smaller). Point
+// every useGLTF at the decoder we vendor in public/draco/ — self-hosted, not the
+// gstatic CDN drei defaults to, so models decode offline (projector) and don't
+// depend on a third party. Path respects the Vite base (/aero-engine-3d/).
+useGLTF.setDecoderPath(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/draco/`)
 
 const router = createHashRouter([
   {
