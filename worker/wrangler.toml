@@ -11,8 +11,11 @@ account_id = "3f9c8ee4978248332bdbffa957684533"
 # few tiles; results accumulate in KV as one global aircraft map. User requests
 # just read that merged snapshot from KV — no upstream calls on the hot path, so
 # the map is instant and the sweep stays polite.
-[triggers]
-crons = ["*/1 * * * *"]   # every minute; the handler also self-paces sub-steps
+# PAUSED 2026-07-28 — the every-minute cron drove the KV daily-read tier to 50%
+# (2 KV reads/run ≈ 2,880/day) while the live-flight feature isn't in active use.
+# Re-enable by uncommenting; the Worker + KV binding stay deployed either way.
+# [triggers]
+# crons = ["*/1 * * * *"]   # every minute; the handler also self-paces sub-steps
 
 # KV namespace holding the accumulated global snapshot + sweep cursor.
 # Create it once with:  npx wrangler kv namespace create FLIGHTS
