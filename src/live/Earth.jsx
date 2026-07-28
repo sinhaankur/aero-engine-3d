@@ -143,19 +143,57 @@ export default function Earth({ radius = 2, showGraticule = true, coastlines }) 
   return (
     <group>
       <mesh material={mat}><sphereGeometry args={[radius, 96, 96]} /></mesh>
-      {/* fresnel atmosphere rim */}
-      <mesh scale={1.05}>
+      {/* inner fresnel atmosphere rim — tight, bright, sun-lit */}
+      <mesh scale={1.045}>
+        <sphereGeometry args={[radius, 64, 64]} />
+        <shaderMaterial
+          transparent
+          side={THREE.BackSide}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          uniforms={{ uSun: mat.uniforms.uSun }}
+          vertexShader={`varying vec3 vN; varying vec3 vP; void main(){ vN=normalize(normalMatrix*normal); vP=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `}
+          fragmentShader={`uniform vec3 uSun; varying vec3 vN; varying vec3 vP; void main(){ float rim=pow(1.0-abs(dot(normalize(vN),vec3(0.0,0.0,1.0))),3.0); float lit=smoothstep(-0.25,0.7,dot(normalize(vP),normalize(uSun))); vec3 c=mix(vec3(0.10,0.28,0.55),vec3(0.45,0.72,1.0),lit); gl_FragColor=vec4(c, rim*(0.35+lit*0.5));} `}
+        />
+      </mesh>
+      {/* outer haze shell — soft wide glow that fakes atmospheric bloom */}
+      <mesh scale={1.14}>
         <sphereGeometry args={[radius, 48, 48]} />
         <shaderMaterial
           transparent
           side={THREE.BackSide}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
           uniforms={{ uSun: mat.uniforms.uSun }}
           vertexShader={`varying vec3 vN; varying vec3 vP; void main(){ vN=normalize(normalMatrix*normal); vP=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `}
-          fragmentShader={`uniform vec3 uSun; varying vec3 vN; varying vec3 vP; void main(){ float rim=pow(1.0-abs(dot(normalize(vN),vec3(0.0,0.0,1.0))),2.5); float lit=smoothstep(-0.2,0.6,dot(normalize(vP),normalize(uSun))); vec3 c=mix(vec3(0.10,0.30,0.55),vec3(0.35,0.6,0.9),lit); gl_FragColor=vec4(c, rim*0.5);} `}
+          fragmentShader={`uniform vec3 uSun; varying vec3 vN; varying vec3 vP; void main(){ float rim=pow(1.0-abs(dot(normalize(vN),vec3(0.0,0.0,1.0))),4.5); float lit=smoothstep(-0.3,0.8,dot(normalize(vP),normalize(uSun))); gl_FragColor=vec4(vec3(0.25,0.5,0.95)*(0.5+lit), rim*0.4*(0.4+lit*0.6)); }`}
         />
       </mesh>
       {coasts && <lineSegments geometry={coasts}><lineBasicMaterial color="#9fd0ec" transparent opacity={0.4} /></lineSegments>}
       {graticule && <lineSegments geometry={graticule}><lineBasicMaterial color="#2b485c" transparent opacity={0.22} /></lineSegments>}
+    </group>
+  )
+}
+
+/**
+ * A sun disc + soft glow far behind the Earth, placed along the live sun
+ * direction — the cinematic light source that makes the terminator read and
+ * gives the scene depth. Export so the globes can drop it in.
+ */
+export function Sun({ distance = 60 }) {
+  const ref = useRef()
+  const tmp = useMemo(() => new THREE.Vector3(), [])
+  useFrame(() => {
+    if (!ref.current) return
+    sunDirection(new Date(), tmp)
+    ref.current.position.copy(tmp).multiplyScalar(distance)
+  })
+  return (
+    <group ref={ref}>
+      <mesh><sphereGeometry args={[2.4, 24, 24]} /><meshBasicMaterial color="#fff6e0" toneMapped={false} /></mesh>
+      {/* layered additive halos for a soft bloom */}
+      <mesh><sphereGeometry args={[5, 24, 24]} /><meshBasicMaterial color="#ffe9b0" transparent opacity={0.35} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} /></mesh>
+      <mesh><sphereGeometry args={[10, 24, 24]} /><meshBasicMaterial color="#ffdca0" transparent opacity={0.14} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} /></mesh>
     </group>
   )
 }

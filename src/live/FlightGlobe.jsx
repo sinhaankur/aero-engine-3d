@@ -3,7 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import CanvasFallback from '../three/CanvasFallback.jsx'
-import Earth, { Clouds } from './Earth.jsx'
+import Earth, { Clouds, Sun } from './Earth.jsx'
 import COASTLINES from './coastlines.json'
 
 const GLOBE_R = 2                        // globe radius in scene units
@@ -253,13 +253,15 @@ export default function FlightGlobe({ flights, tracks, selected, onSelect, heigh
     <div style={{ height, width: '100%', background: 'radial-gradient(120% 120% at 50% 30%, #0a1017, #06080b)' }}>
       <CanvasFallback label="Live globe needs WebGL — unavailable on this device">
         <Canvas camera={{ position: [0, 1.6, 6], fov: 42 }} onPointerMissed={() => onSelect(null)}>
-          <ambientLight intensity={0.75} />
-          <directionalLight position={[5, 3, 5]} intensity={1.2} />
-          <Stars radius={60} depth={30} count={1200} factor={2} fade speed={0.4} />
+          <color attach="background" args={['#05070d']} />
+          <ambientLight intensity={0.35} />
+          <directionalLight position={[5, 3, 5]} intensity={1.4} />
+          <Stars radius={90} depth={50} count={4000} factor={3} fade speed={0.3} />
           <group rotation={[0, 0, 0]}>
             <Suspense fallback={null}>
               <Earth radius={GLOBE_R} coastlines={COASTLINES} />
             </Suspense>
+            <Sun distance={70} />
             <Clouds radius={GLOBE_R} />
             <Trails flights={flights} tracks={tracks} selected={selected} visible={showTrails} />
             <Planes flights={flights} onSelect={onSelect} />

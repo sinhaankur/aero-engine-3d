@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Stars, Html, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import CanvasFallback from '../three/CanvasFallback.jsx'
-import Earth, { Clouds } from './Earth.jsx'
+import Earth, { Clouds, Sun } from './Earth.jsx'
 import COASTLINES from './coastlines.json'
 
 /**
@@ -257,12 +257,14 @@ export default function RouteGlobe({ from, to, progress = 0, height = 560, cinem
     <div style={{ position: 'relative', height, width: '100%', background: 'radial-gradient(120% 120% at 50% 25%, #0a1420, #05070b 70%)' }}>
       <CanvasFallback label="Globe needs WebGL — unavailable on this device">
         <Canvas camera={{ position: [0, 1.5, 6], fov: 40 }}>
-          <ambientLight intensity={0.8} />
-          <directionalLight position={[5, 3, 5]} intensity={1.4} />
-          <Stars radius={80} depth={40} count={2000} factor={2.4} fade speed={0.3} />
+          <color attach="background" args={['#05070d']} />
+          <ambientLight intensity={0.4} />
+          <directionalLight position={[5, 3, 5]} intensity={1.5} />
+          <Stars radius={90} depth={50} count={4000} factor={3} fade speed={0.25} />
           <Suspense fallback={null}>
             <group>
               <Earth radius={R} coastlines={COASTLINES} />
+              <Sun distance={70} />
               <Clouds radius={R} />
               <Beacon lat={from.lat} lon={from.lon} color="#54ff8a" label={from.code} />
               <Beacon lat={to.lat} lon={to.lon} color="#3ec8ff" label={to.code} />
