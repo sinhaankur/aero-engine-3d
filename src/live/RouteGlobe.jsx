@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Stars, Html, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import CanvasFallback from '../three/CanvasFallback.jsx'
-import Earth from './Earth.jsx'
+import Earth, { Clouds } from './Earth.jsx'
 import COASTLINES from './coastlines.json'
 
 /**
@@ -263,6 +263,7 @@ export default function RouteGlobe({ from, to, progress = 0, height = 560, cinem
           <Suspense fallback={null}>
             <group>
               <Earth radius={R} coastlines={COASTLINES} />
+              <Clouds radius={R} />
               <Beacon lat={from.lat} lon={from.lon} color="#54ff8a" label={from.code} />
               <Beacon lat={to.lat} lon={to.lon} color="#3ec8ff" label={to.code} />
               <RouteArc from={from} to={to} progressRef={progressRef} />

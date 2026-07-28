@@ -187,10 +187,58 @@ async function sweepStep(env) {
   return states.length
 }
 
+// ---- weather engine: a coarse global cloud-cover grid from Open-Meteo ----
+// Open-Meteo is keyless + CORS-friendly and takes many points per call, so one
+// request fetches a 10°×10° grid (~612 points) of live cloud cover. Clouds move
+// slowly, so we cache the grid for 10 min and every visitor shares it. Returned
+// compact: { time, step, lat0, lon0, rows, cols, cloud:[0..100,...] } row-major
+// from the SW corner — the globe unpacks it into a wrapping cloud layer.
+const WX_STEP = 10
+const WX_TTL_S = 600
+
+function buildWeatherPoints() {
+  const lats = [], lons = []
+  for (let la = -80; la <= 80; la += WX_STEP)
+    for (let lo = -180; lo < 180; lo += WX_STEP) { lats.push(la); lons.push(lo) }
+  return { lats, lons }
+}
+
+async function fetchWeather() {
+  const { lats, lons } = buildWeatherPoints()
+  // single call — Open-Meteo takes all ~612 points at once, which keeps us to
+  // ONE upstream hit per 10-min cache window (well within the free rate limit).
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats.join(',')}&longitude=${lons.join(',')}&current=cloud_cover`
+  const r = await fetch(url, { headers: { 'Accept': 'application/json' } })
+  if (!r.ok) throw new Error(`open-meteo HTTP ${r.status}`)
+  const text = await r.text()
+  let data
+  try { data = JSON.parse(text) } catch { throw new Error(`open-meteo non-JSON: ${text.slice(0, 60)}`) }
+  const arr = Array.isArray(data) ? data : [data]
+  const cloud = arr.map((p) => Math.round(p?.current?.cloud_cover ?? 0))
+  const cols = Math.round(360 / WX_STEP)
+  const rows = Math.round(160 / WX_STEP) + 1
+  return { time: Math.floor(Date.now() / 1000), step: WX_STEP, lat0: -80, lon0: -180, rows, cols, cloud }
+}
+
+// refresh the weather grid in KV if it's older than the TTL — runs off the cron
+// so user requests never trigger a live upstream fetch
+async function refreshWeatherIfStale(env) {
+  const cached = await env.FLIGHTS.get('weather')
+  if (cached) {
+    try {
+      const g = JSON.parse(cached)
+      if (Math.floor(Date.now() / 1000) - (g.time || 0) < WX_TTL_S) return
+    } catch { /* fall through and refetch */ }
+  }
+  const grid = await fetchWeather()
+  await env.FLIGHTS.put('weather', JSON.stringify(grid))
+}
+
 export default {
-  // cron: advance the global sweep
+  // cron: advance the flight sweep + keep the weather grid warm
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sweepStep(env))
+    ctx.waitUntil(refreshWeatherIfStale(env).catch(() => {}))
   },
 
   // user requests: serve the merged snapshot from KV (no upstream calls)
@@ -202,6 +250,21 @@ export default {
     if (url.pathname === '/sweep') {
       const n = await sweepStep(env)
       return json({ swept: true, aircraft: n })
+    }
+
+    // global cloud-cover grid — served straight from KV (the cron keeps it warm,
+    // so the user path never makes an upstream call). Cold KV falls back to a
+    // one-time inline fetch so the first visitor still gets clouds.
+    if (url.pathname === '/weather') {
+      const cached = await env.FLIGHTS.get('weather')
+      if (cached) return withCache(new Response(cached, { headers: { 'Content-Type': 'application/json', ...CORS } }))
+      try {
+        const grid = await fetchWeather()
+        await env.FLIGHTS.put('weather', JSON.stringify(grid))
+        return withCache(json(grid))
+      } catch (e) {
+        return json({ error: 'weather warming up', detail: String(e).slice(0, 120) }, 503)
+      }
     }
 
     const snap = await env.FLIGHTS.get('snapshot')

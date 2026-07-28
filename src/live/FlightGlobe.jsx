@@ -3,7 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import CanvasFallback from '../three/CanvasFallback.jsx'
-import Earth from './Earth.jsx'
+import Earth, { Clouds } from './Earth.jsx'
 import COASTLINES from './coastlines.json'
 
 const GLOBE_R = 2                        // globe radius in scene units
@@ -260,6 +260,7 @@ export default function FlightGlobe({ flights, tracks, selected, onSelect, heigh
             <Suspense fallback={null}>
               <Earth radius={GLOBE_R} coastlines={COASTLINES} />
             </Suspense>
+            <Clouds radius={GLOBE_R} />
             <Trails flights={flights} tracks={tracks} selected={selected} visible={showTrails} />
             <Planes flights={flights} onSelect={onSelect} />
             <SelectionMarker flight={selected} />

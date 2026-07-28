@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useKTX2 } from '@react-three/drei'
 import * as THREE from 'three'
@@ -157,5 +157,75 @@ export default function Earth({ radius = 2, showGraticule = true, coastlines }) 
       {coasts && <lineSegments geometry={coasts}><lineBasicMaterial color="#9fd0ec" transparent opacity={0.4} /></lineSegments>}
       {graticule && <lineSegments geometry={graticule}><lineBasicMaterial color="#2b485c" transparent opacity={0.22} /></lineSegments>}
     </group>
+  )
+}
+
+const WX_API = import.meta.env.VITE_FLIGHT_API || ''
+
+/**
+ * Live cloud layer — the "weather engine". Fetches a coarse global cloud-cover
+ * grid from the worker's /weather route (Open-Meteo, cached 10 min) and paints
+ * it into a texture: cloud % → white alpha, bilinearly upscaled so the 10° grid
+ * reads as soft cloud masses. Mapped onto a slightly larger transparent sphere
+ * that drifts a touch faster than the globe, so weather visibly moves. Silently
+ * renders nothing if the weather endpoint is unavailable.
+ */
+export function Clouds({ radius = 2, refreshMs = 600000 }) {
+  const ref = useRef()
+  const [grid, setGrid] = useState(null)
+
+  useEffect(() => {
+    if (!WX_API) return
+    let alive = true
+    const load = () => fetch(`${WX_API}/weather`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (alive && d && d.cloud) setGrid(d) })
+      .catch(() => {})
+    load()
+    const iv = setInterval(load, refreshMs)
+    return () => { alive = false; clearInterval(iv) }
+  }, [refreshMs])
+
+  const texture = useMemo(() => {
+    if (!grid) return null
+    const { rows, cols, cloud } = grid
+    // upscale the coarse grid with bilinear sampling into a smooth alpha map
+    const SX = cols * 12, SY = rows * 12
+    const c = document.createElement('canvas'); c.width = SX; c.height = SY
+    const ctx = c.getContext('2d')
+    const img = ctx.createImageData(SX, SY)
+    const at = (r, cc) => cloud[Math.min(rows - 1, Math.max(0, r)) * cols + ((cc % cols) + cols) % cols]
+    for (let y = 0; y < SY; y++) {
+      // grid row 0 is lat -80 (south); texture v=0 is the top (north), so flip
+      const gy = (1 - y / (SY - 1)) * (rows - 1)
+      const r0 = Math.floor(gy), fy = gy - r0
+      for (let x = 0; x < SX; x++) {
+        const gx = (x / SX) * cols
+        const c0 = Math.floor(gx), fx = gx - c0
+        const v = at(r0, c0) * (1 - fx) * (1 - fy) + at(r0, c0 + 1) * fx * (1 - fy) +
+                  at(r0 + 1, c0) * (1 - fx) * fy + at(r0 + 1, c0 + 1) * fx * fy
+        const i = (y * SX + x) * 4
+        // only show meaningful cloud; fade in from ~25% cover
+        const a = Math.max(0, (v - 25) / 75)
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 255
+        img.data[i + 3] = Math.round(a * 210)
+      }
+    }
+    ctx.putImageData(img, 0, 0)
+    const tex = new THREE.CanvasTexture(c)
+    tex.wrapS = THREE.RepeatWrapping
+    tex.colorSpace = THREE.SRGBColorSpace
+    return tex
+  }, [grid])
+
+  // slow independent drift so the weather reads as alive
+  useFrame((_, dt) => { if (ref.current) ref.current.rotation.y += dt * 0.006 })
+
+  if (!texture) return null
+  return (
+    <mesh ref={ref} scale={1.012}>
+      <sphereGeometry args={[radius, 64, 64]} />
+      <meshBasicMaterial map={texture} transparent depthWrite={false} opacity={0.9} />
+    </mesh>
   )
 }
