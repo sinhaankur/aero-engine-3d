@@ -8,7 +8,9 @@ import Cockpit from '../sim/flight/Cockpit.jsx'
 import { updateAtc, callsignFor } from '../sim/flight/atc.js'
 import { FlightAudio } from '../sim/flight/audio.js'
 import EngineLive from '../sim/flight/EngineLive.jsx'
+import AirportBoard from '../sim/flight/AirportBoard.jsx'
 import { checklistProgress } from '../sim/flight/procedures.js'
+import { useFlightData } from '../live/useFlightData.js'
 import { hardReload } from '../lib/hardReload.js'
 
 const FlightScene = lazy(() => import('../three/FlightScene.jsx'))
@@ -51,9 +53,15 @@ export default function FlyPage() {
   const [showEngine, setShowEngine] = useState(false)
   const [coldDark, setColdDark] = useState(false)
   const [photo, setPhoto] = useState(false)
+  const [showBoard, setShowBoard] = useState(false)
+  const [cleared, setCleared] = useState(false)   // departure-slot clearance
   const audioRef = useRef(null)
   if (audioRef.current == null) audioRef.current = new FlightAudio()
   const [, forceTick] = useState(0)
+
+  // live ADS-B feed — used only to show the real aircraft on the ground at the
+  // selected departure field (the "departures board"); poll slowly here
+  const { flights, status: liveStatus } = useFlightData({ intervalMs: 30000 })
 
   const [familyId, aircraftId] = acKey.split('/')
   const aircraft = getAircraft(familyId, aircraftId) || getAircraft('a320', 'a320')
@@ -93,6 +101,7 @@ export default function FlyPage() {
     simRef.current.state = st
     simRef.current.controls = { pitch: 0, roll: 0, yaw: 0, throttle: 0, flap: st.flap, gear: true, brakes: st.brakes, speedbrake: 0 }
     simRef.current.out = null
+    setCleared(false)   // a fresh flight needs a fresh departure clearance
     forceTick((n) => n + 1)
   }
 
@@ -261,6 +270,9 @@ export default function FlyPage() {
         <button className={`fly-reset ${showEngine ? 'on' : ''}`} onClick={() => setShowEngine((v) => !v)} title="Live engine + fuel panel">
           ⚙ Engine
         </button>
+        <button className={`fly-reset ${showBoard ? 'on' : ''}`} onClick={() => setShowBoard((v) => !v)} title="Real aircraft on the ground at your field + departure slot">
+          🛫 Departures
+        </button>
         <button className={`fly-reset ${coldDark ? 'on' : ''}`} onClick={() => setColdDark((v) => !v)} title="Start cold & dark and run the real startup checklist">
           {coldDark ? '❄ Cold & dark' : '✈ Ready'}
         </button>
@@ -418,6 +430,18 @@ export default function FlyPage() {
           </div>
         )}
 
+        {/* departures board: real ground traffic at the field + slot clearance */}
+        {showBoard && (
+          <AirportBoard
+            airport={from}
+            flights={flights}
+            status={liveStatus}
+            myCallsign={callsignFor(aircraft.name)}
+            cleared={cleared}
+            onCleared={() => setCleared(true)}
+          />
+        )}
+
         {/* conditions readout */}
         {hud && (
           <div className="fly-readout">
@@ -439,6 +463,7 @@ export default function FlyPage() {
         {s.onGround && s.v < 3 && !s.crashed && !(coldDark && !checklist.complete) && (
           <div className="fly-coach">
             <b>{shortName(aircraft.name)}</b> lined up on {from.code} runway {from.rwy.id} — {weather.name}.
+            {showBoard && !cleared && <> Hold position — request your <b>departure slot</b> on the board before rolling.</>}
             {(!s.eng1Started || !s.eng2Started) ? <> Start both engines before you can make takeoff thrust.</> :
               c.brakes ? <> Release the park brake <kbd>B</kbd>, then hold <kbd>W</kbd> for takeoff thrust. V<sub>1</sub> {Math.round(ac.v1 / 0.514444)} · V<sub>R</sub> {Math.round(ac.vr / 0.514444)} · V<sub>2</sub> {Math.round(ac.v2 / 0.514444)} kt.</> :
               <> Hold <kbd>W</kbd> for full thrust. V<sub>1</sub> {Math.round(ac.v1 / 0.514444)} · rotate <kbd>↑</kbd> at V<sub>R</sub> {Math.round(ac.vr / 0.514444)} · climb V<sub>2</sub> {Math.round(ac.v2 / 0.514444)} kt,
