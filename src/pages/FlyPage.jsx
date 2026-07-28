@@ -296,6 +296,7 @@ export default function FlyPage() {
               weather={weather}
               view={view}
               runwayHalfLen={rwy.halfLen}
+              airport={from}
             />
           )}
         </Suspense>

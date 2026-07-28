@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Html, Environment, Lightformer } from '@react-three/drei'
+import { Html, Environment, Lightformer, Text } from '@react-three/drei'
 import { useGLTF } from './gltf.js'
 import * as THREE from 'three'
 import CanvasFallback from './CanvasFallback.jsx'
@@ -143,8 +143,21 @@ function InstancedBoxes({ items, material, geometry = unitBox }) {
  */
 const twyLineMat = new THREE.MeshStandardMaterial({ color: '#d7b53a', roughness: 0.8 })
 
-function Runway({ night, halfLen = 1600 }) {
+// the reciprocal runway designator for the far threshold: opposite heading
+// (±18) and swapped L/R (a "27R" one way is "09L" the other).
+function reciprocalRwy(id = '') {
+  const m = id.match(/^(\d{1,2})([LRC]?)$/i)
+  if (!m) return ''
+  let num = (parseInt(m[1], 10) + 18) % 36
+  if (num === 0) num = 36
+  const side = m[2] ? ({ L: 'R', R: 'L', C: 'C' }[m[2].toUpperCase()]) : ''
+  return String(num).padStart(2, '0') + side
+}
+
+function Runway({ night, halfLen = 1600, airport }) {
   const HL = halfLen
+  const rwyId = airport?.rwy?.id || ''
+  const rwyRecip = reciprocalRwy(rwyId)
   const lightMat = useMemo(() => new THREE.MeshStandardMaterial({
     color: '#fff2c8', emissive: '#ffd97a', emissiveIntensity: night ? 3.2 : 1.4,
   }), [night])
@@ -206,6 +219,56 @@ function Runway({ night, halfLen = 1600 }) {
       <mesh position={[75, 0.018, 0]} material={asphaltMat}><boxGeometry args={[22, 0.036, HL * 1.6]} /></mesh>
       <mesh position={[47, 0.018, thr - 160]} material={asphaltMat}><boxGeometry args={[60, 0.036, 22]} /></mesh>
       <InstancedBoxes items={twyDashes} material={twyLineMat} />
+
+      {/* painted runway designators — the real ID on the departure threshold and
+          its reciprocal on the far end, so each airport reads as itself */}
+      {rwyId && (
+        <Text position={[0, 0.09, HL - 120]} rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={26} color="#eef4ff" anchorX="center" anchorY="middle" letterSpacing={0.08}>
+          {rwyId}
+        </Text>
+      )}
+      {rwyRecip && (
+        <Text position={[0, 0.09, -(HL - 120)]} rotation={[-Math.PI / 2, 0, Math.PI]}
+          fontSize={26} color="#eef4ff" anchorX="center" anchorY="middle" letterSpacing={0.08}>
+          {rwyRecip}
+        </Text>
+      )}
+
+      {/* ATC control tower beside the field, with the airport code on the cab */}
+      {airport && (
+        <group position={[130, 0, thr - 260]}>
+          <mesh position={[0, 16, 0]} castShadow>
+            <cylinderGeometry args={[3, 4.5, 32, 12]} />
+            <meshStandardMaterial color="#c8ccd2" roughness={0.7} />
+          </mesh>
+          {/* glazed cab */}
+          <mesh position={[0, 34, 0]}>
+            <cylinderGeometry args={[6.5, 5.5, 6, 12]} />
+            <meshStandardMaterial color="#0d1b2a" emissive="#132a44" emissiveIntensity={night ? 1.2 : 0.3} roughness={0.2} metalness={0.4} />
+          </mesh>
+          {/* roof */}
+          <mesh position={[0, 38, 0]}><cylinderGeometry args={[7, 7, 1, 12]} /><meshStandardMaterial color="#8a929c" /></mesh>
+          {/* rotating beacon */}
+          <mesh position={[0, 39.5, 0]}><sphereGeometry args={[0.8, 8, 8]} /><meshStandardMaterial color="#54ff8a" emissive="#54ff8a" emissiveIntensity={2.5} /></mesh>
+          <Text position={[0, 22, 6.6]} fontSize={5} color="#0b2038" anchorX="center" anchorY="middle" outlineWidth={0.15} outlineColor="#e8eef5">
+            {airport.code}
+          </Text>
+        </group>
+      )}
+
+      {/* field identity sign at the departure end — code + city */}
+      {airport && (
+        <group position={[-70, 0, thr - 40]}>
+          <mesh position={[0, 3, 0]}><boxGeometry args={[34, 6, 1]} /><meshStandardMaterial color="#0b1f12" /></mesh>
+          <Text position={[0, 3.6, 0.6]} fontSize={4} color="#ffd23a" anchorX="center" anchorY="middle">
+            {airport.code} · RWY {rwyId}
+          </Text>
+          <Text position={[0, 1.4, 0.6]} fontSize={2.4} color="#cfe0ff" anchorX="center" anchorY="middle">
+            {airport.city}
+          </Text>
+        </group>
+      )}
     </group>
   )
 }
@@ -523,7 +586,7 @@ function Rain({ count = 2500 }) {
   )
 }
 
-export default function FlightScene({ simRef, modelUrl, dims, weather, view, runwayHalfLen = 1600 }) {
+export default function FlightScene({ simRef, modelUrl, dims, weather, view, runwayHalfLen = 1600, airport }) {
   const sky = SKIES[weather.sky] || SKIES.day
   const groundTex = useGroundTexture(weather.sky)
   const groupRef = useRef()
@@ -563,7 +626,7 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
           <planeGeometry args={[64000, 64000]} />
           <meshStandardMaterial map={groundTex} roughness={1} />
         </mesh>
-        <Runway night={night} halfLen={runwayHalfLen} />
+        <Runway night={night} halfLen={runwayHalfLen} airport={airport} />
         <Buildings />
 
         <Suspense fallback={<Loader />}>
