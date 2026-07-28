@@ -2,18 +2,33 @@
  * Procedural flight soundscape for /fly — no audio files, all synthesised with
  * the Web Audio API and driven live from the sim state each frame.
  *
- * Layers:
- *   • Fan whine     — two detuned sawtooth oscillators whose pitch + gain rise
- *                     with N1; the turbofan "spool" you hear on the ramp.
- *   • Core rumble   — low sine + filtered noise for the combustor/exhaust roar.
- *   • Airflow hiss  — white noise through a band-pass that opens up with TAS
- *                     (wind over the hull), louder still with gear/flaps out.
- *   • Transients    — short filtered-noise "clunks" on gear and flap movement,
- *                     a wheel rumble on the ground, and warning tones.
+ * Turbofan model (the previous version used raw sawtooth oscillators, which
+ * buzzed like an angry wasp — a real turbofan is mostly AIR, not buzz):
+ *   • Fan whine    — a tonal whistle at the blade-pass frequency made by pushing
+ *                    looping noise through a high-Q bandpass (resonant, breathy),
+ *                    with a soft sine partial for body. Pitch rises with N1.
+ *   • Core roar    — low sine + lowpassed noise for combustor/exhaust rumble.
+ *   • Environment  — wind (bandpassed noise scaled by actual wind speed) and
+ *                    airflow over the hull (scaled by TAS, louder dirty), plus a
+ *                    ground/rolling rumble. These layers are prominent now so the
+ *                    world doesn't feel silent around the engine.
+ *   • Transients   — gear/flap clunks, engine light-off whoomph, warning tones.
  *
- * Browsers block audio until a user gesture, so the engine is created lazily on
- * the first start() call (wired to the on-screen SOUND toggle).
+ * A soft-clip waveshaper on the master bus tames peaks so nothing crackles.
+ * Browsers block audio until a gesture, so it's built lazily on first start().
  */
+
+// tanh-ish soft clip curve so summed layers saturate gently instead of digitally
+// clipping (the old graph could overshoot and crackle at full thrust)
+function softClipCurve(k = 2.2) {
+  const n = 1024
+  const curve = new Float32Array(n)
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1
+    curve[i] = Math.tanh(k * x) / Math.tanh(k)
+  }
+  return curve
+}
 
 export class FlightAudio {
   constructor() {
@@ -25,44 +40,59 @@ export class FlightAudio {
     this._warnUntil = 0
   }
 
-  /** Build the audio graph (called on first enable, from a user gesture). */
   _init() {
     const Ctx = window.AudioContext || window.webkitAudioContext
     if (!Ctx) return false
     const ctx = new Ctx()
     this.ctx = ctx
 
+    // master bus: gain → soft-clip limiter → destination
     const master = ctx.createGain()
     master.gain.value = 0.0
-    master.connect(ctx.destination)
+    const limiter = ctx.createWaveShaper()
+    limiter.curve = softClipCurve(2.2)
+    limiter.oversample = '2x'
+    master.connect(limiter); limiter.connect(ctx.destination)
 
-    // ---- fan whine: two saws, detuned, through a low-pass ----
-    const fanA = ctx.createOscillator(); fanA.type = 'sawtooth'; fanA.frequency.value = 90
-    const fanB = ctx.createOscillator(); fanB.type = 'sawtooth'; fanB.frequency.value = 92
-    const fanFilter = ctx.createBiquadFilter(); fanFilter.type = 'lowpass'; fanFilter.frequency.value = 1200; fanFilter.Q.value = 6
-    const fanGain = ctx.createGain(); fanGain.gain.value = 0
-    fanA.connect(fanFilter); fanB.connect(fanFilter); fanFilter.connect(fanGain); fanGain.connect(master)
-    fanA.start(); fanB.start()
-
-    // ---- core rumble: low sine + noise ----
-    const core = ctx.createOscillator(); core.type = 'sine'; core.frequency.value = 45
-    const coreGain = ctx.createGain(); coreGain.gain.value = 0
-    core.connect(coreGain); coreGain.connect(master)
-    core.start()
-
-    // shared noise buffer source (looping white noise)
+    // shared looping white-noise buffer (2 s)
     const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate)
     const data = noiseBuf.getChannelData(0)
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
     const makeNoise = () => { const n = ctx.createBufferSource(); n.buffer = noiseBuf; n.loop = true; n.start(); return n }
 
-    // core noise (rumble body)
+    // ---- fan whine: resonant bandpassed noise (the breathy turbofan whistle) ----
+    // high-Q bandpass on broadband noise gives a pitched-but-airy tone — far
+    // smoother than a sawtooth. A quiet sine adds tonal body underneath.
+    const fanNoise = makeNoise()
+    const fanBP = ctx.createBiquadFilter(); fanBP.type = 'bandpass'; fanBP.frequency.value = 480; fanBP.Q.value = 3.2
+    const fanBP2 = ctx.createBiquadFilter(); fanBP2.type = 'bandpass'; fanBP2.frequency.value = 960; fanBP2.Q.value = 5 // 2nd harmonic shimmer
+    const fanGain = ctx.createGain(); fanGain.gain.value = 0
+    const fan2Gain = ctx.createGain(); fan2Gain.gain.value = 0
+    fanNoise.connect(fanBP); fanBP.connect(fanGain); fanGain.connect(master)
+    fanNoise.connect(fanBP2); fanBP2.connect(fan2Gain); fan2Gain.connect(master)
+    // tonal body under the whine
+    const fanTone = ctx.createOscillator(); fanTone.type = 'sine'; fanTone.frequency.value = 240
+    const fanToneGain = ctx.createGain(); fanToneGain.gain.value = 0
+    fanTone.connect(fanToneGain); fanToneGain.connect(master); fanTone.start()
+
+    // ---- core roar: low sine + lowpassed noise ----
+    const core = ctx.createOscillator(); core.type = 'sine'; core.frequency.value = 45
+    const coreGain = ctx.createGain(); coreGain.gain.value = 0
+    core.connect(coreGain); coreGain.connect(master); core.start()
+
     const coreNoise = makeNoise()
     const coreNoiseFilter = ctx.createBiquadFilter(); coreNoiseFilter.type = 'lowpass'; coreNoiseFilter.frequency.value = 220
     const coreNoiseGain = ctx.createGain(); coreNoiseGain.gain.value = 0
     coreNoise.connect(coreNoiseFilter); coreNoiseFilter.connect(coreNoiseGain); coreNoiseGain.connect(master)
 
-    // ---- airflow hiss: band-passed noise scaled by airspeed ----
+    // ---- wind: the moving air around you, scaled by real wind speed ----
+    const wind = makeNoise()
+    const windFilter = ctx.createBiquadFilter(); windFilter.type = 'bandpass'; windFilter.frequency.value = 500; windFilter.Q.value = 0.5
+    const windLP = ctx.createBiquadFilter(); windLP.type = 'lowpass'; windLP.frequency.value = 1400
+    const windGain = ctx.createGain(); windGain.gain.value = 0
+    wind.connect(windFilter); windFilter.connect(windLP); windLP.connect(windGain); windGain.connect(master)
+
+    // ---- airflow over the hull, scaled by TAS (louder with gear/flaps out) ----
     const air = makeNoise()
     const airFilter = ctx.createBiquadFilter(); airFilter.type = 'bandpass'; airFilter.frequency.value = 900; airFilter.Q.value = 0.7
     const airGain = ctx.createGain(); airGain.gain.value = 0
@@ -72,8 +102,9 @@ export class FlightAudio {
     const fxGain = ctx.createGain(); fxGain.gain.value = 0.9; fxGain.connect(master)
 
     this.nodes = {
-      master, fanA, fanB, fanFilter, fanGain, core, coreGain,
-      coreNoiseFilter, coreNoiseGain, airFilter, airGain, fxGain, noiseBuf,
+      master, fanBP, fanBP2, fanGain, fan2Gain, fanTone, fanToneGain,
+      core, coreGain, coreNoiseFilter, coreNoiseGain,
+      windFilter, windLP, windGain, airFilter, airGain, fxGain, noiseBuf,
     }
     return true
   }
@@ -82,7 +113,7 @@ export class FlightAudio {
     if (!this.ctx && !this._init()) return
     await this.ctx.resume()
     this.on = true
-    this.nodes.master.gain.setTargetAtTime(0.6, this.ctx.currentTime, 0.3)
+    this.nodes.master.gain.setTargetAtTime(0.5, this.ctx.currentTime, 0.3)
   }
 
   stop() {
@@ -93,18 +124,17 @@ export class FlightAudio {
 
   toggle() { this.on ? this.stop() : this.start() }
 
-  /** lazily build the persistent starter-motor whine (a filtered triangle). */
   _startStarter() {
     if (!this.ctx || this._starter) return
+    // starter/APU whine — a soft filtered triangle, gentle not piercing
     const osc = this.ctx.createOscillator(); osc.type = 'triangle'; osc.frequency.value = 240
-    const filt = this.ctx.createBiquadFilter(); filt.type = 'bandpass'; filt.frequency.value = 600; filt.Q.value = 3
+    const filt = this.ctx.createBiquadFilter(); filt.type = 'bandpass'; filt.frequency.value = 550; filt.Q.value = 2
     const gain = this.ctx.createGain(); gain.gain.value = 0
     osc.connect(filt); filt.connect(gain); gain.connect(this.nodes.master)
     osc.start()
     this._starter = { osc, gain }
   }
 
-  /** short filtered-noise burst for gear/flap clunks etc. */
   _clunk(freq = 180, dur = 0.12, gain = 0.5) {
     if (!this.ctx) return
     const t = this.ctx.currentTime
@@ -115,79 +145,83 @@ export class FlightAudio {
     n.start(t); n.stop(t + dur)
   }
 
-  /** short two-tone chirp for warnings (overspeed / stall). */
   _warn(freq = 700) {
     if (!this.ctx || this.ctx.currentTime < this._warnUntil) return
     this._warnUntil = this.ctx.currentTime + 0.5
     const t = this.ctx.currentTime
     const o = this.ctx.createOscillator(); o.type = 'square'; o.frequency.value = freq
     const g = this.ctx.createGain(); g.gain.setValueAtTime(0.0, t)
-    g.gain.linearRampToValueAtTime(0.25, t + 0.02); g.gain.linearRampToValueAtTime(0.0, t + 0.18)
+    g.gain.linearRampToValueAtTime(0.22, t + 0.02); g.gain.linearRampToValueAtTime(0.0, t + 0.18)
     o.connect(g); g.connect(this.nodes.fxGain); o.start(t); o.stop(t + 0.2)
   }
 
-  /**
-   * Push live sim values every frame. `out` is the model's readout, `state` the
-   * sim state. Cheap: just sets a few AudioParam targets + fires transients.
-   */
   update(state, out) {
     if (!this.on || !this.ctx) return
     const n = this.nodes
     const t = this.ctx.currentTime
     const smooth = (param, val, tc = 0.08) => param.setTargetAtTime(val, t, tc)
 
-    // --- engine start: starter whine while cranking + a light-off whoomph ---
-    // an engine "cranks" when its master is on, fuel is flowing, but it hasn't
-    // yet self-sustained (started=false). Detect the light-off transition to
-    // fire a one-shot ignition transient.
+    // --- engine start: starter whine while cranking + light-off whoomph ---
     const cranking =
       (state.eng1Master && state.fuelPump1 && !state.eng1Started && (state.eng1N1 || 0) > 0.01) ||
       (state.eng2Master && state.fuelPump2 && !state.eng2Started && (state.eng2N1 || 0) > 0.01)
     if (cranking) {
-      // rising starter whine: pitch climbs with the cranking N1 of the lit engine
       const crankN1 = Math.max(state.eng1N1 || 0, state.eng2N1 || 0)
-      const wHz = 220 + crankN1 * 900
+      const wHz = 200 + crankN1 * 700
       if (!this._starter) this._startStarter()
       if (this._starter) {
         this._starter.osc.frequency.setTargetAtTime(wHz, t, 0.15)
-        this._starter.gain.gain.setTargetAtTime(0.06, t, 0.2)
+        this._starter.gain.gain.setTargetAtTime(0.05, t, 0.2)
       }
     } else if (this._starter) {
       this._starter.gain.gain.setTargetAtTime(0, t, 0.25)
     }
-    // light-off: either engine flips started false→true
     const bothStarted = !!state.eng1Started + !!state.eng2Started
-    if (bothStarted > (this._prevStarted ?? bothStarted)) this._clunk(90, 0.4, 0.5) // combustor whoomph
+    if (bothStarted > (this._prevStarted ?? bothStarted)) this._clunk(80, 0.45, 0.5) // combustor whoomph
     this._prevStarted = bothStarted
 
-    // engine N1 fraction (0..1), averaged across engines
+    // engine N1 fraction (0..1+), averaged across engines
     const n1 = out ? Math.max(0, Math.min(1.1, out.n1 / 100)) : 0
-    // fan whine pitch: idle ~90 Hz → ~380 Hz at full
-    const fanHz = 90 + n1 * 290
-    smooth(n.fanA.frequency, fanHz)
-    smooth(n.fanB.frequency, fanHz * 1.02)
-    smooth(n.fanFilter.frequency, 700 + n1 * 2600)
-    smooth(n.fanGain.gain, 0.03 + n1 * 0.16)
-    // core rumble grows with N1
-    smooth(n.core.frequency, 42 + n1 * 26)
-    smooth(n.coreGain.gain, 0.04 + n1 * 0.14)
-    smooth(n.coreNoiseFilter.frequency, 160 + n1 * 260)
-    smooth(n.coreNoiseGain.gain, 0.02 + n1 * 0.10)
 
-    // airflow hiss from TAS (m/s); gear + flaps add turbulent noise
+    // fan whine: blade-pass frequency climbs with N1. Both bandpass bands track
+    // it (fundamental + a harmonic shimmer); a sine partial gives tonal weight.
+    const bladeHz = 300 + n1 * 1500          // resonant centre — the whistle pitch
+    smooth(n.fanBP.frequency, bladeHz)
+    smooth(n.fanBP2.frequency, bladeHz * 2)
+    smooth(n.fanGain.gain, 0.05 + n1 * 0.22)
+    smooth(n.fan2Gain.gain, 0.02 + n1 * 0.10)
+    smooth(n.fanTone.frequency, 120 + n1 * 220)
+    smooth(n.fanToneGain.gain, 0.02 + n1 * 0.05)
+
+    // core roar
+    smooth(n.core.frequency, 40 + n1 * 24)
+    smooth(n.coreGain.gain, 0.05 + n1 * 0.16)
+    smooth(n.coreNoiseFilter.frequency, 150 + n1 * 300)
+    let coreNoiseLvl = 0.03 + n1 * 0.12
+
+    // --- environment: wind + airflow (now clearly audible) ---
     const tas = out ? out.tasKt * 0.514444 : 0
-    const q = Math.min(1, tas / 260)
-    const dirty = (state.gear ? 0.5 : 0) + (state.flap > 0 ? state.flap * 0.18 : 0) + state.speedbrake * 0.4
+    const q = Math.min(1, tas / 240)
+    const dirty = (state.gear ? 0.5 : 0) + (state.flap > 0 ? state.flap * 0.2 : 0) + (state.speedbrake || 0) * 0.4
     smooth(n.airFilter.frequency, 500 + q * 2200)
-    smooth(n.airGain.gain, q * (0.05 + dirty * 0.06))
+    smooth(n.airGain.gain, q * (0.10 + dirty * 0.10))   // ~2x the old level
 
-    // ground wheel rumble when rolling
+    // wind: driven by the actual wind field (m/s), always present outside, and a
+    // touch of gust flutter via the filter centre
+    const windMs = out?.wind ? (out.wind.spdKt || 0) * 0.514444 : 0
+    const windQ = Math.min(1, windMs / 25)
+    const gust = out?.wind?.shear ? out.wind.shear : 0
+    smooth(n.windFilter.frequency, 320 + windQ * 500 + Math.sin(t * 3) * 60 * gust, 0.2)
+    smooth(n.windGain.gain, 0.04 + windQ * 0.14 + gust * 0.06)
+
+    // ground/rolling rumble on the takeoff/landing roll
     if (state.onGround && tas > 2) {
-      smooth(n.coreNoiseGain.gain, (0.02 + n1 * 0.10) + Math.min(0.12, tas / 60 * 0.12))
+      coreNoiseLvl += Math.min(0.16, tas / 55 * 0.16)
     }
+    smooth(n.coreNoiseGain.gain, coreNoiseLvl)
 
     // transients on config change
-    if (state.gear !== this._prevGear) { this._clunk(state.gear ? 150 : 200, 0.22, 0.55); this._prevGear = state.gear }
+    if (state.gear !== this._prevGear) { this._clunk(state.gear ? 150 : 200, 0.24, 0.55); this._prevGear = state.gear }
     if (state.flap !== this._prevFlap) { this._clunk(300, 0.16, 0.4); this._prevFlap = state.flap }
 
     // warnings
