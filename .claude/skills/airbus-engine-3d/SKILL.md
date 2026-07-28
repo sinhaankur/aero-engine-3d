@@ -54,15 +54,17 @@ at `~/Library/Android/sdk`.
 - `src/sim/` — `AirfoilFlow` (2D intuition toy, NACA-4 math, stall at 15°),
   `FuelSystem` (interactive schematic), `WindTunnel` (plays the precomputed
   CFD videos from `public/media/cfd/`).
-- `worker/` — Cloudflare Worker `ada-flight-proxy`: full-globe ADS-B coverage.
-  A **cron** (every min) sweeps a 467-tile grid (250 nm each): all 31 HOT busy
-  corridors every run (low-lag) + 34 rotating COLD tiles (oceans/remote, full
-  rotation ~12 min, TTL 20 min). Merges into a **KV** snapshot (`FLIGHTS` ns);
-  user GETs read that snapshot (single KV read, ~80 ms, no upstream on the hot
-  path). Polite pacing (batch 3, 700 ms pauses) — airplanes.live rate-limits
-  bursts hard, so DON'T fan the whole grid out at once (gets ~70% rejected).
-  `/sweep` runs one step inline for warming/testing. Response is OpenSky-shaped
-  (idx 17-19 = reg/type/mach); client unchanged. Deploy needs
+- `worker/` — Cloudflare Worker `ada-flight-proxy`: ADS-B proxy, **on-demand,
+  NO cron** (the every-min cron drove KV to ~50% of the free daily tier while
+  idle, so it was removed 2026-07-28 to kill cost — re-enable by uncommenting
+  `[triggers]` in wrangler.toml). `/live` serves the `FLIGHTS` KV snapshot when
+  fresh (<45 s); when stale it sweeps only the ~31 HOT corridors and an edge
+  cache (max-age 30) collapses bursts so ~one request/window does the work —
+  cost tracks real traffic, zero while idle. A 467-tile global grid + hot/cold
+  `sweepStep` still exist for when the cron's re-enabled. airplanes.live
+  rate-limits bursts hard (250 nm cap; a full fan-out gets ~70% rejected) so
+  DON'T sweep the whole grid on the user path. Response OpenSky-shaped (idx
+  17-19 = reg/type/mach). Deploy needs
   `CLOUDFLARE_ACCOUNT_ID=3f9c8ee4978248332bdbffa957684533` (two CF accounts).
   Also serves `/weather`: a 612-point (10°) global cloud-cover grid from
   Open-Meteo (keyless), warmed into KV by the cron every 10 min so the user path
