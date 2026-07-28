@@ -64,6 +64,12 @@ at `~/Library/Android/sdk`.
   `/sweep` runs one step inline for warming/testing. Response is OpenSky-shaped
   (idx 17-19 = reg/type/mach); client unchanged. Deploy needs
   `CLOUDFLARE_ACCOUNT_ID=3f9c8ee4978248332bdbffa957684533` (two CF accounts).
+  Also serves `/weather`: a 612-point (10°) global cloud-cover grid from
+  Open-Meteo (keyless), warmed into KV by the cron every 10 min so the user path
+  is a pure KV read (no live upstream — Open-Meteo rate-limits bursts). The
+  globes' `Clouds` layer (src/live/Earth.jsx) upscales it into a drifting cloud
+  sphere. Single upstream call of ~612 points is fine; do NOT chunk it (doubles
+  rate-limit pressure) and a long single-call URL does NOT 1101.
 - `blender/` — `generate_airframe_hd.py` is the current generator (NACA-4
   wing sections, windows/doors/gear as real geometry, 60–90k tris);
   `generate_airframe.py` is the low-detail predecessor. All variant + engine
