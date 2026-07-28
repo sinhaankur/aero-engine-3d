@@ -187,6 +187,25 @@ async function sweepStep(env) {
   return states.length
 }
 
+// On-demand refresh (no cron): sweep ONLY the ~31 hot corridors — the bulk of
+// traffic — and write the snapshot. Cheap enough to run when a visitor opens
+// /live and the KV copy has gone stale. Cost then scales with real usage and is
+// zero while the site is idle.
+const SNAPSHOT_STALE_S = 45
+async function refreshHot(env) {
+  const now = Math.floor(Date.now() / 1000)
+  const mapRaw = await env.FLIGHTS.get('map')
+  const map = mapRaw ? JSON.parse(mapRaw) : {}
+  await fetchInto(HOT, map, now)
+  for (const hex of Object.keys(map)) {
+    if (now - map[hex].t > AIRCRAFT_TTL_S) delete map[hex]
+  }
+  await env.FLIGHTS.put('map', JSON.stringify(map))
+  const snap = JSON.stringify({ time: now, states: Object.values(map).map((e) => e.s) })
+  await env.FLIGHTS.put('snapshot', snap)
+  return snap
+}
+
 // ---- weather engine: a coarse global cloud-cover grid from Open-Meteo ----
 // Open-Meteo is keyless + CORS-friendly and takes many points per call, so one
 // request fetches a 10°×10° grid (~612 points) of live cloud cover. Clouds move
@@ -267,15 +286,28 @@ export default {
       }
     }
 
-    const snap = await env.FLIGHTS.get('snapshot')
-    if (!snap) {
-      // cold KV (first deploy, before the first cron): do one inline step so the
-      // very first visitor still gets data instead of an empty map
-      const n = await sweepStep(env)
-      const fresh = await env.FLIGHTS.get('snapshot')
-      return withCache(json(JSON.parse(fresh || `{"time":${Math.floor(Date.now()/1000)},"states":[]}`)), n)
+    // Live flights, on demand (no cron). Serve the KV snapshot if it's fresh;
+    // if it's stale/missing, refresh just the hot corridors. The edge cache
+    // (max-age 30) collapses bursts so only ~one request per window ever does
+    // the refresh — cost tracks real traffic and is zero while idle.
+    const edge = caches.default
+    const edgeKey = new Request('https://flight-proxy.internal/live-v2', { method: 'GET' })
+    const hit = await edge.match(edgeKey)
+    if (hit) return withCors(hit)
+
+    let snap = await env.FLIGHTS.get('snapshot')
+    let fresh = false
+    if (snap) {
+      try { fresh = Math.floor(Date.now() / 1000) - (JSON.parse(snap).time || 0) < SNAPSHOT_STALE_S } catch { fresh = false }
     }
-    return withCache(new Response(snap, { headers: { 'Content-Type': 'application/json', ...CORS } }))
+    if (!fresh) {
+      try { snap = await refreshHot(env) } catch { /* keep whatever we had */ }
+    }
+    const body = snap || `{"time":${Math.floor(Date.now() / 1000)},"states":[]}`
+    const res = json(JSON.parse(body))
+    res.headers.set('Cache-Control', 'public, max-age=30')
+    ctx.waitUntil(edge.put(edgeKey, res.clone()))
+    return res
   },
 }
 
