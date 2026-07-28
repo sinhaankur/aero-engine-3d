@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Html } from '@react-three/drei'
+import { OrbitControls, Html } from '@react-three/drei'
+import { useGLTF } from './gltf.js'
 import * as THREE from 'three'
 import CanvasFallback from './CanvasFallback.jsx'
 

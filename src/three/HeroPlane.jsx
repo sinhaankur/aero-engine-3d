@@ -1,6 +1,7 @@
 import { Suspense, useMemo, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Stage, useGLTF, Html, Float } from '@react-three/drei'
+import { Stage, Html, Float } from '@react-three/drei'
+import { useGLTF } from './gltf.js'
 import CanvasFallback from './CanvasFallback.jsx'
 import { collectParts, updateParts, demoSchedule } from './modelAnim.js'
 

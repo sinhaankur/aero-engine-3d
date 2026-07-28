@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useGLTF, Html, Environment, Lightformer } from '@react-three/drei'
+import { Html, Environment, Lightformer } from '@react-three/drei'
+import { useGLTF } from './gltf.js'
 import * as THREE from 'three'
 import CanvasFallback from './CanvasFallback.jsx'
 import { stepFlight, autoflight } from '../sim/flight/model.js'

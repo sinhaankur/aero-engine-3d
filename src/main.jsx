@@ -1,27 +1,35 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import ReactDOM from 'react-dom/client'
 import { createHashRouter, RouterProvider } from 'react-router-dom'
-import { useGLTF } from '@react-three/drei'
 import App from './App.jsx'
-import Home from './pages/Home.jsx'
-import FamilyPage from './pages/FamilyPage.jsx'
-import AircraftPage from './pages/AircraftPage.jsx'
-import EnginePage from './pages/EnginePage.jsx'
-import SystemsPage from './pages/SystemsPage.jsx'
-import LiveMapPage from './pages/LiveMapPage.jsx'
-import SimulatePage from './pages/SimulatePage.jsx'
-import ComparePage from './pages/ComparePage.jsx'
-import ProjectorPage from './pages/ProjectorPage.jsx'
-import FlyPage from './pages/FlyPage.jsx'
-import RoutesPage from './pages/RoutesPage.jsx'
-import ComponentsPage from './pages/ComponentsPage.jsx'
+import Home from './pages/Home.jsx'   // landing page — eager for instant first paint
 import './styles/global.css'
 
-// All aircraft/engine GLBs are Draco-compressed geometry (~80% smaller). Point
-// every useGLTF at the decoder we vendor in public/draco/ — self-hosted, not the
-// gstatic CDN drei defaults to, so models decode offline (projector) and don't
-// depend on a third party. Path respects the Vite base (/aero-engine-3d/).
-useGLTF.setDecoderPath(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/draco/`)
+// Every other page is code-split so the initial load only pulls Home + shared
+// chrome, not all 12 pages. Each becomes its own chunk fetched on navigation.
+const FamilyPage = lazy(() => import('./pages/FamilyPage.jsx'))
+const AircraftPage = lazy(() => import('./pages/AircraftPage.jsx'))
+const EnginePage = lazy(() => import('./pages/EnginePage.jsx'))
+const SystemsPage = lazy(() => import('./pages/SystemsPage.jsx'))
+const LiveMapPage = lazy(() => import('./pages/LiveMapPage.jsx'))
+const SimulatePage = lazy(() => import('./pages/SimulatePage.jsx'))
+const ComparePage = lazy(() => import('./pages/ComparePage.jsx'))
+const ProjectorPage = lazy(() => import('./pages/ProjectorPage.jsx'))
+const FlyPage = lazy(() => import('./pages/FlyPage.jsx'))
+const RoutesPage = lazy(() => import('./pages/RoutesPage.jsx'))
+const ComponentsPage = lazy(() => import('./pages/ComponentsPage.jsx'))
+
+// wrap a lazy page element in a Suspense boundary with a lightweight fallback
+const L = (El) => (
+  <Suspense fallback={<div className="viewport-loading" style={{ minHeight: '60vh' }}>Loading…</div>}>
+    {El}
+  </Suspense>
+)
+
+// The Draco decoder path (useGLTF.setDecoderPath) is configured lazily inside
+// the 3D layer, NOT here — importing drei at the app entry would drag the whole
+// ~1.2 MB three+drei bundle into the initial load for every visitor, even those
+// who never open a 3D view.
 
 const router = createHashRouter([
   {
@@ -29,18 +37,18 @@ const router = createHashRouter([
     element: <App />,
     children: [
       { index: true, element: <Home /> },
-      { path: 'live', element: <LiveMapPage /> },
-      { path: 'simulate', element: <SimulatePage /> },
-      { path: 'fly', element: <FlyPage /> },
-      { path: 'routes', element: <RoutesPage /> },
-      { path: 'components', element: <ComponentsPage /> },
-      { path: 'compare', element: <ComparePage /> },
-      { path: 'systems', element: <SystemsPage /> },
-      { path: 'systems/:systemId', element: <SystemsPage /> },
-      { path: 'projector', element: <ProjectorPage /> },
-      { path: 'engine/:engineId', element: <EnginePage /> },
-      { path: 'family/:familyId', element: <FamilyPage /> },
-      { path: 'family/:familyId/:aircraftId', element: <AircraftPage /> },
+      { path: 'live', element: L(<LiveMapPage />) },
+      { path: 'simulate', element: L(<SimulatePage />) },
+      { path: 'fly', element: L(<FlyPage />) },
+      { path: 'routes', element: L(<RoutesPage />) },
+      { path: 'components', element: L(<ComponentsPage />) },
+      { path: 'compare', element: L(<ComparePage />) },
+      { path: 'systems', element: L(<SystemsPage />) },
+      { path: 'systems/:systemId', element: L(<SystemsPage />) },
+      { path: 'projector', element: L(<ProjectorPage />) },
+      { path: 'engine/:engineId', element: L(<EnginePage />) },
+      { path: 'family/:familyId', element: L(<FamilyPage />) },
+      { path: 'family/:familyId/:aircraftId', element: L(<AircraftPage />) },
     ],
   },
 ])
