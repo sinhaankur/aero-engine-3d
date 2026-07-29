@@ -187,22 +187,22 @@ async function sweepStep(env) {
   return states.length
 }
 
-// On-demand refresh (no cron): sweep ONLY the ~31 hot corridors — the bulk of
-// traffic — and write the snapshot. Cheap enough to run when a visitor opens
-// /live and the KV copy has gone stale. Cost then scales with real usage and is
-// zero while the site is idle.
-const SNAPSHOT_STALE_S = 45
+// On-demand refresh (no cron). The KV FREE tier allows only ~1,000 WRITES/day,
+// so writes are the scarce resource — reads are cheap by comparison. We minimise
+// writes hard:
+//   • the aircraft map is rebuilt fresh from the hot tiles each time (no map
+//     read, no map write — one fewer write than before);
+//   • the snapshot is only refreshed when it's older than SNAPSHOT_STALE_S, so
+//     no matter how many people poll, KV is written at most ~once/window.
+// With a 120 s window that's ≤ ~720 writes/day even under constant traffic,
+// safely inside the free tier, and zero while idle.
+const SNAPSHOT_STALE_S = 120
 async function refreshHot(env) {
   const now = Math.floor(Date.now() / 1000)
-  const mapRaw = await env.FLIGHTS.get('map')
-  const map = mapRaw ? JSON.parse(mapRaw) : {}
+  const map = {}
   await fetchInto(HOT, map, now)
-  for (const hex of Object.keys(map)) {
-    if (now - map[hex].t > AIRCRAFT_TTL_S) delete map[hex]
-  }
-  await env.FLIGHTS.put('map', JSON.stringify(map))
   const snap = JSON.stringify({ time: now, states: Object.values(map).map((e) => e.s) })
-  await env.FLIGHTS.put('snapshot', snap)
+  await env.FLIGHTS.put('snapshot', snap)   // the ONLY write on the read path
   return snap
 }
 
@@ -271,27 +271,35 @@ export default {
       return json({ swept: true, aircraft: n })
     }
 
-    // global cloud-cover grid — served straight from KV (the cron keeps it warm,
-    // so the user path never makes an upstream call). Cold KV falls back to a
-    // one-time inline fetch so the first visitor still gets clouds.
+    // global cloud-cover grid, on demand. Clouds move slowly, so we only refetch
+    // (and write KV) when the cached grid is older than WX_TTL_S — a KV write at
+    // most ~once/window no matter the traffic, and an edge cache in front so most
+    // requests never even read KV.
     if (url.pathname === '/weather') {
-      const cached = await env.FLIGHTS.get('weather')
-      if (cached) return withCache(new Response(cached, { headers: { 'Content-Type': 'application/json', ...CORS } }))
-      try {
-        const grid = await fetchWeather()
-        await env.FLIGHTS.put('weather', JSON.stringify(grid))
-        return withCache(json(grid))
-      } catch (e) {
-        return json({ error: 'weather warming up', detail: String(e).slice(0, 120) }, 503)
+      const wxEdge = caches.default
+      const wxKey = new Request('https://flight-proxy.internal/weather-c', { method: 'GET' })
+      const wxHit = await wxEdge.match(wxKey)
+      if (wxHit) return withCors(wxHit)
+
+      let cached = await env.FLIGHTS.get('weather')
+      let wxFresh = false
+      if (cached) { try { wxFresh = Math.floor(Date.now() / 1000) - (JSON.parse(cached).time || 0) < WX_TTL_S } catch { wxFresh = false } }
+      if (!wxFresh) {
+        try { const grid = await fetchWeather(); cached = JSON.stringify(grid); await env.FLIGHTS.put('weather', cached) }
+        catch (e) { if (!cached) return json({ error: 'weather warming up', detail: String(e).slice(0, 120) }, 503) }
       }
+      const res = new Response(cached, { headers: { 'Content-Type': 'application/json', ...CORS } })
+      res.headers.set('Cache-Control', `public, max-age=${WX_TTL_S}`)
+      ctx.waitUntil(wxEdge.put(wxKey, res.clone()))
+      return res
     }
 
     // Live flights, on demand (no cron). Serve the KV snapshot if it's fresh;
     // if it's stale/missing, refresh just the hot corridors. The edge cache
-    // (max-age 30) collapses bursts so only ~one request per window ever does
-    // the refresh — cost tracks real traffic and is zero while idle.
+    // (max-age 120) collapses bursts so only ~one request per window ever
+    // reaches KV — cost tracks real traffic and is zero while idle.
     const edge = caches.default
-    const edgeKey = new Request('https://flight-proxy.internal/live-v2', { method: 'GET' })
+    const edgeKey = new Request('https://flight-proxy.internal/live-v3', { method: 'GET' })
     const hit = await edge.match(edgeKey)
     if (hit) return withCors(hit)
 
@@ -305,7 +313,7 @@ export default {
     }
     const body = snap || `{"time":${Math.floor(Date.now() / 1000)},"states":[]}`
     const res = json(JSON.parse(body))
-    res.headers.set('Cache-Control', 'public, max-age=30')
+    res.headers.set('Cache-Control', 'public, max-age=120')
     ctx.waitUntil(edge.put(edgeKey, res.clone()))
     return res
   },

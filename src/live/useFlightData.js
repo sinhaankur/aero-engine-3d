@@ -41,7 +41,7 @@ const TRACK_STALE_S = 180    // drop tracks for aircraft not seen in 3 minutes
  *   tracks: Map<icao24, [lat, lon, altM][]> — position history accumulated
  *   across polls this session, for drawing flight paths.
  */
-export function useFlightData({ intervalMs = 15000 } = {}) {
+export function useFlightData({ intervalMs = 60000 } = {}) {
   const [flights, setFlights] = useState([])
   const [time, setTime] = useState(null)
   const [status, setStatus] = useState(PROXY ? 'loading' : 'unconfigured')
