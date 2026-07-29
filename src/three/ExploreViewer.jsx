@@ -264,7 +264,14 @@ function CameraRig({ mode, L, H0, controlsRef }) {
 
 function ExploreScene({ modelUrl, dims, cut, xray, labels, view, controlsRef }) {
   const { scene } = useGLTF(withBase(modelUrl))
-  const cloned = useMemo(() => scene.clone(true), [scene])
+  const cloned = useMemo(() => {
+    const c = scene.clone(true)
+    // The GLB now ships its own simple cabin (Cabin_*). Explore has a RICHER
+    // procedural interior (cargo, tanks, bays, APU, clickable labels), so hide
+    // the GLB cabin here to avoid two overlapping sets of seats.
+    c.traverse((o) => { if (o.isMesh && o.name.startsWith('Cabin')) o.visible = false })
+    return c
+  }, [scene])
 
   // world-space clipping plane: keeps z <= constant, cutting the near half open
   const clipPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, -1), 1000), [])
