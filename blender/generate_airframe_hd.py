@@ -124,6 +124,10 @@ def make_materials(spec):
         "tyre": mat("HD_Tyre", (0.04, 0.04, 0.05, 1), 0.1, 0.85),
         "hub": mat("HD_Hub", (0.60, 0.62, 0.65, 1), 0.85, 0.30),
         "antenna": mat("HD_Antenna", (0.18, 0.20, 0.24, 1), 0.4, 0.5),
+        # cabin interior
+        "cabin_floor": mat("HD_CabinFloor", (0.20, 0.21, 0.24, 1), 0.0, 0.9),
+        "cabin_wall": mat("HD_CabinWall", (0.82, 0.83, 0.85, 1), 0.0, 0.6),
+        "seat": mat("HD_Seat", (0.12, 0.28, 0.62, 1), 0.0, 0.75),
     }
 
 
@@ -149,6 +153,24 @@ def obj_from_bm(bm, name, material, smooth=True):
     bm.free()
     assign(ob, material)
     shade_smooth(ob, smooth)
+    return ob
+
+
+def add_subsurf(ob, levels=1, apply=True):
+    """Smooth an object with a Subdivision Surface modifier — the main lever for
+    high-detail curved surfaces (fuselage/wings/nacelles read smooth instead of
+    faceted). Applied by default so the extra geometry bakes into the exported
+    GLB; skip apply for parts that must keep their control-cage vertex names."""
+    if levels <= 0:
+        return ob
+    m = ob.modifiers.new(name="Subsurf", type="SUBSURF")
+    m.levels = levels
+    m.render_levels = levels
+    # Catmull-Clark; keep the boundary tidy so wing edges/TE stay crisp
+    m.use_limit_surface = True
+    if apply:
+        bpy.context.view_layer.objects.active = ob
+        bpy.ops.object.modifier_apply(modifier=m.name)
     return ob
 
 
@@ -877,6 +899,82 @@ def build_gear_and_details(spec, materials, fuse):
 
 
 # --------------------------------------------------------------------------- #
+# cabin interior (floor, seats, sidewalls) — visible in cutaway / explore views
+# --------------------------------------------------------------------------- #
+def _abreast(dia):
+    """Seats-per-row groups by fuselage diameter (matches the site's layout)."""
+    if dia <= 3.2:
+        return [2, 2]
+    if dia <= 4.3:
+        return [3, 3]
+    if dia <= 5.8:
+        return [2, 4, 2]
+    return [3, 4, 3]
+
+
+def build_cabin(spec, materials, fuse):
+    """Procedural cabin: a floor deck, two sidewalls, and instanced seat rows,
+    sized from the variant's real diameter/length. Sits inside the hull so the
+    cutaway/explore view reads as a real cabin. Kept as its own named objects."""
+    L = spec["length"]
+    R = spec["fuse_dia"] / 2.0
+    x_nose_end = fuse["x_nose_end"]
+    x_tail_start = fuse["x_tail_start"]
+    floor_y = -R * 0.30
+    cabin_from = x_nose_end + L * 0.03
+    cabin_to = x_tail_start - L * 0.03
+    length = cabin_to - cabin_from
+    objs = []
+
+    # ---- floor deck ----
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    ob = obj_from_bm(bm, "Cabin_Floor", materials["cabin_floor"], smooth=False)
+    ob.scale = (length / 2, 0.06, R * 0.9)
+    ob.location = ((cabin_from + cabin_to) / 2, floor_y, 0)
+    objs.append(ob)
+
+    # ---- seats: one instanced-ish block set, laid out in rows/abreast ----
+    groups = _abreast(spec["fuse_dia"])
+    seat_w, aisle_w, pitch = 0.5, 0.5, 0.82
+    total_w = sum(g * seat_w for g in groups) + (len(groups) - 1) * aisle_w
+    rows = max(4, int(length / pitch))
+    seat_mat = materials["seat"]
+    # build one seat mesh, then duplicate via a combined bmesh for a single object
+    bm = bmesh.new()
+    for r in range(rows):
+        x = cabin_from + r * pitch + pitch * 0.5
+        z = -total_w / 2
+        for g in groups:
+            for _s in range(g):
+                # seat base + backrest as two little boxes
+                for (cx, cy, cz, sx, sy, sz) in (
+                    (x, floor_y + 0.28, z + seat_w / 2, 0.5, 0.12, seat_w * 0.9),      # cushion
+                    (x - 0.22, floor_y + 0.55, z + seat_w / 2, 0.1, 0.5, seat_w * 0.9)):  # back
+                    cube = bmesh.ops.create_cube(bm, size=1.0)["verts"]
+                    for v in cube:
+                        v.co.x = v.co.x * sx + cx
+                        v.co.y = v.co.y * sy + cy
+                        v.co.z = v.co.z * sz + cz
+                z += seat_w
+            z += aisle_w
+    ob = obj_from_bm(bm, "Cabin_Seats", seat_mat, smooth=False)
+    objs.append(ob)
+
+    # ---- cabin sidewalls (thin curved-ish panels along the deck) ----
+    for side in (-1, 1):
+        bm = bmesh.new()
+        bmesh.ops.create_cube(bm, size=1.0)
+        w = obj_from_bm(bm, f"Cabin_Wall_{'R' if side > 0 else 'L'}",
+                        materials["cabin_wall"], smooth=False)
+        w.scale = (length / 2, R * 0.55, 0.05)
+        w.location = ((cabin_from + cabin_to) / 2, floor_y + R * 0.45, side * R * 0.82)
+        objs.append(w)
+
+    return objs
+
+
+# --------------------------------------------------------------------------- #
 # assemble + export
 # --------------------------------------------------------------------------- #
 def build_aircraft(spec, outdir):
@@ -886,15 +984,32 @@ def build_aircraft(spec, outdir):
     all_objs = []
     fuse_ob, fuse = build_fuselage(spec, materials)
     all_objs.append(fuse_ob)
+    wing_objs = []
     for side in (-1, 1):
-        all_objs += build_wing(spec, materials, side, fuse)
+        wing_objs += build_wing(spec, materials, side, fuse)
+    all_objs += wing_objs
     all_objs += build_tail(spec, materials, fuse)
     ec = spec.get("engine_count", 2)
+    nacelles = []
     for side in (-1, 1):
         for idx in range(ec // 2):
-            all_objs += build_engine(spec, materials, side, idx, fuse)
+            parts = build_engine(spec, materials, side, idx, fuse)
+            nacelles += [p for p in parts if p.name.startswith("Nacelle")]
+            all_objs += parts
+    cabin_objs = build_cabin(spec, materials, fuse)
+    all_objs += cabin_objs
     all_objs += build_windows_doors(spec, materials, fuse)
     all_objs += build_gear_and_details(spec, materials, fuse)
+
+    # ---- high-detail smoothing: subdivide the big curved surfaces so the
+    # silhouette reads smooth, not faceted. Wings keep sharp trailing edges via
+    # the limit surface; the fuselage gets one level (already high-res). ----
+    add_subsurf(fuse_ob, levels=1)
+    for w in wing_objs:
+        if w.name.startswith("Wing"):
+            add_subsurf(w, levels=1)
+    for nac in nacelles:
+        add_subsurf(nac, levels=1)
 
     bpy.ops.object.select_all(action="DESELECT")
     for o in all_objs:
