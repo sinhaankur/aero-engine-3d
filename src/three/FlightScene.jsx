@@ -992,6 +992,49 @@ function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 15000
   )
 }
 
+/**
+ * Sun disc + glare. A soft additive billboard placed far along the sun direction
+ * so it sits in the sky where the physical <Sky> puts its sun, blooming when you
+ * look toward it — the airline-window "sun in your eyes" cue. Two stacked halos
+ * (tight core + wide bloom) fake the flare; a subtle screen-wide wash brightens
+ * as the camera aims at the sun. Cosmetic only; fixed sprites, no per-pixel cost.
+ */
+function SunGlare({ sunDir, tint, strength = 1 }) {
+  const grpRef = useRef()
+  const coreRef = useRef()
+  const bloomRef = useRef()
+  const { camera } = useThree()
+  const fwd = useMemo(() => new THREE.Vector3(), [])
+  const pos = useMemo(() => sunDir.clone().multiplyScalar(70000), [sunDir])
+  useFrame(() => {
+    // keep the sun locked in the sky relative to the camera (it's effectively at
+    // infinity), so it stays put as you fly and only leaves frame as you turn
+    if (grpRef.current) grpRef.current.position.set(
+      camera.position.x + pos.x, camera.position.y + pos.y, camera.position.z + pos.z,
+    )
+    // bloom harder the more directly the camera faces the sun
+    camera.getWorldDirection(fwd)
+    const facing = Math.max(0, fwd.dot(sunDir))
+    const glow = Math.pow(facing, 3)
+    if (coreRef.current) coreRef.current.material.opacity = (0.6 + 0.4 * glow) * strength
+    if (bloomRef.current) {
+      bloomRef.current.material.opacity = (0.15 + 0.45 * glow) * strength
+      const s = 22000 * (1 + glow * 0.8)
+      bloomRef.current.scale.set(s, s, 1)
+    }
+  })
+  return (
+    <group ref={grpRef}>
+      <sprite ref={coreRef} scale={[8000, 8000, 1]}>
+        <spriteMaterial map={softSprite()} color={tint} transparent opacity={0.9 * strength} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </sprite>
+      <sprite ref={bloomRef} scale={[22000, 22000, 1]}>
+        <spriteMaterial map={softSprite()} color={tint} transparent opacity={0.35 * strength} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </sprite>
+    </group>
+  )
+}
+
 export default function FlightScene({ simRef, modelUrl, dims, weather, view, runwayHalfLen = 1600, airport }) {
   const sky = SKIES[weather.sky] || SKIES.day
   const groundTex = useGroundTexture(weather.sky)
@@ -1014,6 +1057,7 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
         camera={{ position: [150, 40, 1700], fov: 45, near: 0.5, far: 90000 }}
       >
         <FlightSky sky={sky} simRef={simRef} />
+        {!night && <SunGlare sunDir={sunDir} tint={sky.sunTint} strength={sky.sun / 1.5} />}
         <CloudDeck skyId={weather.sky} simRef={simRef} />
         <Atmosphere simRef={simRef} baseColor={sky.bg} visM={visM} />
         <hemisphereLight intensity={sky.hemi} color="#dfe9f2" groundColor="#3a4450" />
@@ -1040,13 +1084,6 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
           <Lightformer intensity={0.3} color={sky.ground} form="rect" scale={[24, 24, 1]} position={[0, -10, 0]} rotation={[-Math.PI / 2, 0, 0]} />
         </Environment>
 
-        {/* horizon fill: a big tinted plane well below, so beyond the real-Earth
-            tile the ground still reads as land/sea to the horizon instead of a
-            hard edge into the sky */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.2, 0]}>
-          <planeGeometry args={[400000, 400000]} />
-          <meshStandardMaterial color={sky.ground} roughness={1} />
-        </mesh>
         {/* real NASA Blue Marble terrain around the departure field; falls back to
             the procedural field texture while the KTX2 loads (or if it fails) */}
         <Suspense fallback={
