@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { getFamily, getAircraft, getEngine } from './data/index.js'
+import { TECH_STACK } from './data/techStack.js'
 import { hardReload } from './lib/hardReload.js'
 
 const BASE_TITLE = 'Aircraft Design Archive'
@@ -205,6 +206,30 @@ export default function App() {
             <Link to="/family/a320">A320</Link>
             <Link to="/family/a350">A350</Link>
             <Link to="/family/a380">A380</Link>
+          </div>
+        </div>
+        {/* Colophon: the site is itself an engineering artefact, so we're open
+            about how it's built — the same transparency the /components DB gives
+            for the aircraft. */}
+        <div className="tech-stack">
+          <div className="tech-stack-head">
+            <span className="hash">//</span> Built with
+            <span className="tech-stack-note">open tools + public data</span>
+          </div>
+          <div className="tech-stack-grid">
+            {TECH_STACK.map((col) => (
+              <div key={col.group} className="tech-stack-col">
+                <h5>{col.group}</h5>
+                <ul>
+                  {col.items.map((it) => (
+                    <li key={it.name}>
+                      <a href={it.url} target="_blank" rel="noreferrer noopener">{it.name}</a>
+                      <span>{it.role}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
         <div className="footer-fine">

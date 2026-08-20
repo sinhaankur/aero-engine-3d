@@ -13,3 +13,7 @@ dist
 # local env (e.g. VITE_FLIGHT_API pointing at a dev worker)
 .env.local
 .env
+
+# Python bytecode cache
+__pycache__/
+*.pyc

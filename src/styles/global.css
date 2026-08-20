@@ -314,6 +314,30 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .footer-fine { padding-top: 18px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; line-height: 1.6; max-width: 80ch; }
 @media (max-width: 680px) { .footer-cols { grid-template-columns: 1fr 1fr; } .footer-brand { grid-column: 1 / -1; } }
 
+/* colophon / tech stack — the site's own "built with", styled like the index
+   section heads. Four columns of credited tools; each tool links out. */
+.tech-stack { margin: 4px 0 28px; padding-top: 24px; border-top: 1px solid var(--border); }
+.tech-stack-head {
+  display: flex; align-items: baseline; gap: 10px;
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink);
+  margin-bottom: 16px;
+}
+.tech-stack-head .hash { color: var(--accent); }
+.tech-stack-note { color: var(--faint); text-transform: none; letter-spacing: 0.02em; font-size: 11.5px; }
+.tech-stack-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.tech-stack-col h5 {
+  margin: 0 0 10px; font-size: 10.5px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
+  padding-bottom: 7px; border-bottom: 1px solid var(--border);
+}
+.tech-stack-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.tech-stack-col li { display: flex; flex-direction: column; gap: 1px; }
+.tech-stack-col li a { font-size: 13px; color: var(--ink); letter-spacing: 0.01em; }
+.tech-stack-col li a:hover { color: var(--accent); }
+.tech-stack-col li span { font-size: 11px; color: var(--faint); }
+@media (max-width: 760px) { .tech-stack-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 420px) { .tech-stack-grid { grid-template-columns: 1fr; } }
+
 /* ================================================================== */
 /* TERMINAL INDEX — the numbered catalog (tol.is-inspired, elevated)   */
 /* ================================================================== */
