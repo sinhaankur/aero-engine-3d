@@ -124,6 +124,23 @@ function useGroundTexture(skyId) {
   }, [skyId])
 }
 
+// A soft radial-gradient sprite, reused for smoke puffs (round, feathered edge).
+let _softSprite = null
+function softSprite() {
+  if (_softSprite) return _softSprite
+  const c = document.createElement('canvas')
+  c.width = c.height = 64
+  const g = c.getContext('2d')
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32)
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)')
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.35)')
+  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 64, 64)
+  _softSprite = new THREE.CanvasTexture(c)
+  return _softSprite
+}
+
 // Shared markings material so the many white boxes batch under one material.
 const paintMat = new THREE.MeshStandardMaterial({ color: '#d7dde3', roughness: 0.8 })
 const asphaltMat = new THREE.MeshStandardMaterial({ color: '#21252b', roughness: 0.96 })
@@ -765,6 +782,113 @@ function Rain({ count = 2500 }) {
   )
 }
 
+/**
+ * Wingtip contrails. Real contrails form when the air is cold and moist enough
+ * (roughly above ~8 km / below ~−40 °C). We emit a fading line of points from
+ * each wingtip in WORLD space: each frame the newest point is placed at the
+ * current wingtip and the buffer scrolls, so the trail hangs in the sky behind
+ * the jet and slowly fades + widens. Purely cosmetic; costs one points draw.
+ */
+const CONTRAIL_LEN = 220 // points per wingtip
+
+function Contrails({ simRef, dims }) {
+  const ref = useRef()
+  const geom = useRef()
+  const positions = useMemo(() => new Float32Array(CONTRAIL_LEN * 2 * 3), [])
+  const alphas = useMemo(() => new Float32Array(CONTRAIL_LEN * 2), [])
+  const head = useRef(0)
+  const tmpL = useMemo(() => new THREE.Vector3(), [])
+  const tmpR = useMemo(() => new THREE.Vector3(), [])
+
+  useFrame((_, dt) => {
+    const s = simRef.current?.state
+    if (!s || !geom.current) return
+    const altFt = s.h / 0.3048
+    // form only up high & cold, and only when actually moving forward
+    const forming = altFt > 26000 && s.v > 80 && !s.onGround
+    // half-span offset, in world space, perpendicular to heading
+    const halfSpan = (dims?.wingspanM || 34) / 2
+    const cosP = Math.cos(s.psi), sinP = Math.sin(s.psi)
+    // right vector (perpendicular to the −z heading) = (cosψ, 0, sinψ)
+    const wx = cosP * halfSpan, wz = sinP * halfSpan
+    const yWing = s.h + (simRef.current?.groundClear || 2) * 0.4
+
+    if (forming) {
+      const i = head.current
+      tmpL.set(s.x - wx, yWing, s.z - wz)
+      tmpR.set(s.x + wx, yWing, s.z + wz)
+      positions[i * 6 + 0] = tmpL.x; positions[i * 6 + 1] = tmpL.y; positions[i * 6 + 2] = tmpL.z
+      positions[i * 6 + 3] = tmpR.x; positions[i * 6 + 4] = tmpR.y; positions[i * 6 + 5] = tmpR.z
+      alphas[i * 2] = 1; alphas[i * 2 + 1] = 1
+      head.current = (i + 1) % CONTRAIL_LEN
+    }
+    // fade every point a little each frame (older = fainter), scaled by dt
+    const fade = Math.pow(0.5, dt / 6) // ~6 s half-life
+    for (let k = 0; k < alphas.length; k++) alphas[k] *= fade
+    geom.current.attributes.position.needsUpdate = true
+    geom.current.attributes.alpha.needsUpdate = true
+  })
+
+  return (
+    <points ref={ref} frustumCulled={false}>
+      <bufferGeometry ref={geom}>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-alpha" args={[alphas, 1]} />
+      </bufferGeometry>
+      {/* size-attenuated soft white points; the custom alpha attribute fades the
+          tail. onBeforeCompile injects the per-point alpha into the fragment. */}
+      <pointsMaterial
+        color="#eef4ff" size={7} sizeAttenuation transparent depthWrite={false}
+        opacity={0.5} blending={THREE.AdditiveBlending}
+        onBeforeCompile={(sh) => {
+          sh.vertexShader = 'attribute float alpha;\nvarying float vA;\n' +
+            sh.vertexShader.replace('void main() {', 'void main() {\n  vA = alpha;')
+          sh.fragmentShader = 'varying float vA;\n' +
+            sh.fragmentShader.replace('vec4( diffuse, opacity )', 'vec4( diffuse, opacity * vA )')
+        }}
+      />
+    </points>
+  )
+}
+
+/**
+ * Touchdown puffs: a short burst of grey smoke from the main gear the instant
+ * the wheels kiss the runway (and a lighter puff on a hard landing). Watches the
+ * sim for the ground-contact transition and spawns an expanding, fading sprite.
+ */
+function TouchdownSmoke({ simRef }) {
+  const ref = useRef()
+  const wasAir = useRef(false)
+  const puff = useRef({ t: 999, x: 0, z: 0, hard: false })
+  const mat = useMemo(() => new THREE.SpriteMaterial({
+    map: softSprite(), color: '#c9cdd3', transparent: true, opacity: 0, depthWrite: false,
+  }), [])
+
+  useFrame((_, dt) => {
+    const s = simRef.current?.state
+    if (!s || !ref.current) return
+    // detect the airborne→ground transition
+    if (wasAir.current && s.onGround) {
+      puff.current = { t: 0, x: s.x, z: s.z, hard: !!s.landedHard || Math.abs(s.touchdownVs || 0) > 400 }
+    }
+    wasAir.current = !s.onGround
+    const p = puff.current
+    p.t += dt
+    const life = 1.4
+    if (p.t < life) {
+      const k = p.t / life
+      ref.current.visible = true
+      ref.current.position.set(p.x, 0.5 + k * 6, p.z)
+      const grow = (p.hard ? 10 : 6) * (0.4 + k)
+      ref.current.scale.setScalar(grow)
+      mat.opacity = (p.hard ? 0.6 : 0.4) * (1 - k)
+    } else {
+      ref.current.visible = false
+    }
+  })
+  return <sprite ref={ref} material={mat} visible={false} />
+}
+
 export default function FlightScene({ simRef, modelUrl, dims, weather, view, runwayHalfLen = 1600, airport }) {
   const sky = SKIES[weather.sky] || SKIES.day
   const groundTex = useGroundTexture(weather.sky)
@@ -824,6 +948,8 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
           <AircraftModel url={modelUrl} simRef={simRef} groupRef={groupRef} />
         </Suspense>
         {weather.sky === 'storm' && <Rain />}
+        <Contrails simRef={simRef} dims={dims} />
+        <TouchdownSmoke simRef={simRef} />
         <Runner simRef={simRef} />
         <CameraRig simRef={simRef} groupRef={groupRef} view={view} dims={dims} />
       </Canvas>
