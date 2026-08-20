@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Html, Environment, Lightformer, Text } from '@react-three/drei'
+import { Html, Environment, Lightformer, Text, Sky, Stars, Clouds, Cloud } from '@react-three/drei'
 import { useGLTF } from './gltf.js'
 import * as THREE from 'three'
 import CanvasFallback from './CanvasFallback.jsx'
@@ -23,11 +23,29 @@ function withBase(path) {
   return import.meta.env.BASE_URL.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
 }
 
+// Each weather sky drives both the fallback background colour AND a physical
+// drei <Sky> (Preetham scattering). `elev`/`azim` place the sun in the dome;
+// `turbidity`/`rayleigh` set the haze thickness and blue depth; `mie*` the
+// sun-disc bloom. High sun + low turbidity = crisp clear day; low sun + high
+// turbidity = a heavy, golden storm/haze horizon.
 const SKIES = {
-  day: { bg: '#6fa3d8', sun: 1.5, hemi: 0.65, ground: '#22301f' },
-  haze: { bg: '#b09a6e', sun: 1.1, hemi: 0.5, ground: '#4a4228' },
-  storm: { bg: '#2e3540', sun: 0.5, hemi: 0.55, ground: '#1b221e' },
-  cold: { bg: '#a9c2d9', sun: 1.2, hemi: 0.7, ground: '#c8d3da' },
+  day:  { bg: '#6fa3d8', sun: 1.5, hemi: 0.65, ground: '#22301f', elev: 34, azim: 155, turbidity: 3.0,  rayleigh: 1.6, mieCoefficient: 0.006, mieDirectionalG: 0.85, sunTint: '#fff4e0' },
+  haze: { bg: '#b09a6e', sun: 1.1, hemi: 0.5,  ground: '#4a4228', elev: 18, azim: 200, turbidity: 9.0,  rayleigh: 2.4, mieCoefficient: 0.012, mieDirectionalG: 0.90, sunTint: '#ffdca0' },
+  storm:{ bg: '#2e3540', sun: 0.5, hemi: 0.55, ground: '#1b221e', elev: 8,  azim: 210, turbidity: 12.0, rayleigh: 3.0, mieCoefficient: 0.020, mieDirectionalG: 0.80, sunTint: '#c9d2dc' },
+  cold: { bg: '#a9c2d9', sun: 1.2, hemi: 0.7,  ground: '#c8d3da', elev: 22, azim: 130, turbidity: 4.0,  rayleigh: 2.0, mieCoefficient: 0.005, mieDirectionalG: 0.86, sunTint: '#eaf2ff' },
+}
+
+// Unit sun direction from elevation/azimuth (degrees). Elevation 0 = horizon,
+// 90 = overhead; azimuth measured clockwise from −z. Shared by the sky dome, the
+// key light and the reflection environment so every highlight agrees.
+function sunVector(elevDeg, azimDeg, out = new THREE.Vector3()) {
+  const el = elevDeg * Math.PI / 180
+  const az = azimDeg * Math.PI / 180
+  return out.set(
+    Math.cos(el) * Math.sin(az),
+    Math.sin(el),
+    -Math.cos(el) * Math.cos(az),
+  ).normalize()
 }
 
 // Land-cover palettes per weather/season. Earthlike patchwork of fields,
@@ -314,7 +332,13 @@ function Buildings() {
 
 function AircraftModel({ url, simRef, groupRef }) {
   const { scene } = useGLTF(withBase(url))
-  const cloned = useMemo(() => scene.clone(true), [scene])
+  const cloned = useMemo(() => {
+    const c = scene.clone(true)
+    // the airframe casts a shadow on the runway/terrain — the single biggest cue
+    // that the jet is really sitting on (and lifting off) the ground
+    c.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+    return c
+  }, [scene])
 
   // The GLB already carries landing gear (built by generate_airframe_hd.py).
   // The bounding-box minimum, though, is the wingtip/nacelle — lower than the
@@ -499,17 +523,172 @@ function CameraRig({ simRef, groupRef, view, dims }) {
 }
 
 /**
+ * Physical sky dome + altitude starfield. drei's <Sky> is a Preetham scattering
+ * model: a real graded blue dome with a sun disc and horizon glow, placed from
+ * the weather's sun elevation/azimuth. As you climb past the troposphere it
+ * dissolves into the deep-space background (see Atmosphere) and the stars,
+ * already there, take over — so leaving the surface reads the way it does from a
+ * real flight deck. The dome sits on a huge sphere so it's always beyond the fog.
+ */
+function FlightSky({ sky, simRef }) {
+  const skyRef = useRef()
+  const starsRef = useRef()
+  const sunPos = useMemo(() => {
+    const v = sunVector(sky.elev, sky.azim).multiplyScalar(1000)
+    return [v.x, v.y, v.z]
+  }, [sky])
+
+  useFrame(() => {
+    const h = simRef.current?.state?.h || 0
+    // The scattering dome owns the surface layer; above ~14 km there's almost no
+    // atmosphere to scatter, so hand off to the deep-space background + stars.
+    // drei's <Sky> shader has no opacity, so we fade the whole dome by shrinking
+    // it below the far plane once it's no longer wanted (a clean on/off with a
+    // little hysteresis via the height threshold).
+    if (skyRef.current) skyRef.current.visible = h < 15000
+    // Stars are always in the scene; they only read against the dark high-altitude
+    // sky, so a simple visibility gate from ~6 km up is enough and costs nothing.
+    if (starsRef.current) starsRef.current.visible = h > 6000
+  })
+
+  return (
+    <group>
+      <Sky
+        ref={skyRef}
+        distance={45000}
+        sunPosition={sunPos}
+        turbidity={sky.turbidity}
+        rayleigh={sky.rayleigh}
+        mieCoefficient={sky.mieCoefficient}
+        mieDirectionalG={sky.mieDirectionalG}
+      />
+      <Stars ref={starsRef} radius={40000} depth={8000} count={2600} factor={90} saturation={0} fade speed={0.4} />
+    </group>
+  )
+}
+
+/**
+ * A broken cloud deck you climb through. drei's <Clouds> batches every puff into
+ * one instanced draw, so a whole scattered layer is cheap. The deck sits at a
+ * realistic altitude band (denser + lower in poor weather) and re-centres on the
+ * aircraft each frame so there's always cloud around you to punch through —
+ * the single most visceral "I'm flying" cue on climb-out and descent. Skipped
+ * entirely on a crystal-clear day so the clean-sky case stays clean.
+ */
+const CLOUD_DECKS = {
+  day:  { baseM: 1400, count: 7,  opacity: 0.55, spread: 3200 },
+  haze: { baseM: 900,  count: 12, opacity: 0.7,  spread: 2600 },
+  storm:{ baseM: 500,  count: 16, opacity: 0.9,  spread: 2200 },
+  cold: { baseM: 1100, count: 9,  opacity: 0.6,  spread: 3000 },
+}
+
+function CloudDeck({ skyId, simRef }) {
+  const cfg = CLOUD_DECKS[skyId]
+  const groupRef = useRef()
+  // deterministic scatter so the deck is stable frame to frame
+  const puffs = useMemo(() => {
+    if (!cfg) return []
+    let seed = 91
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    return Array.from({ length: cfg.count }, () => ({
+      x: (rnd() - 0.5) * cfg.spread * 2,
+      y: cfg.baseM + (rnd() - 0.5) * 500,
+      z: (rnd() - 0.5) * cfg.spread * 2,
+      scale: 260 + rnd() * 360,
+      seed: rnd() * 100,
+    }))
+  }, [cfg])
+
+  // slide the whole deck to stay centred on the jet (in x/z only — the band keeps
+  // its real altitude) so you never run out of cloud, without spawning thousands
+  useFrame(() => {
+    const g = simRef.current?.state
+    if (!groupRef.current || !g) return
+    groupRef.current.position.x = g.x
+    groupRef.current.position.z = g.z
+  })
+
+  if (!cfg) return null
+  return (
+    <group ref={groupRef}>
+      <Clouds material={THREE.MeshLambertMaterial} limit={cfg.count * 24} range={cfg.count}>
+        {puffs.map((p, i) => (
+          <Cloud
+            key={i}
+            seed={p.seed}
+            position={[p.x, p.y, p.z]}
+            bounds={[p.scale, p.scale * 0.35, p.scale]}
+            volume={p.scale * 0.5}
+            segments={16}
+            opacity={cfg.opacity}
+            growth={p.scale * 0.4}
+            speed={0.08}
+            color="#eef2f7"
+          />
+        ))}
+      </Clouds>
+    </group>
+  )
+}
+
+/**
+ * Sun key light with a shadow frustum that follows the aircraft. A directional
+ * light's shadow is an orthographic box; if it's fixed at the origin the plane
+ * flies out of it and loses its shadow. Here the light + its target ride along
+ * over the aircraft (offset up-sun) so a tight, high-res shadow box stays
+ * centred on the jet the whole way down the runway and into the flare. Shadows
+ * are dropped in the storm sky (no real sun) to save the shadow pass.
+ */
+function SunLight({ simRef, sunDir, intensity, color, shadows }) {
+  const lightRef = useRef()
+  const targetRef = useRef()
+  const off = useMemo(() => sunDir.clone().multiplyScalar(600), [sunDir])
+  useFrame(() => {
+    const g = simRef.current?.state
+    const l = lightRef.current
+    const t = targetRef.current
+    if (!l || !t || !g) return
+    const gy = (g.h || 0)
+    t.position.set(g.x, gy, g.z)
+    l.position.set(g.x + off.x, gy + off.y, g.z + off.z)
+    l.target = t
+    t.updateMatrixWorld()
+  })
+  return (
+    <>
+      <object3D ref={targetRef} />
+      <directionalLight
+        ref={lightRef}
+        intensity={intensity}
+        color={color}
+        castShadow={shadows}
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.02}
+        shadow-camera-near={1}
+        shadow-camera-far={1400}
+        shadow-camera-left={-140}
+        shadow-camera-right={140}
+        shadow-camera-top={140}
+        shadow-camera-bottom={-140}
+      />
+    </>
+  )
+}
+
+/**
  * Altitude atmosphere: drives the scene background + fog by height so climbing
- * actually leaves the surface. Low down you get the weather sky and thick haze;
- * as you climb the sky darkens through deep blue to near-black space and the fog
- * pushes far out, so the ground recedes instead of clinging to the aircraft.
- * The band edges follow the real atmosphere — most scattering is gone by ~15 km.
+ * actually leaves the surface. Low down the physical sky dome (FlightSky) owns
+ * the look and the background just matches the horizon; as you climb the
+ * background darkens through deep blue to near-black space and the fog pushes far
+ * out, so the ground recedes and the dome dissolves into the stars. The band
+ * edges follow the real atmosphere — most scattering is gone by ~15 km.
  */
 function Atmosphere({ simRef, baseColor, visM }) {
   const { scene } = useThree()
   const base = useMemo(() => new THREE.Color(baseColor), [baseColor])
-  const space = useMemo(() => new THREE.Color('#05070f'), [])   // high-altitude sky
-  const horizon = useMemo(() => new THREE.Color('#1a2c50'), []) // thin bright band
+  const space = useMemo(() => new THREE.Color('#03050c'), [])   // high-altitude sky
+  const horizon = useMemo(() => new THREE.Color('#16294c'), []) // thin bright band
   const tmp = useMemo(() => new THREE.Color(), [])
   const fog = useMemo(() => new THREE.Fog(baseColor, visM * 0.12, visM), [baseColor, visM])
 
@@ -592,37 +771,49 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
   const groupRef = useRef()
   const visM = weather.visKm * 1000
 
+  // The sun's world position/direction, shared by the key light, the sky dome and
+  // the reflection environment so every highlight, shadow and specular agrees.
+  const sunDir = useMemo(() => sunVector(sky.elev, sky.azim), [sky])
+  const envSunPos = useMemo(() => sunDir.clone().multiplyScalar(12), [sunDir])
+
   const night = weather.sky === 'storm'
   return (
     <CanvasFallback label="3D flight view unavailable on this device">
       <Canvas
+        shadows
         // dpr cap keeps 4K/retina from tanking the framerate; high-perf GPU hint
         dpr={[1, 1.75]}
         gl={{ powerPreference: 'high-performance', antialias: true }}
         camera={{ position: [150, 40, 1700], fov: 45, near: 0.5, far: 90000 }}
       >
+        <FlightSky sky={sky} simRef={simRef} />
+        <CloudDeck skyId={weather.sky} simRef={simRef} />
         <Atmosphere simRef={simRef} baseColor={sky.bg} visM={visM} />
         <hemisphereLight intensity={sky.hemi} color="#dfe9f2" groundColor="#3a4450" />
-        <directionalLight position={[2500, 3800, 1200]} intensity={sky.sun} />
+        {/* sun key light, aimed from the real sky-sun direction so the lit side of
+            the jet matches the bright side of the dome and the sun disc. The
+            SunLight rig slides the shadow frustum along with the aircraft so its
+            shadow stays crisp anywhere down the runway (see SunLight). */}
+        <SunLight simRef={simRef} sunDir={sunDir} intensity={sky.sun} color={sky.sunTint} shadows={!night} />
         {/* Procedural reflection environment — the metallic fuselage/nacelles
             need something to reflect or they read as flat chalk. Built from
             Lightformers (no CDN HDRI fetch, so it works offline / on the
-            projector) tinted to the current sky: bright sun panel, warm-to-cool
-            sky gradient overhead, dark ground below. This is what gives the jet
-            its painted-aluminium sheen instead of the washed-out matte look. */}
+            projector) tinted to the current sky: bright sun panel placed at the
+            real sun direction, warm-to-cool sky gradient overhead, dark ground
+            below. This is what gives the jet its painted-aluminium sheen. */}
         <Environment resolution={128} frames={1}>
           <color attach="background" args={['#000000']} />
           {/* overhead sky dome */}
           <Lightformer intensity={sky.hemi * 1.6} color={sky.bg} form="ring" scale={[20, 20, 1]} position={[0, 12, 0]} rotation={[Math.PI / 2, 0, 0]} />
-          {/* bright sun disc for a strong specular highlight */}
-          <Lightformer intensity={sky.sun * 3} color="#fff4e0" form="circle" scale={4} position={[10, 10, 6]} target={[0, 0, 0]} />
+          {/* bright sun disc for a strong specular highlight, at the sun's bearing */}
+          <Lightformer intensity={sky.sun * 3.2} color={sky.sunTint} form="circle" scale={4} position={[envSunPos.x, envSunPos.y, envSunPos.z]} target={[0, 0, 0]} />
           {/* soft fill from the opposite side */}
           <Lightformer intensity={sky.hemi} color="#9fb8d8" form="rect" scale={[16, 8, 1]} position={[-14, 4, -8]} target={[0, 0, 0]} />
           {/* dark ground so the belly picks up a grounded reflection, not glare */}
           <Lightformer intensity={0.3} color={sky.ground} form="rect" scale={[24, 24, 1]} position={[0, -10, 0]} rotation={[-Math.PI / 2, 0, 0]} />
         </Environment>
 
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
           <planeGeometry args={[64000, 64000]} />
           <meshStandardMaterial map={groundTex} roughness={1} />
         </mesh>
