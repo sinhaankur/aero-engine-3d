@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Html, Environment, Lightformer, Text, Sky, Stars, Clouds, Cloud } from '@react-three/drei'
+import { Html, Environment, Lightformer, Text, Sky, Stars, Clouds, Cloud, useKTX2 } from '@react-three/drei'
 import { useGLTF } from './gltf.js'
 import * as THREE from 'three'
 import CanvasFallback from './CanvasFallback.jsx'
@@ -592,28 +592,33 @@ function FlightSky({ sky, simRef }) {
  * the single most visceral "I'm flying" cue on climb-out and descent. Skipped
  * entirely on a crystal-clear day so the clean-sky case stays clean.
  */
+// Each deck now spans TWO bands so clouds are visible from the runway (a low
+// scattered layer nearby) all the way up (a higher broken deck you climb into).
+// count is per band; spread is the horizontal radius of the scatter.
 const CLOUD_DECKS = {
-  day:  { baseM: 1400, count: 7,  opacity: 0.55, spread: 3200 },
-  haze: { baseM: 900,  count: 12, opacity: 0.7,  spread: 2600 },
-  storm:{ baseM: 500,  count: 16, opacity: 0.9,  spread: 2200 },
-  cold: { baseM: 1100, count: 9,  opacity: 0.6,  spread: 3000 },
+  day:  { lowM: 750,  highM: 2400, count: 10, opacity: 0.7,  spread: 3400 },
+  haze: { lowM: 500,  highM: 1800, count: 14, opacity: 0.82, spread: 2800 },
+  storm:{ lowM: 320,  highM: 1300, count: 18, opacity: 0.95, spread: 2400 },
+  cold: { lowM: 650,  highM: 2100, count: 12, opacity: 0.75, spread: 3200 },
 }
 
 function CloudDeck({ skyId, simRef }) {
   const cfg = CLOUD_DECKS[skyId]
   const groupRef = useRef()
-  // deterministic scatter so the deck is stable frame to frame
+  // deterministic scatter across both bands so the deck is stable frame to frame
   const puffs = useMemo(() => {
     if (!cfg) return []
     let seed = 91
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    return Array.from({ length: cfg.count }, () => ({
-      x: (rnd() - 0.5) * cfg.spread * 2,
-      y: cfg.baseM + (rnd() - 0.5) * 500,
-      z: (rnd() - 0.5) * cfg.spread * 2,
-      scale: 260 + rnd() * 360,
+    const make = (baseM, spreadMul, scaleBase) => Array.from({ length: cfg.count }, () => ({
+      x: (rnd() - 0.5) * cfg.spread * 2 * spreadMul,
+      y: baseM + (rnd() - 0.5) * 400,
+      z: (rnd() - 0.5) * cfg.spread * 2 * spreadMul,
+      scale: scaleBase + rnd() * 380,
       seed: rnd() * 100,
     }))
+    // low band clusters tighter + smaller (nearby cumulus); high band spreads wide
+    return [...make(cfg.lowM, 0.7, 300), ...make(cfg.highM, 1.1, 340)]
   }, [cfg])
 
   // slide the whole deck to stay centred on the jet (in x/z only — the band keeps
@@ -628,18 +633,18 @@ function CloudDeck({ skyId, simRef }) {
   if (!cfg) return null
   return (
     <group ref={groupRef}>
-      <Clouds material={THREE.MeshLambertMaterial} limit={cfg.count * 24} range={cfg.count}>
+      <Clouds material={THREE.MeshLambertMaterial} limit={puffs.length * 26} range={puffs.length}>
         {puffs.map((p, i) => (
           <Cloud
             key={i}
             seed={p.seed}
             position={[p.x, p.y, p.z]}
             bounds={[p.scale, p.scale * 0.35, p.scale]}
-            volume={p.scale * 0.5}
-            segments={16}
+            volume={p.scale * 0.6}
+            segments={18}
             opacity={cfg.opacity}
-            growth={p.scale * 0.4}
-            speed={0.08}
+            growth={p.scale * 0.45}
+            speed={0.06}
             color="#eef2f7"
           />
         ))}
@@ -889,6 +894,94 @@ function TouchdownSmoke({ simRef }) {
   return <sprite ref={ref} material={mat} visible={false} />
 }
 
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+const EARTH_DAY_URL = `${base}/textures/earth/day.ktx2`
+const EARTH_BASIS = `${base}/basis/`
+// metres per degree of latitude (mean); longitude scaled by cos(lat) per airport
+const M_PER_DEG_LAT = 111320
+
+/**
+ * Real-Earth ground: the NASA Blue Marble day map (the same texture the /live
+ * globe uses) sampled at the DEPARTURE airport's lat/lon and laid on the ground
+ * plane, so you take off and fly over real coastlines and land instead of a
+ * procedural lawn. The equirectangular map is lon→U (0..1 over 360°), lat→V
+ * (0..1 over 180°, north at the top); we set the texture's repeat to the plane's
+ * geographic span and its offset to the airport, then slide the offset with the
+ * aircraft so flying moves you across the real map. A soft green ground tint fills
+ * beyond the map so the horizon still reads as land, not a hard texture edge.
+ */
+function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 200000 }) {
+  const { day } = useKTX2({ day: EARTH_DAY_URL }, EARTH_BASIS)
+  const matRef = useRef()
+
+  const tex = useMemo(() => {
+    if (!day) return null
+    const t = day.clone()
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping
+    t.colorSpace = THREE.SRGBColorSpace
+    t.anisotropy = 8
+    t.needsUpdate = true
+    return t
+  }, [day])
+
+  // The NASA map is low-res at runway scale, so multiply in the high-frequency
+  // procedural field texture (fields/soil/speckle) tiled tightly — real land
+  // colour + coastlines from NASA, crisp surface detail underfoot from the field.
+  const detail = useMemo(() => {
+    if (!detailTex) return null
+    const d = detailTex.clone()
+    d.wrapS = d.wrapT = THREE.RepeatWrapping
+    d.repeat.set(sizeM / 1400, sizeM / 1400) // ~1.4 km detail tile
+    d.needsUpdate = true
+    return d
+  }, [detailTex, sizeM])
+
+  // geographic span the plane covers, as a fraction of the full map (deg → UV)
+  const spanU = (sizeM / (M_PER_DEG_LAT * Math.cos(lat * Math.PI / 180))) / 360
+  const spanV = (sizeM / M_PER_DEG_LAT) / 180
+  // UV of the airport (map origin at lon −180 / lat +90)
+  const u0 = (lon + 180) / 360
+  const v0 = (90 - lat) / 180
+
+  useEffect(() => {
+    if (!tex) return
+    tex.repeat.set(spanU, spanV)
+    tex.offset.set(u0 - spanU / 2, 1 - (v0 + spanV / 2))
+  }, [tex, spanU, spanV, u0, v0])
+
+  // slide the map under the aircraft: world +x is east (+U), world −z is north
+  // (+V, since north is up in the map). Convert metres → UV and offset from the
+  // airport centre so the real terrain scrolls past as you fly.
+  useFrame(() => {
+    if (!tex) return
+    const s = simRef.current?.state
+    if (!s) return
+    const du = (s.x / (M_PER_DEG_LAT * Math.cos(lat * Math.PI / 180)) / 360)
+    const dv = (-s.z / M_PER_DEG_LAT / 180)
+    tex.offset.set(u0 - spanU / 2 + du, 1 - (v0 + spanV / 2) - dv)
+  })
+
+  if (!tex) return null
+  return (
+    <group>
+      {/* real NASA land colour + coastlines */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
+        <planeGeometry args={[sizeM, sizeM]} />
+        <meshStandardMaterial ref={matRef} map={tex} roughness={1} />
+      </mesh>
+      {/* high-frequency detail multiplied over the top so the surface has crisp
+          texture underfoot (the NASA map alone is soft at runway scale). Tiled
+          tightly, faded with distance via the scene fog, multiply blend. */}
+      {detail && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
+          <planeGeometry args={[sizeM, sizeM]} />
+          <meshBasicMaterial map={detail} transparent opacity={0.5} blending={THREE.MultiplyBlending} depthWrite={false} />
+        </mesh>
+      )}
+    </group>
+  )
+}
+
 export default function FlightScene({ simRef, modelUrl, dims, weather, view, runwayHalfLen = 1600, airport }) {
   const sky = SKIES[weather.sky] || SKIES.day
   const groundTex = useGroundTexture(weather.sky)
@@ -937,10 +1030,23 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
           <Lightformer intensity={0.3} color={sky.ground} form="rect" scale={[24, 24, 1]} position={[0, -10, 0]} rotation={[-Math.PI / 2, 0, 0]} />
         </Environment>
 
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-          <planeGeometry args={[64000, 64000]} />
-          <meshStandardMaterial map={groundTex} roughness={1} />
+        {/* horizon fill: a big tinted plane well below, so beyond the real-Earth
+            tile the ground still reads as land/sea to the horizon instead of a
+            hard edge into the sky */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.2, 0]}>
+          <planeGeometry args={[400000, 400000]} />
+          <meshStandardMaterial color={sky.ground} roughness={1} />
         </mesh>
+        {/* real NASA Blue Marble terrain around the departure field; falls back to
+            the procedural field texture while the KTX2 loads (or if it fails) */}
+        <Suspense fallback={
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
+            <planeGeometry args={[64000, 64000]} />
+            <meshStandardMaterial map={groundTex} roughness={1} />
+          </mesh>
+        }>
+          <RealGround simRef={simRef} detailTex={groundTex} lat={airport?.lat ?? 51.47} lon={airport?.lon ?? -0.45} />
+        </Suspense>
         <Runway night={night} halfLen={runwayHalfLen} airport={airport} />
         <Buildings />
 
