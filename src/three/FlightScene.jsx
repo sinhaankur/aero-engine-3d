@@ -910,9 +910,10 @@ const M_PER_DEG_LAT = 111320
  * aircraft so flying moves you across the real map. A soft green ground tint fills
  * beyond the map so the horizon still reads as land, not a hard texture edge.
  */
-function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 200000 }) {
+function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 1500000 }) {
   const { day } = useKTX2({ day: EARTH_DAY_URL }, EARTH_BASIS)
   const matRef = useRef()
+  const detailMatRef = useRef()
 
   const tex = useMemo(() => {
     if (!day) return null
@@ -927,14 +928,15 @@ function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 20000
   // The NASA map is low-res at runway scale, so multiply in the high-frequency
   // procedural field texture (fields/soil/speckle) tiled tightly — real land
   // colour + coastlines from NASA, crisp surface detail underfoot from the field.
+  const DETAIL_SIZE = 80000 // matches the detail plane below
   const detail = useMemo(() => {
     if (!detailTex) return null
     const d = detailTex.clone()
     d.wrapS = d.wrapT = THREE.RepeatWrapping
-    d.repeat.set(sizeM / 1400, sizeM / 1400) // ~1.4 km detail tile
+    d.repeat.set(DETAIL_SIZE / 1400, DETAIL_SIZE / 1400) // ~1.4 km detail tile
     d.needsUpdate = true
     return d
-  }, [detailTex, sizeM])
+  }, [detailTex])
 
   // geographic span the plane covers, as a fraction of the full map (deg → UV)
   const spanU = (sizeM / (M_PER_DEG_LAT * Math.cos(lat * Math.PI / 180))) / 360
@@ -951,7 +953,9 @@ function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 20000
 
   // slide the map under the aircraft: world +x is east (+U), world −z is north
   // (+V, since north is up in the map). Convert metres → UV and offset from the
-  // airport centre so the real terrain scrolls past as you fly.
+  // airport centre so the real terrain scrolls past as you fly. Also fade the
+  // near-ground detail overlay out with altitude — it only matters low down; at
+  // cruise the clean NASA land should show through.
   useFrame(() => {
     if (!tex) return
     const s = simRef.current?.state
@@ -959,6 +963,10 @@ function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 20000
     const du = (s.x / (M_PER_DEG_LAT * Math.cos(lat * Math.PI / 180)) / 360)
     const dv = (-s.z / M_PER_DEG_LAT / 180)
     tex.offset.set(u0 - spanU / 2 + du, 1 - (v0 + spanV / 2) - dv)
+    if (detailMatRef.current) {
+      // full detail on the deck, gone by ~3 km
+      detailMatRef.current.opacity = 0.5 * Math.max(0, 1 - s.h / 3000)
+    }
   })
 
   if (!tex) return null
@@ -974,8 +982,10 @@ function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 20000
           tightly, faded with distance via the scene fog, multiply blend. */}
       {detail && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
-          <planeGeometry args={[sizeM, sizeM]} />
-          <meshBasicMaterial map={detail} transparent opacity={0.5} blending={THREE.MultiplyBlending} depthWrite={false} />
+          {/* detail only needs to cover the near field (fades by 3 km); a smaller
+              plane keeps the tight tiling dense where it's actually seen */}
+          <planeGeometry args={[80000, 80000]} />
+          <meshBasicMaterial ref={detailMatRef} map={detail} transparent opacity={0.5} blending={THREE.MultiplyBlending} depthWrite={false} />
         </mesh>
       )}
     </group>
