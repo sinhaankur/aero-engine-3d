@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
 import { COMPONENTS, COMPONENT_GROUPS } from '../data/components.js'
 import Formula from '../components/Formula.jsx'
 import Calculator from '../components/Calculator.jsx'
+import { EASE } from '../lib/motion.jsx'
 
 /**
  * /components — how each part of an airliner is built: material, process,
@@ -12,13 +14,23 @@ import Calculator from '../components/Calculator.jsx'
 
 function ComponentCard({ c, focused }) {
   const ref = useRef(null)
+  const reduce = useReducedMotion()
   useEffect(() => {
     if (focused && ref.current) {
       ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }, [focused])
   return (
-    <article ref={ref} id={c.id} className={`comp-card ${focused ? 'focused' : ''}`}>
+    <m.article
+      ref={ref}
+      id={c.id}
+      className={`comp-card ${focused ? 'focused' : ''}`}
+      layout={!reduce}
+      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={reduce ? { opacity: 0 } : { opacity: 0, y: -12, scale: 0.98 }}
+      transition={{ duration: 0.4, ease: EASE }}
+    >
       <header>
         <h3>{c.name}</h3>
         <span className="comp-group">{c.group}</span>
@@ -41,7 +53,7 @@ function ComponentCard({ c, focused }) {
           {c.design.calc && <Calculator calc={c.design.calc} />}
         </div>
       )}
-    </article>
+    </m.article>
   )
 }
 
@@ -80,11 +92,13 @@ export default function ComponentsPage() {
         ))}
       </div>
 
-      <div className="comp-grid">
-        {list.map((c) => (
-          <ComponentCard key={c.id} c={c} focused={focus === c.id} />
-        ))}
-      </div>
+      <m.div className="comp-grid" layout>
+        <AnimatePresence mode="popLayout">
+          {list.map((c) => (
+            <ComponentCard key={c.id} c={c} focused={focus === c.id} />
+          ))}
+        </AnimatePresence>
+      </m.div>
 
       <p className="model-note" style={{ marginTop: 18 }}>
         Sources: public teardown analyses, supplier annual reports, certification documents

@@ -1,9 +1,13 @@
 import { lazy, Suspense } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { m, useReducedMotion } from 'framer-motion'
 import { getEngine, getAircraftUsingEngine } from '../data/index.js'
 import { ENGINES } from '../data/engines.js'
 import { ENGINE_MODELS } from '../data/engineParts.js'
 import EngineDiagram from '../components/EngineDiagram.jsx'
+import { Stagger, StaggerItem, item, itemReduced } from '../lib/motion.jsx'
+
+const MLink = m(Link)
 
 // EngineExplorer drags in the WebGL viewer + blueprint; load it on demand.
 const EngineExplorer = lazy(() => import('../components/EngineExplorer.jsx'))
@@ -34,6 +38,7 @@ function Bar({ label, value, max, unit }) {
 
 export default function EnginePage() {
   const { engineId } = useParams()
+  const reduce = useReducedMotion()
   const e = getEngine(engineId)
 
   if (!e) return <p>Engine not found. <Link to="/">← Index</Link></p>
@@ -93,18 +98,23 @@ export default function EnginePage() {
       {/* ---- USED ON ---- */}
       <h2 className="section-title">Used on</h2>
       {usedOn.length ? (
-        <div className="idx-list">
+        <Stagger className="idx-list fm-list" stagger={0.05}>
           {usedOn.map((a) => (
-            <Link key={`${a.familyId}-${a.id}`} to={`/family/${a.familyId}/${a.id}`} className="idx-row">
+            <StaggerItem
+              as={MLink}
+              key={`${a.familyId}-${a.id}`}
+              to={`/family/${a.familyId}/${a.id}`}
+              className="idx-row"
+            >
               <span className="idx-num">{a.familyName.replace(' Family', '')}</span>
               <span className="idx-main">
                 <span className="idx-name">{a.name.replace(/^(Airbus|Boeing) /, '')}</span>
                 <span className="idx-desc">{a.dimensions.paxTypical} seats · {a.dimensions.rangeKm.toLocaleString()} km</span>
               </span>
               <span className="idx-meta"><span className="idx-arrow">→</span></span>
-            </Link>
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       ) : (
         <p className="model-note">No aircraft in this archive currently list this engine.</p>
       )}

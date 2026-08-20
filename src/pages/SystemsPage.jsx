@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { SYSTEMS } from '../data/systems.js'
 import SystemSchematic from '../components/SystemSchematic.jsx'
+import { Stagger, StaggerItem } from '../lib/motion.jsx'
 
 /**
  * The "how each system works internally" learning section. A left rail picks a
@@ -69,9 +70,10 @@ export default function SystemsPage() {
       </div>
 
       <h2 className="section-title">Key components</h2>
-      <div className="sys-components">
+      {/* re-key on the active system so the grid re-staggers when you switch tabs */}
+      <Stagger key={sys.id} className="sys-components" stagger={0.04}>
         {sys.components.map((c) => (
-          <div
+          <StaggerItem
             key={c.id}
             className={`sys-comp ${hoverNode === c.id ? 'on' : ''}`}
             onMouseEnter={() => setHoverNode(c.id)}
@@ -79,9 +81,9 @@ export default function SystemsPage() {
           >
             <h4>{c.name}</h4>
             <p>{c.role}</p>
-          </div>
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
 
       <div className="sys-cards">
         <div className="sys-card">

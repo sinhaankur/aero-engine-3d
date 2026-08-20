@@ -1,4 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
+import { m, useReducedMotion } from 'framer-motion'
 import coastlines from '../live/coastlines.json'
 import { FAMILIES, getAircraftForFamily } from '../data/index.js'
 import { isa } from '../sim/flight/model.js'
@@ -104,6 +105,7 @@ const ALL_AIRCRAFT = FAMILIES.flatMap((f) =>
 )
 
 export default function RoutesPage() {
+  const reduce = useReducedMotion()
   const [fromIata, setFrom] = useState('LHR')
   const [toIata, setTo] = useState('JFK')
   const [windKt, setWind] = useState(0) // + headwind, − tailwind
@@ -233,14 +235,21 @@ export default function RoutesPage() {
               {results.map(({ a, esadKm, margin }) => {
                 const cls = margin >= 0.1 ? 'ok' : margin >= 0 ? 'tight' : 'no'
                 const pct = Math.min(100, (esadKm / a.dimensions.rangeKm) * 100)
+                const w = Number.isFinite(pct) ? pct : 100
                 return (
-                  <div key={a.id} className={`routes-row ${cls}`}>
+                  // layout: rows slide to their new position as the list re-sorts
+                  // by margin when you drag the wind slider — the payload-range
+                  // story becomes a live, animated ranking
+                  <m.div key={a.id} layout={!reduce} transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                    className={`routes-row ${cls}`}>
                     <span className="rr-name">{a.name.replace(/^(Airbus|Boeing|Embraer) /, '')}</span>
-                    <span className="rr-bar"><i style={{ width: `${Number.isFinite(pct) ? pct : 100}%` }} /></span>
+                    <span className="rr-bar">
+                      <m.i initial={false} animate={{ width: `${w}%` }} transition={{ duration: reduce ? 0 : 0.4, ease: [0.2, 0.7, 0.3, 1] }} />
+                    </span>
                     <span className="rr-val">
                       {margin >= 0 ? `+${Math.round(margin * 100)}%` : 'short'}
                     </span>
-                  </div>
+                  </m.div>
                 )
               })}
               <p className="routes-note">

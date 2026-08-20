@@ -11,6 +11,15 @@
  */
 import { m, useReducedMotion } from 'framer-motion'
 
+// Resolve the `as` prop to a motion component. A string ('div', 'section', 'ul')
+// maps to the built-in m.<tag>; a component (e.g. a motion-wrapped react-router
+// Link created with m(Link)) is used directly. Falls back to m.div.
+function resolve(as) {
+  if (!as) return m.div
+  if (typeof as === 'string') return m[as] || m.div
+  return as
+}
+
 // the site's standard easing — matches the cubic-bezier used across the CSS
 export const EASE = [0.2, 0.7, 0.3, 1]
 
@@ -40,7 +49,7 @@ export const itemReduced = {
  */
 export function Reveal({ as = 'div', children, delay = 0, y = 18, once = true, ...rest }) {
   const reduce = useReducedMotion()
-  const Comp = m[as] || m.div
+  const Comp = resolve(as)
   return (
     <Comp
       initial={reduce ? { opacity: 0 } : { opacity: 0, y }}
@@ -58,7 +67,7 @@ export function Reveal({ as = 'div', children, delay = 0, y = 18, once = true, .
  * Stagger a set of children in on scroll-into-view. Wrap items in <StaggerItem>.
  */
 export function Stagger({ as = 'div', children, stagger = 0.06, delay = 0, once = true, ...rest }) {
-  const Comp = m[as] || m.div
+  const Comp = resolve(as)
   return (
     <Comp
       variants={container(stagger, delay)}
@@ -74,7 +83,7 @@ export function Stagger({ as = 'div', children, stagger = 0.06, delay = 0, once 
 
 export function StaggerItem({ as = 'div', children, ...rest }) {
   const reduce = useReducedMotion()
-  const Comp = m[as] || m.div
+  const Comp = resolve(as)
   return (
     <Comp variants={reduce ? itemReduced : item} {...rest}>
       {children}

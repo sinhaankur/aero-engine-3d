@@ -1,10 +1,14 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { m, useReducedMotion } from 'framer-motion'
 import { getFamily, getAircraft } from '../data/index.js'
 import { RISK_LEVELS } from '../data/schema.js'
 import Blueprint from '../components/Blueprint.jsx'
 import { ENGINE_MODELS } from '../data/engineParts.js'
 import { TYPES_FOR_AIRCRAFT } from '../data/icaoTypes.js'
+import { Stagger, StaggerItem, Reveal, item, itemReduced, spring } from '../lib/motion.jsx'
+
+const MLink = m(Link)
 
 /**
  * Sky ↔ plane bridge: one-shot count of this exact type airborne right now,
@@ -54,6 +58,7 @@ function Spec({ label, value, unit }) {
 
 export default function AircraftPage() {
   const { familyId, aircraftId } = useParams()
+  const reduce = useReducedMotion()
   const family = getFamily(familyId)
   const a = getAircraft(familyId, aircraftId)
   const [view, setView] = useState('3d')
@@ -130,19 +135,24 @@ export default function AircraftPage() {
       )}
       {/* function-focused cross-links: this page is the hub for visualising
           the aircraft and how it works */}
-      <div className="ac-actions">
+      <Stagger className="ac-actions" stagger={0.05}>
         {a.model && (
-          <Link className="ac-action" to={`/fly?ac=${familyId}/${a.id}`}>
+          <StaggerItem as={MLink} className="ac-action" to={`/fly?ac=${familyId}/${a.id}`}
+            whileHover={reduce ? undefined : { y: -3 }} transition={spring}>
             🛫 Fly it — cockpit view, real weather
-          </Link>
+          </StaggerItem>
         )}
-        <Link className="ac-action" to={`/simulate?ac=${familyId}/${a.id}`}>
+        <StaggerItem as={MLink} className="ac-action" to={`/simulate?ac=${familyId}/${a.id}`}
+          whileHover={reduce ? undefined : { y: -3 }} transition={spring}>
           🌬 Fly this wing — lift, stall &amp; wind conditions
-        </Link>
-        <Link className="ac-action" to="/compare">⇄ Compare against another variant</Link>
-        <Link className="ac-action" to="/systems">⚙ How its systems work</Link>
-        <Link className="ac-action" to="/components">🔩 How its parts are built</Link>
-      </div>
+        </StaggerItem>
+        <StaggerItem as={MLink} className="ac-action" to="/compare"
+          whileHover={reduce ? undefined : { y: -3 }} transition={spring}>⇄ Compare against another variant</StaggerItem>
+        <StaggerItem as={MLink} className="ac-action" to="/systems"
+          whileHover={reduce ? undefined : { y: -3 }} transition={spring}>⚙ How its systems work</StaggerItem>
+        <StaggerItem as={MLink} className="ac-action" to="/components"
+          whileHover={reduce ? undefined : { y: -3 }} transition={spring}>🔩 How its parts are built</StaggerItem>
+      </Stagger>
 
       {!a.model && (
         <p className="model-note">
@@ -171,9 +181,10 @@ export default function AircraftPage() {
 
       {/* ---- Engines ---- */}
       <h2 className="section-title">Engine options</h2>
-      <div className="engine-grid">
+      <Stagger className="engine-grid" stagger={0.07}>
         {a.engines.map((e) => (
-          <Link key={e.id} to={`/engine/${e.id}`} className="engine-card">
+          <StaggerItem as={MLink} key={e.id} to={`/engine/${e.id}`} className="engine-card"
+            whileHover={reduce ? undefined : { y: -4 }} transition={spring}>
             <div className="engine-head">
               <h3>{e.name}</h3>
               <span className="maker">{e.manufacturer}</span>
@@ -188,9 +199,9 @@ export default function AircraftPage() {
             <span className="family-card-cta">
               {ENGINE_MODELS[e.id] ? 'Exploded 3D →' : 'View engine →'}
             </span>
-          </Link>
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
 
       {/* ---- In-depth engine parts breakdown ---- */}
       {modelledEngines.length > 0 && (

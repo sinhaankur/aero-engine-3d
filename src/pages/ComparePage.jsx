@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { m } from 'framer-motion'
 import { FAMILIES, getAircraftForFamily, getAircraft } from '../data/index.js'
 import CompareOverlay from '../components/CompareOverlay.jsx'
 import TradeSpace from '../components/TradeSpace.jsx'
+import { Reveal, container, item } from '../lib/motion.jsx'
 
 const COLOR_A = '#d8ff3e'
 const COLOR_B = '#86b7ff'
@@ -51,24 +53,31 @@ function DeltaTable({ a, b }) {
           <th>Δ B vs A</th>
         </tr>
       </thead>
-      <tbody>
+      {/* re-key on the pairing so the rows re-stagger whenever A or B changes;
+          animate opacity only (transforms on <tr> are unreliable across browsers) */}
+      <m.tbody
+        key={`${a.id}-${b.id}`}
+        variants={container(0.035)}
+        initial="hidden"
+        animate="show"
+      >
         {ROWS.map(([label, get, unit, dp]) => {
           const va = get(a.dimensions)
           const vb = get(b.dimensions)
           const pct = va ? ((vb - va) / va) * 100 : 0
           const fmt = (v) => `${v.toLocaleString(undefined, { maximumFractionDigits: dp, minimumFractionDigits: dp })}${unit ? ` ${unit}` : ''}`
           return (
-            <tr key={label}>
+            <m.tr key={label} variants={{ hidden: { opacity: 0 }, show: { opacity: 1 } }}>
               <td className="k">{label}</td>
               <td>{fmt(va)}</td>
               <td>{fmt(vb)}</td>
               <td className={`d ${pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : ''}`}>
                 {Math.abs(pct) < 0.5 ? '≈' : `${pct > 0 ? '+' : ''}${pct.toFixed(0)}%`}
               </td>
-            </tr>
+            </m.tr>
           )
         })}
-      </tbody>
+      </m.tbody>
     </table>
   )
 }
@@ -113,7 +122,7 @@ export default function ComparePage() {
         <VariantSelect label="B" color={COLOR_B} value={selB} onChange={setSelB} />
       </div>
 
-      <div className="cmp-body">
+      <Reveal className="cmp-body">
         <div className="cmp-overlay">
           <CompareOverlay a={a} b={b} colorA={COLOR_A} colorB={COLOR_B} />
           <div className="cmp-legend">
@@ -122,7 +131,7 @@ export default function ComparePage() {
           </div>
         </div>
         <DeltaTable a={a} b={b} />
-      </div>
+      </Reveal>
 
       <p className="model-note">
         Silhouettes use the archive's shared parametric proportions, so fine

@@ -443,6 +443,9 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
   color: var(--ink); position: relative; transition: background .12s, padding-left .12s;
   animation: row-in .32s ease both;
 }
+/* when a list is driven by framer-motion (Stagger), suppress the CSS row-in so
+   the two don't double-animate the same opacity/transform */
+.fm-list .idx-row { animation: none; }
 /* light stagger on the first rows so a section "types in" on load */
 .idx-list .idx-row:nth-child(1) { animation-delay: .02s; }
 .idx-list .idx-row:nth-child(2) { animation-delay: .05s; }

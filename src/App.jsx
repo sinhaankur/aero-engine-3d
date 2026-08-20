@@ -143,11 +143,12 @@ function RouteEffects() {
   // light stagger — skipped entirely under prefers-reduced-motion
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    // NB: .map-col is intentionally NOT here — Home's sitemap columns are now
-    // animated by framer-motion (Stagger/StaggerItem), and letting both drive the
-    // same opacity would fight. Keep this observer for the pages not yet migrated.
+    // NB: selectors that framer-motion now drives (Stagger/StaggerItem/Reveal)
+    // are intentionally NOT here — letting both drive the same opacity fights.
+    // Removed as pages migrate: .map-col, .engine-card, .ac-actions, .comp-card,
+    // .cmp-body. Keep this observer for the blocks not yet migrated.
     const els = document.querySelectorAll(
-      '.section-title, .engine-card, .sys-card, .spec-grid, .cmp-body, .proj-card, .safety-panel, .count-strip, .comp-card, .timeline, .ac-actions',
+      '.section-title, .sys-card, .spec-grid, .proj-card, .safety-panel, .count-strip, .timeline',
     )
     const io = new IntersectionObserver(
       (entries) => {
