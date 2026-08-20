@@ -1,9 +1,29 @@
-import { lazy, Suspense, useRef } from 'react'
+import { lazy, Suspense, useRef, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { m, useReducedMotion, animate } from 'framer-motion'
 import { FAMILIES, getAircraftForFamily } from '../data/index.js'
 import { ENGINES } from '../data/engines.js'
 import { ENGINE_MODELS } from '../data/engineParts.js'
 import { SYSTEMS } from '../data/systems.js'
+import { Stagger, StaggerItem, container, item, itemReduced } from '../lib/motion.jsx'
+
+/**
+ * Count a stat up from 0 on mount — a small premium flourish that fits the
+ * tabular-nums engineering readout. Honours reduced-motion (jumps to the value).
+ */
+function CountUp({ to, pad = 2, duration = 1.1 }) {
+  const reduce = useReducedMotion()
+  const [n, setN] = useState(reduce ? to : 0)
+  useEffect(() => {
+    if (reduce) { setN(to); return }
+    const controls = animate(0, to, {
+      duration, ease: [0.2, 0.7, 0.3, 1],
+      onUpdate: (v) => setN(Math.round(v)),
+    })
+    return () => controls.stop()
+  }, [to, reduce, duration])
+  return <>{String(n).padStart(pad, '0')}</>
+}
 
 // Three.js is heavy — load the live viewport only when Home actually renders,
 // keeping it out of the initial bundle shared with every other route.
@@ -29,6 +49,7 @@ const EXPLORE = [
 ]
 
 export default function Home() {
+  const reduce = useReducedMotion()
   const engines = Object.values(ENGINES)
   const aircraftCount = FAMILIES.reduce((n, f) => n + getAircraftForFamily(f.id).length, 0)
 
@@ -69,35 +90,48 @@ export default function Home() {
 
       {/* ---- MASTHEAD + LIVE RENDER ---- */}
       <div className="map-top">
-        <div className="map-mast">
-          <h1>
+        <m.div
+          className="map-mast"
+          variants={container(0.08, 0.05)}
+          initial="hidden"
+          animate="show"
+        >
+          <m.h1 variants={reduce ? itemReduced : item}>
             Aircraft Design <span className="accent">Archive</span>
             <span className="cursor">_</span>
-          </h1>
-          <p>
+          </m.h1>
+          <m.p variants={reduce ? itemReduced : item}>
             An interactive, engineering-grade catalog of aircraft families — every
             variant in 3D, dimensioned blueprints, exploded engines, live traffic
             and the systems that keep them flying. Everything is one click away.
-          </p>
-          <div className="map-stats">
-            <div className="map-stat"><span className="n">{String(FAMILIES.length).padStart(2, '0')}</span><span className="l">Families</span></div>
-            <div className="map-stat"><span className="n">{String(aircraftCount).padStart(2, '0')}</span><span className="l">Aircraft</span></div>
-            <div className="map-stat"><span className="n">{String(engines.length).padStart(2, '0')}</span><span className="l">Engines</span></div>
-            <div className="map-stat"><span className="n">{String(SYSTEMS.length).padStart(2, '0')}</span><span className="l">Systems</span></div>
-          </div>
-        </div>
-        <div className="map-hero" ref={heroRef} onMouseMove={onHeroMove} onMouseLeave={onHeroLeave}>
+          </m.p>
+          <m.div className="map-stats" variants={reduce ? itemReduced : item}>
+            <div className="map-stat"><span className="n"><CountUp to={FAMILIES.length} /></span><span className="l">Families</span></div>
+            <div className="map-stat"><span className="n"><CountUp to={aircraftCount} /></span><span className="l">Aircraft</span></div>
+            <div className="map-stat"><span className="n"><CountUp to={engines.length} /></span><span className="l">Engines</span></div>
+            <div className="map-stat"><span className="n"><CountUp to={SYSTEMS.length} /></span><span className="l">Systems</span></div>
+          </m.div>
+        </m.div>
+        <m.div
+          className="map-hero"
+          ref={heroRef}
+          onMouseMove={onHeroMove}
+          onMouseLeave={onHeroLeave}
+          initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, ease: [0.2, 0.7, 0.3, 1], delay: 0.15 }}
+        >
           <span className="tag-corner">MODEL // <b>A320</b> · LIVE RENDER</span>
           <Suspense fallback={<div className="viewport-loading" style={{ height: 230 }}>Loading model…</div>}>
             <HeroPlane url="/models/a320.glb" height={230} />
           </Suspense>
-        </div>
+        </m.div>
       </div>
 
       {/* ---- THE SITEMAP GRID ---- */}
-      <div className="map-grid">
+      <Stagger className="map-grid" stagger={0.1} delay={0.25}>
         {/* fleet: every family, every variant */}
-        <div className="map-col">
+        <StaggerItem className="map-col">
           <div className="map-col-head">
             <span className="hash">//</span>
             <span>Fleet</span>
@@ -120,10 +154,10 @@ export default function Home() {
               </div>
             )
           })}
-        </div>
+        </StaggerItem>
 
         {/* engines + systems */}
-        <div className="map-col">
+        <StaggerItem className="map-col">
           <div className="map-col-head">
             <span className="hash">//</span>
             <span>Engines</span>
@@ -153,10 +187,10 @@ export default function Home() {
               </Link>
             ))}
           </div>
-        </div>
+        </StaggerItem>
 
         {/* experiences + reference */}
-        <div className="map-col">
+        <StaggerItem className="map-col">
           <div className="map-col-head">
             <span className="hash">//</span>
             <span>Explore</span>
@@ -178,8 +212,8 @@ export default function Home() {
             Nominal public specs; safety figures attributed per aircraft.
             Roadmap: open aviation knowledge base + LLM — <code>docs/ROADMAP.md</code>.
           </div>
-        </div>
-      </div>
+        </StaggerItem>
+      </Stagger>
     </div>
   )
 }

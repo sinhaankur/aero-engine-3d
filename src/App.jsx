@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
+import { AnimatePresence, LazyMotion, domAnimation, m, useReducedMotion } from 'framer-motion'
 import { getFamily, getAircraft, getEngine } from './data/index.js'
 import { TECH_STACK } from './data/techStack.js'
 import { hardReload } from './lib/hardReload.js'
@@ -87,13 +88,44 @@ function ParallaxDriver() {
   return null
 }
 
-/** Route-keyed wrapper so every page glides in instead of popping. */
+/**
+ * Route-keyed page transitions. AnimatePresence keeps the outgoing page mounted
+ * long enough to animate OUT while the new one animates IN — the old CSS
+ * `page-enter` only ever animated in, so navigations popped on exit. The motion
+ * is a short fade + small vertical glide with a soft ease; under
+ * prefers-reduced-motion it collapses to a plain fade with no transform.
+ *
+ * `mode="popLayout"` lets the incoming page take its place immediately (no
+ * height jump while both are briefly mounted). We key on the top-level route
+ * segment, not the full pathname, so moving between e.g. two aircraft pages
+ * cross-fades content without a full page teardown.
+ */
 function AnimatedOutlet() {
   const { pathname } = useLocation()
+  const reduce = useReducedMotion()
+  const seg = pathname.split('/').filter(Boolean)[0] || 'home'
+
+  const variants = reduce
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
+    : {
+        initial: { opacity: 0, y: 14 },
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: -8 },
+      }
+
   return (
-    <div key={pathname} className="page-enter">
-      <Outlet />
-    </div>
+    <AnimatePresence mode="popLayout" initial={false}>
+      <m.div
+        key={seg}
+        variants={variants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={{ duration: reduce ? 0.2 : 0.4, ease: [0.2, 0.7, 0.3, 1] }}
+      >
+        <Outlet />
+      </m.div>
+    </AnimatePresence>
   )
 }
 
@@ -111,8 +143,11 @@ function RouteEffects() {
   // light stagger — skipped entirely under prefers-reduced-motion
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    // NB: .map-col is intentionally NOT here — Home's sitemap columns are now
+    // animated by framer-motion (Stagger/StaggerItem), and letting both drive the
+    // same opacity would fight. Keep this observer for the pages not yet migrated.
     const els = document.querySelectorAll(
-      '.section-title, .map-col, .engine-card, .sys-card, .spec-grid, .cmp-body, .proj-card, .safety-panel, .count-strip, .comp-card, .timeline, .ac-actions',
+      '.section-title, .engine-card, .sys-card, .spec-grid, .cmp-body, .proj-card, .safety-panel, .count-strip, .comp-card, .timeline, .ac-actions',
     )
     const io = new IntersectionObserver(
       (entries) => {
@@ -138,6 +173,10 @@ function RouteEffects() {
 
 export default function App() {
   return (
+    // LazyMotion + the `m` component ship only the DOM-animation feature bundle
+    // (~half of full framer-motion), keeping the shared initial chunk lean —
+    // the site's code-splitting budget matters (projector kiosk, live-only users).
+    <LazyMotion features={domAnimation} strict>
     <div className="app">
       <RouteEffects />
       <ParallaxDriver />
@@ -239,5 +278,6 @@ export default function App() {
         </div>
       </footer>
     </div>
+    </LazyMotion>
   )
 }

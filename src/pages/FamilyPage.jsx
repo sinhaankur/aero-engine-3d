@@ -1,9 +1,14 @@
 import { Link, useParams } from 'react-router-dom'
+import { m, useReducedMotion } from 'framer-motion'
 import { getFamily, getAircraftForFamily } from '../data/index.js'
 import { RISK_LEVELS } from '../data/schema.js'
+import { container, item, itemReduced } from '../lib/motion.jsx'
+
+const MLink = m(Link)
 
 export default function FamilyPage() {
   const { familyId } = useParams()
+  const reduce = useReducedMotion()
   const family = getFamily(familyId)
   const aircraft = getAircraftForFamily(familyId)
 
@@ -34,11 +39,23 @@ export default function FamilyPage() {
       <p className="intro">{family.intro}</p>
 
       <h2 className="section-title">Family journey</h2>
-      <div className="journey">
+      <m.div
+        className="journey"
+        variants={container(0.07)}
+        initial="hidden"
+        animate="show"
+      >
         {ordered.map((a) => {
           const risk = RISK_LEVELS[a.safety.risk]
           return (
-            <Link key={a.id} to={`/family/${familyId}/${a.id}`} className="journey-row">
+            <MLink
+              key={a.id}
+              to={`/family/${familyId}/${a.id}`}
+              className="journey-row"
+              variants={reduce ? itemReduced : item}
+              whileHover={reduce ? undefined : { x: 6 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+            >
               <div className="journey-year">{a.firstFlightYear}</div>
               <div className="journey-dot" />
               <div className="journey-body">
@@ -55,10 +72,10 @@ export default function FamilyPage() {
                   </span>
                 </div>
               </div>
-            </Link>
+            </MLink>
           )
         })}
-      </div>
+      </m.div>
     </div>
   )
 }
