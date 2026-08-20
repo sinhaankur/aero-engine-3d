@@ -242,8 +242,10 @@ function ProgressDriver({ live, previewing, secs, out, onLiveTakeover }) {
 }
 
 export default function RouteGlobe({ from, to, progress = 0, height = 560, cinematic = true, autoPreview = false }) {
-  // auto-start the flyover on open when nothing's really flying, so the globe is
-  // immediately cinematic; the user can stop it any time
+  // The flyover is now OPT-IN, not an endless auto-loop: the globe opens as an
+  // interactive, orbitable planet (gentle auto-rotate) and you press ▶ to watch
+  // the cinematic leg. `autoPreview` is kept for callers that still want it, but
+  // a real live leg (progress>0) always drives the ride regardless.
   const [previewing, setPreviewing] = useState(autoPreview && progress < 0.001)
   const progressRef = useRef(progress)
   // keep the shared ref seeded with the latest live progress so the first frame
@@ -280,10 +282,12 @@ export default function RouteGlobe({ from, to, progress = 0, height = 560, cinem
             out={progressRef}
             onLiveTakeover={() => setPreviewing(false)}
           />
+          {/* orbit whenever the cinematic ride ISN'T running — drag to inspect the
+              planet, gentle auto-rotate when idle. makeDefault so drag events bind. */}
           {!flying && (
             <OrbitControls
               enablePan={false} minDistance={2.6} maxDistance={9}
-              enableDamping autoRotate autoRotateSpeed={0.4} makeDefault
+              enableDamping autoRotate autoRotateSpeed={0.35} rotateSpeed={0.6} makeDefault
             />
           )}
         </Canvas>

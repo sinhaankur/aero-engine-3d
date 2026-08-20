@@ -625,8 +625,11 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 }
 .fly-topbar > * { flex: 0 0 auto; }   /* controls keep their size, don't shrink */
 /* back-to-site link — the immersive fly page hides the global nav, so this is
-   the way out. Styled like the other control-strip buttons. */
+   the way out. Pinned sticky at the left of the scrolling strip so it's ALWAYS
+   reachable even when the controls overflow horizontally. */
 .fly-home {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--bg); box-shadow: 8px 0 8px -4px var(--bg);
   display: inline-flex; align-items: center; gap: 6px;
   padding: 7px 12px; border: 1px solid var(--border-2); border-radius: 3px;
   color: var(--fg); text-decoration: none;

@@ -287,7 +287,7 @@ export default function FlyPage() {
       <div className={`fly-stage ${photo ? 'photo' : ''}`}>
         <Suspense fallback={<div className="viewport-loading" style={{ height: '100%' }}>Loading world…</div>}>
           {view === 'globe' ? (
-            <RouteGlobe from={from} to={to} progress={leg.frac} height="100%" cinematic autoPreview />
+            <RouteGlobe from={from} to={to} progress={leg.frac} height="100%" cinematic />
           ) : flyable && (
             <FlightScene
               simRef={simRef}
