@@ -54,22 +54,41 @@ function sunDirection(date, out = new THREE.Vector3()) {
 }
 
 const earthVert = `
-  varying vec2 vUv; varying vec3 vP;
+  varying vec2 vUv; varying vec3 vP; varying vec3 vWorld;
   void main(){ vUv = uv; vP = normalize(position);
+    vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
 `
 const earthFrag = `
-  uniform sampler2D uDay; uniform sampler2D uNight; uniform vec3 uSun;
-  varying vec2 vUv; varying vec3 vP;
+  uniform sampler2D uDay; uniform sampler2D uNight; uniform vec3 uSun; uniform vec3 uCam;
+  varying vec2 vUv; varying vec3 vP; varying vec3 vWorld;
   void main(){
-    float d = dot(normalize(vP), normalize(uSun));   // -1 night .. 1 subsolar
-    float day = smoothstep(-0.12, 0.25, d);          // soft terminator
-    vec3 dayCol = texture2D(uDay, vUv).rgb;
-    vec3 nightCol = texture2D(uNight, vUv).rgb * 1.5; // boost the city lights
+    vec3 N = normalize(vP);
+    vec3 S = normalize(uSun);
+    float d = dot(N, S);                              // -1 night .. 1 subsolar
+    float day = smoothstep(-0.12, 0.25, d);           // soft terminator
+    vec3 dayTex = texture2D(uDay, vUv).rgb;
+    vec3 nightCol = texture2D(uNight, vUv).rgb * 1.6;  // boost the city lights
+
+    // Ocean is dark blue and fairly uniform in the Blue Marble map; detect it as
+    // "dark + bluish" so we can give water a subtle sun glint (specular) and land
+    // stays matte — the single biggest cue that reads as a real planet.
+    float lum = dot(dayTex, vec3(0.299, 0.587, 0.114));
+    float isWater = smoothstep(0.28, 0.10, lum) * step(dayTex.r, dayTex.b + 0.02);
+
+    // day-side diffuse shading so the subsolar point is brighter than the limb
+    vec3 dayCol = dayTex * (0.55 + 0.75 * max(d, 0.0));
+
+    // specular sun-glint off water (Blinn-ish), only on the lit hemisphere
+    vec3 V = normalize(uCam - vWorld);
+    vec3 H = normalize(S + V);
+    float spec = pow(max(dot(N, H), 0.0), 60.0) * isWater * smoothstep(0.0, 0.2, d);
+    dayCol += vec3(1.0, 0.92, 0.72) * spec * 0.9;
+
     vec3 col = mix(nightCol, dayCol, day);
     // warm gold band riding the terminator
     float term = smoothstep(0.9, 1.0, 1.0 - abs(d));
-    col += vec3(0.35, 0.18, 0.05) * term;
+    col += vec3(0.40, 0.20, 0.06) * term;
     gl_FragColor = vec4(col, 1.0);
   }
 `
@@ -92,17 +111,28 @@ export default function Earth({ radius = 2, showGraticule = true, coastlines }) 
         uDay: { value: day },
         uNight: { value: night },
         uSun: { value: sunDirection(new Date()) },
+        uCam: { value: new THREE.Vector3() },
       },
       vertexShader: earthVert,
       fragmentShader: earthFrag,
     })
   }, [day, night])
 
+  // Shared uniforms for the two atmosphere shells: the live sun direction and the
+  // live camera world-position (so the fresnel rim tracks the true limb as the
+  // globe spins). Both surface materials reference these same objects.
+  const rimUniforms = useMemo(() => ({
+    uSun: mat.uniforms.uSun,
+    uCam: { value: new THREE.Vector3() },
+  }), [mat])
+
   // update the sun once a minute of wall-clock is plenty; recompute each frame is
   // cheap enough and keeps a long-open globe correct as real time passes
   const sunTmp = useRef(new THREE.Vector3())
-  useFrame(() => {
+  useFrame((state) => {
     mat.uniforms.uSun.value.copy(sunDirection(new Date(), sunTmp.current))
+    mat.uniforms.uCam.value.copy(state.camera.position)
+    rimUniforms.uCam.value.copy(state.camera.position)
   })
 
   const surface = (lat, lon, out) => {
@@ -143,7 +173,7 @@ export default function Earth({ radius = 2, showGraticule = true, coastlines }) 
   return (
     <group>
       <mesh material={mat}><sphereGeometry args={[radius, 96, 96]} /></mesh>
-      {/* inner fresnel atmosphere rim — tight, bright, sun-lit */}
+      {/* inner fresnel atmosphere rim — tight, bright, sun-lit, tracks the limb */}
       <mesh scale={1.045}>
         <sphereGeometry args={[radius, 64, 64]} />
         <shaderMaterial
@@ -151,28 +181,60 @@ export default function Earth({ radius = 2, showGraticule = true, coastlines }) 
           side={THREE.BackSide}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
-          uniforms={{ uSun: mat.uniforms.uSun }}
-          vertexShader={`varying vec3 vN; varying vec3 vP; void main(){ vN=normalize(normalMatrix*normal); vP=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `}
-          fragmentShader={`uniform vec3 uSun; varying vec3 vN; varying vec3 vP; void main(){ float rim=pow(1.0-abs(dot(normalize(vN),vec3(0.0,0.0,1.0))),3.0); float lit=smoothstep(-0.25,0.7,dot(normalize(vP),normalize(uSun))); vec3 c=mix(vec3(0.10,0.28,0.55),vec3(0.45,0.72,1.0),lit); gl_FragColor=vec4(c, rim*(0.35+lit*0.5));} `}
+          uniforms={rimUniforms}
+          vertexShader={rimVert}
+          fragmentShader={rimFrag(3.0, 'vec3(0.45,0.72,1.0)', 'vec3(0.10,0.28,0.55)', 1.0)}
         />
       </mesh>
       {/* outer haze shell — soft wide glow that fakes atmospheric bloom */}
-      <mesh scale={1.14}>
+      <mesh scale={1.16}>
         <sphereGeometry args={[radius, 48, 48]} />
         <shaderMaterial
           transparent
           side={THREE.BackSide}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
-          uniforms={{ uSun: mat.uniforms.uSun }}
-          vertexShader={`varying vec3 vN; varying vec3 vP; void main(){ vN=normalize(normalMatrix*normal); vP=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `}
-          fragmentShader={`uniform vec3 uSun; varying vec3 vN; varying vec3 vP; void main(){ float rim=pow(1.0-abs(dot(normalize(vN),vec3(0.0,0.0,1.0))),4.5); float lit=smoothstep(-0.3,0.8,dot(normalize(vP),normalize(uSun))); gl_FragColor=vec4(vec3(0.25,0.5,0.95)*(0.5+lit), rim*0.4*(0.4+lit*0.6)); }`}
+          uniforms={rimUniforms}
+          vertexShader={rimVert}
+          fragmentShader={rimFrag(4.5, 'vec3(0.30,0.55,1.0)', 'vec3(0.08,0.16,0.38)', 0.45)}
         />
       </mesh>
       {coasts && <lineSegments geometry={coasts}><lineBasicMaterial color="#9fd0ec" transparent opacity={0.4} /></lineSegments>}
       {graticule && <lineSegments geometry={graticule}><lineBasicMaterial color="#2b485c" transparent opacity={0.22} /></lineSegments>}
     </group>
   )
+}
+
+/**
+ * Fresnel atmosphere shells for the globe. Two additive back-side shells give a
+ * tight bright inner rim and a soft wide haze. The fresnel is computed against
+ * the REAL view direction (camera → fragment), so the glow rides the true limb
+ * of the globe as it spins — the earlier version used a fixed screen-space axis
+ * and the halo stuck to one edge instead of tracking the horizon. The lit side
+ * is brighter (day-side scattering) via the shared sun uniform.
+ */
+const rimVert = `
+  varying vec3 vWorld; varying vec3 vNormalW; varying vec3 vP;
+  void main(){
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorld = wp.xyz;
+    vNormalW = normalize(mat3(modelMatrix) * normal);
+    vP = normalize(position);
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`
+function rimFrag(power, tintDay, tintNight, alpha) {
+  return `
+    uniform vec3 uSun; uniform vec3 uCam;
+    varying vec3 vWorld; varying vec3 vNormalW; varying vec3 vP;
+    void main(){
+      vec3 view = normalize(uCam - vWorld);
+      float rim = pow(1.0 - abs(dot(normalize(vNormalW), view)), ${power.toFixed(1)});
+      float lit = smoothstep(-0.3, 0.75, dot(normalize(vP), normalize(uSun)));
+      vec3 c = mix(${tintNight}, ${tintDay}, lit);
+      gl_FragColor = vec4(c, rim * ${alpha} * (0.35 + lit * 0.65));
+    }
+  `
 }
 
 /**
