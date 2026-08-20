@@ -13,11 +13,13 @@ const CX = 230
 const CY = 172
 const PPD = 4.6 // pixels per degree of pitch
 
-function SpeedTape({ ias, stallKt, vr }) {
+const SPD_PPK = 2.4 // px per knot on the speed tape
+
+function SpeedTape({ ias, stallKt, vr, v2, vsel, trendKt }) {
   const ticks = []
   const lo = Math.max(0, Math.floor((ias - 55) / 10) * 10)
   for (let v = lo; v <= ias + 55; v += 10) {
-    const y = CY + (ias - v) * 2.4
+    const y = CY + (ias - v) * SPD_PPK
     if (y < 30 || y > 320) continue
     ticks.push(
       <g key={v}>
@@ -28,8 +30,24 @@ function SpeedTape({ ias, stallKt, vr }) {
       </g>
     )
   }
-  // red band below stall speed, amber near it
-  const stallY = CY + (ias - stallKt) * 2.4
+  const yOf = (v) => CY + (ias - v) * SPD_PPK
+  const clampY = (y) => Math.max(28, Math.min(322, y))
+  // red band below stall speed
+  const stallY = yOf(stallKt)
+  // speed bugs: VR / V2 (takeoff refs) drawn on the tape when in range
+  const bug = (v, color, label) => {
+    const y = yOf(v)
+    if (y < 30 || y > 320) return null
+    return (
+      <g key={label}>
+        <path d={`M 71 ${y} l 8 -5 v 10 z`} fill={color} />
+        <text x={83} y={y + 4} fill={color} fontSize="10" fontFamily="monospace">{label}</text>
+      </g>
+    )
+  }
+  // speed trend vector: a magenta arrow toward where IAS will be in ~10 s
+  const trendEndY = clampY(CY - trendKt * SPD_PPK)
+  const showTrend = Math.abs(trendKt) > 1.5
   return (
     <g>
       <rect x={14} y={26} width={58} height={298} fill="#161b22" stroke="#30363d" />
@@ -37,21 +55,36 @@ function SpeedTape({ ias, stallKt, vr }) {
       {stallY > 26 && (
         <rect x={64} y={Math.max(stallY, 26)} width={7} height={Math.max(0, 324 - Math.max(stallY, 26))} fill="#f85149" />
       )}
+      {/* selected-speed bug (cyan) from the FCU */}
+      {vsel != null && yOf(vsel) > 28 && yOf(vsel) < 322 && (
+        <path d={`M 60 ${yOf(vsel)} l 12 -6 v 12 z`} fill="none" stroke="#22d3ee" strokeWidth="2" />
+      )}
+      {bug(vr, '#e6edf3', 'VR')}
+      {bug(v2, '#22d3ee', 'V2')}
+      {/* trend vector */}
+      {showTrend && (
+        <g stroke="#e879f9" strokeWidth="2.4" fill="none">
+          <line x1={73} y1={CY} x2={73} y2={trendEndY} />
+          <path d={`M 73 ${trendEndY} l -4 ${trendKt > 0 ? 7 : -7} M 73 ${trendEndY} l 4 ${trendKt > 0 ? 7 : -7}`} />
+        </g>
+      )}
       <rect x={12} y={CY - 14} width={62} height={28} fill="#0d1117" stroke="#e3b341" strokeWidth="1.5" />
       <text x={43} y={CY + 6} fill="#e3b341" fontSize="17" textAnchor="middle" fontFamily="monospace" fontWeight="700">
         {Math.round(ias)}
       </text>
-      <text x={43} y={340} fill="#8b949e" fontSize="10" textAnchor="middle" fontFamily="monospace">IAS KT · VR {Math.round(vr)}</text>
+      <text x={43} y={340} fill="#8b949e" fontSize="10" textAnchor="middle" fontFamily="monospace">IAS KT</text>
     </g>
   )
 }
 
-function AltTape({ alt, vs }) {
+const ALT_PPF = 0.42 // px per foot on the altitude tape
+
+function AltTape({ alt, vs, altSel }) {
   const ticks = []
   const lo = Math.floor((alt - 320) / 100) * 100
   for (let v = lo; v <= alt + 320; v += 100) {
     if (v < 0) continue
-    const y = CY + (alt - v) * 0.42
+    const y = CY + (alt - v) * ALT_PPF
     if (y < 30 || y > 320) continue
     ticks.push(
       <g key={v}>
@@ -63,10 +96,19 @@ function AltTape({ alt, vs }) {
     )
   }
   const vsY = Math.max(-60, Math.min(60, -vs / 35))
+  const selY = altSel != null ? CY + (alt - altSel) * ALT_PPF : null
   return (
     <g>
       <rect x={386} y={26} width={58} height={298} fill="#161b22" stroke="#30363d" />
       {ticks}
+      {/* selected-altitude bug (cyan) — clamped to the top/bottom when off-tape */}
+      {selY != null && (
+        <path
+          d={`M 386 ${Math.max(30, Math.min(320, selY))} h 58`}
+          stroke="#22d3ee" strokeWidth="2.5" fill="none"
+          strokeDasharray={selY < 30 || selY > 320 ? '4 3' : undefined}
+        />
+      )}
       <rect x={384} y={CY - 14} width={62} height={28} fill="#0d1117" stroke="#3fb950" strokeWidth="1.5" />
       <text x={415} y={CY + 6} fill="#3fb950" fontSize="16" textAnchor="middle" fontFamily="monospace" fontWeight="700">
         {Math.round(alt)}
@@ -160,26 +202,83 @@ function HeadingTape({ hdg }) {
   )
 }
 
+const KT = 0.514444
+
+/**
+ * The Airbus FMA (Flight Mode Annunciator): three green columns across the top —
+ * thrust/speed mode | vertical mode | lateral mode — with the AP/FD/ATHR
+ * engagement row beneath. Modes are derived from the sim's AP/phase state so the
+ * boxes light up as the flight progresses, the way a real one does.
+ */
+function FMA({ state, out }) {
+  const athr = state.athrOn
+  const ap = state.apOn
+  // thrust column
+  const col1 = state.onGround
+    ? (state.throttle > 0.8 ? 'MAN TOGA' : 'MAN THR')
+    : athr ? 'SPEED' : (state.throttle > 0.9 ? 'THR CLB' : 'MAN THR')
+  // vertical column
+  const col2 = state.onGround ? '—'
+    : ap ? (state.apVsMode ? 'V/S' : 'ALT') : (out.vsFpm > 200 ? 'CLB' : out.vsFpm < -200 ? 'DES' : 'ALT*')
+  // lateral column
+  const col3 = state.onGround ? 'RWY'
+    : ap ? (state.apHdgMode ? 'HDG' : 'NAV') : 'HDG'
+  const cell = (x, txt, active) => (
+    <g>
+      {active && <rect x={x - 44} y={5} width={88} height={17} rx={2} fill="none" stroke="#3fb950" strokeWidth="1" />}
+      <text x={x} y={17} fill="#3fb950" fontSize="11" textAnchor="middle" fontFamily="monospace" fontWeight="700">{txt}</text>
+    </g>
+  )
+  return (
+    <g>
+      <line x1={W / 3} x2={W / 3} y1={3} y2={24} stroke="#30363d" strokeWidth="0.8" />
+      <line x1={(2 * W) / 3} x2={(2 * W) / 3} y1={3} y2={24} stroke="#30363d" strokeWidth="0.8" />
+      {cell(W / 6, col1, athr || state.onGround)}
+      {cell(W / 2, col2, ap)}
+      {cell((5 * W) / 6, col3, ap)}
+      {/* engagement row */}
+      <text x={CX} y={34} fill="#22d3ee" fontSize="9" textAnchor="middle" fontFamily="monospace">
+        {ap ? 'AP1  ' : ''}1FD2  {athr ? 'A/THR' : ''}
+      </text>
+    </g>
+  )
+}
+
 export default function PFD({ out, state, ac, weatherName }) {
   if (!out) return null
   // stall speed in IAS terms: Vs = sqrt(2W / (rho0 · S · CLmax))
   const vsKt = Math.sqrt((2 * ac.mass * 9.81) / (1.225 * ac.S * (ac.clMaxClean + ac.flaps[state.flap].dCl))) / 0.514444
 
+  // speed trend: net longitudinal accel × 10 s, converted TAS→IAS. Uses the same
+  // forces the model exposes, so the magenta arrow predicts where IAS is heading.
+  const sinG = Math.sin(state.gamma || 0)
+  const axMs2 = (out.T * Math.cos(state.alpha) - out.D) / ac.mass - 9.80665 * sinG
+  const trendKt = (axMs2 * 10 / KT) * Math.sqrt(out.atm.sigma) // 10-s trend, in IAS kt
+
+  // FCU selected targets for the bugs (only meaningful once flying / AP armed)
+  const altSel = state.fcuAlt != null ? state.fcuAlt : null
+  const vSel = state.athrOn ? state.fcuSpd : null
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="pfd" role="img" aria-label="Primary flight display">
       <rect x={0} y={0} width={W} height={H} rx={10} fill="#0d1117" stroke="#30363d" />
-      {/* FMA row */}
-      <text x={16} y={18} fill="#3fb950" fontSize="11" fontFamily="monospace">
-        {state.onGround ? 'GND' : state.apOn ? 'AP1 · ALT HLD' : 'MANUAL FLT'}
-      </text>
-      <text x={CX} y={18} fill="#58a6ff" fontSize="11" textAnchor="middle" fontFamily="monospace">
-        FLAPS {ac.flaps[state.flap].name} · GEAR {state.gear ? 'DN' : 'UP'}
-      </text>
-      <text x={W - 16} y={18} fill="#8b949e" fontSize="11" textAnchor="end" fontFamily="monospace">{weatherName}</text>
+      {/* FMA — three-column Airbus annunciator */}
+      <FMA state={state} out={out} />
 
       <Attitude pitch={(state.theta * 180) / Math.PI} roll={(state.phi * 180) / Math.PI} stalled={state.stalled} />
-      <SpeedTape ias={out.iasKt} stallKt={vsKt} vr={ac.vr / 0.514444} />
-      <AltTape alt={out.altFt} vs={out.vsFpm} />
+      {/* config + weather strip, centred below the attitude sphere (clear of the tapes) */}
+      <text x={CX} y={CY + 108} fill="#58a6ff" fontSize="11" textAnchor="middle" fontFamily="monospace">
+        FLAPS {ac.flaps[state.flap].name} · GEAR {state.gear ? 'DN' : 'UP'} · {weatherName}
+      </text>
+      <SpeedTape
+        ias={out.iasKt}
+        stallKt={vsKt}
+        vr={ac.vr / KT}
+        v2={ac.v2 / KT}
+        vsel={vSel}
+        trendKt={trendKt}
+      />
+      <AltTape alt={out.altFt} vs={out.vsFpm} altSel={altSel} />
       <HeadingTape hdg={out.hdg} />
 
       {out.overspeed && (
