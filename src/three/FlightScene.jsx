@@ -633,19 +633,25 @@ function CloudDeck({ skyId, simRef }) {
   if (!cfg) return null
   return (
     <group ref={groupRef}>
-      <Clouds material={THREE.MeshLambertMaterial} limit={puffs.length * 26} range={puffs.length}>
+      {/* drei's <Cloud>: `bounds` is the cloud's extent in metres (segments are
+          scattered across it), and `volume` is the SIZE of each puff-sprite — it
+          must scale with the cloud or the sprites are microscopic inside a huge
+          box (that was the bug: default volume 6 in a 300 m cloud = invisible).
+          ~0.16×scale makes ~50–115 m sprites that overlap into a solid cloud. */}
+      <Clouds material={THREE.MeshLambertMaterial} limit={puffs.length * 40}>
         {puffs.map((p, i) => (
           <Cloud
             key={i}
             seed={p.seed}
             position={[p.x, p.y, p.z]}
-            bounds={[p.scale, p.scale * 0.35, p.scale]}
-            volume={p.scale * 0.6}
-            segments={18}
+            bounds={[p.scale, p.scale * 0.4, p.scale]}
+            segments={26}
+            volume={p.scale * 0.16}
+            growth={p.scale * 0.05}
+            concentrate="inside"
             opacity={cfg.opacity}
-            growth={p.scale * 0.45}
-            speed={0.06}
-            color="#eef2f7"
+            speed={0.05}
+            color="#f2f5fa"
           />
         ))}
       </Clouds>
