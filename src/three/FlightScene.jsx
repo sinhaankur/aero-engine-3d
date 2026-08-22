@@ -1090,8 +1090,13 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
   return (
     <CanvasFallback label="3D flight view unavailable on this device">
       <Canvas
-        shadows
-        // dpr cap keeps 4K/retina from tanking the framerate; high-perf GPU hint
+        // NB: no `shadows`. Enabling the shadow-map pass rendered the ENTIRE /fly
+        // scene pure black (verified by headless render: /simulate + /live render
+        // fine, /fly went black, and removing `shadows` restored it) — the
+        // aircraft-following shadow frustum over the huge receiveShadow ground was
+        // producing a broken/black shadow map. The scene is fully lit by the
+        // directional + hemisphere + environment lights without it. Do not
+        // re-enable shadows without a small dedicated shadow-catcher + testing.
         dpr={[1, 1.75]}
         gl={{ powerPreference: 'high-performance', antialias: true }}
         camera={{ position: [150, 40, 1700], fov: 45, near: 0.5, far: 90000 }}
