@@ -1,6 +1,7 @@
-import { Suspense, useEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Html, Environment, Lightformer, Text, Sky, Stars, Clouds, Cloud, useKTX2 } from '@react-three/drei'
+import { Html, Environment, Lightformer, Text, Sky, Stars, Clouds, Cloud } from '@react-three/drei'
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { useGLTF } from './gltf.js'
 import * as THREE from 'three'
 import CanvasFallback from './CanvasFallback.jsx'
@@ -919,19 +920,32 @@ const M_PER_DEG_LAT = 111320
  * beyond the map so the horizon still reads as land, not a hard texture edge.
  */
 function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 1500000 }) {
-  const { day } = useKTX2({ day: EARTH_DAY_URL }, EARTH_BASIS)
+  const { gl } = useThree()
   const matRef = useRef()
   const detailMatRef = useRef()
-
-  const tex = useMemo(() => {
-    if (!day) return null
-    const t = day.clone()
-    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping
-    t.colorSpace = THREE.SRGBColorSpace
-    t.anisotropy = 8
-    t.needsUpdate = true
-    return t
-  }, [day])
+  // Load the NASA KTX2 IMPERATIVELY (non-suspending): the scene must never block
+  // on it — a slow or failed transcode (e.g. software WebGL) would otherwise
+  // freeze the whole world on "Loading…". We render the procedural detail ground
+  // immediately and swap the real Earth in when/if the texture arrives.
+  const [tex, setTex] = useState(null)
+  useEffect(() => {
+    let alive = true
+    let loader
+    try {
+      loader = new KTX2Loader().setTranscoderPath(EARTH_BASIS).detectSupport(gl)
+    } catch {
+      return undefined
+    }
+    loader.load(EARTH_DAY_URL, (t) => {
+      if (!alive) { t.dispose?.(); return }
+      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping
+      t.colorSpace = THREE.SRGBColorSpace
+      t.anisotropy = 8
+      t.needsUpdate = true
+      setTex(t)
+    }, undefined, () => { /* transcode failed — stay on the procedural ground */ })
+    return () => { alive = false; loader.dispose?.() }
+  }, [gl])
 
   // The NASA map is low-res at runway scale, so multiply in the high-frequency
   // procedural field texture (fields/soil/speckle) tiled tightly — real land
@@ -942,6 +956,18 @@ function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 15000
     const d = detailTex.clone()
     d.wrapS = d.wrapT = THREE.RepeatWrapping
     d.repeat.set(DETAIL_SIZE / 1400, DETAIL_SIZE / 1400) // ~1.4 km detail tile
+    d.needsUpdate = true
+    return d
+  }, [detailTex])
+
+  // base ground texture: the procedural land tiled a handful of times across the
+  // 64 km sheet (varied land, not a stamped tile) — the instant, always-there
+  // surface under everything.
+  const groundBase = useMemo(() => {
+    if (!detailTex) return null
+    const d = detailTex.clone()
+    d.wrapS = d.wrapT = THREE.RepeatWrapping
+    d.repeat.set(12, 12)
     d.needsUpdate = true
     return d
   }, [detailTex])
@@ -977,21 +1003,27 @@ function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 15000
     }
   })
 
-  if (!tex) return null
   return (
     <group>
-      {/* real NASA land colour + coastlines */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
-        <planeGeometry args={[sizeM, sizeM]} />
-        <meshStandardMaterial ref={matRef} map={tex} roughness={1} />
+      {/* ALWAYS-present base ground: the procedural land texture as a lit, opaque
+          surface. This renders instantly (no async), so there's a proper lit
+          ground from frame one whether or not the NASA texture ever loads. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.06, 0]} receiveShadow>
+        <planeGeometry args={[64000, 64000]} />
+        <meshStandardMaterial map={groundBase} roughness={1} />
       </mesh>
+      {/* real NASA land colour + coastlines, laid over the base once loaded */}
+      {tex && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
+          <planeGeometry args={[sizeM, sizeM]} />
+          <meshStandardMaterial ref={matRef} map={tex} roughness={1} />
+        </mesh>
+      )}
       {/* high-frequency detail multiplied over the top so the surface has crisp
-          texture underfoot (the NASA map alone is soft at runway scale). Tiled
-          tightly, faded with distance via the scene fog, multiply blend. */}
-      {detail && (
+          texture underfoot (the NASA map alone is soft at runway scale). Only
+          when the NASA layer is present — otherwise the base already IS detail. */}
+      {tex && detail && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
-          {/* detail only needs to cover the near field (fades by 3 km); a smaller
-              plane keeps the tight tiling dense where it's actually seen */}
           <planeGeometry args={[80000, 80000]} />
           <meshBasicMaterial ref={detailMatRef} map={detail} transparent opacity={0.5} blending={THREE.MultiplyBlending} depthWrite={false} />
         </mesh>
@@ -1064,6 +1096,12 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
         gl={{ powerPreference: 'high-performance', antialias: true }}
         camera={{ position: [150, 40, 1700], fov: 45, near: 0.5, far: 90000 }}
       >
+        {/* One Suspense INSIDE the Canvas: several drei helpers here (Sky, Clouds,
+            Cloud, Environment) suspend while they lazy-load. Without a boundary in
+            the Canvas, that suspension bubbles to FlyPage's outer fallback and the
+            whole world hangs on "Loading world…". Catch it here so the scene keeps
+            rendering as pieces resolve. */}
+        <Suspense fallback={null}>
         <FlightSky sky={sky} simRef={simRef} />
         {!night && <SunGlare sunDir={sunDir} tint={sky.sunTint} strength={sky.sun / 1.5} />}
         <CloudDeck skyId={weather.sky} simRef={simRef} />
@@ -1092,16 +1130,10 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
           <Lightformer intensity={0.3} color={sky.ground} form="rect" scale={[24, 24, 1]} position={[0, -10, 0]} rotation={[-Math.PI / 2, 0, 0]} />
         </Environment>
 
-        {/* real NASA Blue Marble terrain around the departure field; falls back to
-            the procedural field texture while the KTX2 loads (or if it fails) */}
-        <Suspense fallback={
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
-            <planeGeometry args={[64000, 64000]} />
-            <meshStandardMaterial map={groundTex} roughness={1} />
-          </mesh>
-        }>
-          <RealGround simRef={simRef} detailTex={groundTex} lat={airport?.lat ?? 51.47} lon={airport?.lon ?? -0.45} />
-        </Suspense>
+        {/* real NASA Blue Marble terrain around the departure field. RealGround is
+            now synchronous — it renders the procedural base instantly and swaps in
+            the NASA map imperatively when it loads, so the world never blocks. */}
+        <RealGround simRef={simRef} detailTex={groundTex} lat={airport?.lat ?? 51.47} lon={airport?.lon ?? -0.45} />
         <Runway night={night} halfLen={runwayHalfLen} airport={airport} />
         <Buildings />
 
@@ -1113,6 +1145,7 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
         <TouchdownSmoke simRef={simRef} />
         <Runner simRef={simRef} />
         <CameraRig simRef={simRef} groupRef={groupRef} view={view} dims={dims} />
+        </Suspense>
       </Canvas>
     </CanvasFallback>
   )
