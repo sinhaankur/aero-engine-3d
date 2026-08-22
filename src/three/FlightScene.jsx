@@ -815,8 +815,10 @@ function Contrails({ simRef, dims }) {
     const s = simRef.current?.state
     if (!s || !geom.current) return
     const altFt = s.h / 0.3048
-    // form only up high & cold, and only when actually moving forward
-    const forming = altFt > 26000 && s.v > 80 && !s.onGround
+    // Contrails form in cold, moist air aloft. The real threshold is ~FL260, but
+    // this sim's short hops rarely get that high, so trigger from ~15,000 ft so
+    // you actually see them on a normal climb — a reasonable dramatic licence.
+    const forming = altFt > 15000 && s.v > 80 && !s.onGround
     // half-span offset, in world space, perpendicular to heading
     const halfSpan = (dims?.wingspanM || 34) / 2
     const cosP = Math.cos(s.psi), sinP = Math.sin(s.psi)
