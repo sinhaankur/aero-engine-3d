@@ -55,6 +55,8 @@ export default function FlyPage() {
   const [photo, setPhoto] = useState(false)
   const [showBoard, setShowBoard] = useState(false)
   const [cleared, setCleared] = useState(false)   // departure-slot clearance
+  const [optionsOpen, setOptionsOpen] = useState(false) // ⋯ options drawer
+  const optionsRef = useRef(null)
   const audioRef = useRef(null)
   if (audioRef.current == null) audioRef.current = new FlightAudio()
   const [, forceTick] = useState(0)
@@ -222,6 +224,21 @@ export default function FlyPage() {
   // reset ATC transcript when the aircraft or departure changes
   useEffect(() => { atcMem.current = null; setAtcLog([]) }, [acKey, fromCode])
 
+  // ---- options drawer: close on click-outside or Escape ----
+  useEffect(() => {
+    if (!optionsOpen) return
+    const onDown = (e) => { if (!optionsRef.current?.contains(e.target)) setOptionsOpen(false) }
+    const onKey = (e) => { if (e.key === 'Escape') setOptionsOpen(false) }
+    // pointerdown (not click) so it closes before a control inside a re-opened
+    // menu can be re-triggered; capture so it fires even over the Canvas
+    window.addEventListener('pointerdown', onDown, true)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', onDown, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [optionsOpen])
+
   const s = simRef.current.state
   const c = simRef.current.controls
   // live startup checklist (only meaningful when spawned cold & dark)
@@ -232,56 +249,100 @@ export default function FlyPage() {
   return (
     <div className={`fly-page ${mode === 'deck' ? 'has-deck' : ''}`}>
       <div className="fly-topbar">
-        <a href="#/" className="fly-home" title="Back to the site" aria-label="Home">✈ Home</a>
-        <select value={acKey} onChange={(e) => setAcKey(e.target.value)} aria-label="Aircraft">
-          {FAMILIES.map((f) => (
-            <optgroup key={f.id} label={f.name}>
-              {getAircraftForFamily(f.id).filter((a) => a.model).map((a) => (
-                <option key={a.id} value={`${f.id}/${a.id}`}>{shortName(a.name)}</option>
+        {/* ROW 1 — essentials: home, what you fly, where, the weather */}
+        <div className="fly-bar-row fly-bar-main">
+          <a href="#/" className="fly-home" title="Back to the site" aria-label="Home">✈ Home</a>
+          <label className="fly-field" title="Aircraft">
+            <span className="fly-field-k">AC</span>
+            <select value={acKey} onChange={(e) => setAcKey(e.target.value)} aria-label="Aircraft">
+              {FAMILIES.map((f) => (
+                <optgroup key={f.id} label={f.name}>
+                  {getAircraftForFamily(f.id).filter((a) => a.model).map((a) => (
+                    <option key={a.id} value={`${f.id}/${a.id}`}>{shortName(a.name)}</option>
+                  ))}
+                </optgroup>
               ))}
-            </optgroup>
-          ))}
-        </select>
-        <select value={wxKey} onChange={(e) => setWxKey(e.target.value)} aria-label="Weather">
-          {Object.entries(WEATHER).map(([k, w]) => (
-            <option key={k} value={k}>{w.name}</option>
-          ))}
-        </select>
-        <select value={fromCode} onChange={(e) => setFromCode(e.target.value)} aria-label="Departure airport" title="Depart from">
-          {AIRPORTS.map((a) => <option key={a.code} value={a.code}>◐ {a.code} · {a.city}</option>)}
-        </select>
-        <span className="fly-arrow">→</span>
-        <select value={toCode} onChange={(e) => setToCode(e.target.value)} aria-label="Destination airport" title="Fly to">
-          {AIRPORTS.map((a) => <option key={a.code} value={a.code}>◑ {a.code} · {a.city}</option>)}
-        </select>
-        <div className="viewer-toggle" style={{ margin: 0 }}>
-          {VIEWS.map((v) => (
-            <button key={v.id} className={view === v.id ? 'on' : ''} onClick={() => setView(v.id)}>{v.name}</button>
-          ))}
+            </select>
+          </label>
+          <label className="fly-field" title="Depart from">
+            <span className="fly-field-k">FROM</span>
+            <select value={fromCode} onChange={(e) => setFromCode(e.target.value)} aria-label="Departure airport">
+              {AIRPORTS.map((a) => <option key={a.code} value={a.code}>{a.code} · {a.city}</option>)}
+            </select>
+          </label>
+          <span className="fly-arrow">→</span>
+          <label className="fly-field" title="Fly to">
+            <span className="fly-field-k">TO</span>
+            <select value={toCode} onChange={(e) => setToCode(e.target.value)} aria-label="Destination airport">
+              {AIRPORTS.map((a) => <option key={a.code} value={a.code}>{a.code} · {a.city}</option>)}
+            </select>
+          </label>
+          <label className="fly-field" title="Weather">
+            <span className="fly-field-k">WX</span>
+            <select value={wxKey} onChange={(e) => setWxKey(e.target.value)} aria-label="Weather">
+              {Object.entries(WEATHER).map(([k, w]) => (
+                <option key={k} value={k}>{w.name}</option>
+              ))}
+            </select>
+          </label>
+          <span className="fly-spacer" />
+          {/* ⋯ options drawer: the secondary toggles, out of the way until wanted */}
+          <div className="fly-options" ref={optionsRef}>
+            <button
+              className={`fly-reset fly-options-btn ${optionsOpen ? 'on' : ''}`}
+              onClick={() => setOptionsOpen((v) => !v)}
+              aria-haspopup="true" aria-expanded={optionsOpen}
+              title="More options"
+            >⋯ Options</button>
+            {optionsOpen && (
+              <div className="fly-drawer" role="menu">
+                <div className="fly-drawer-sec">Controls</div>
+                <div className="viewer-toggle fly-mode" style={{ margin: 0 }} title="Fly with the keyboard, or click the real flight-deck controls">
+                  {MODES.map((m) => (
+                    <button key={m.id} className={mode === m.id ? 'on' : ''} onClick={() => setMode(m.id)}>{m.name}</button>
+                  ))}
+                </div>
+                <div className="fly-drawer-sec">Panels & audio</div>
+                <button className={`fly-drawer-item ${sound ? 'on' : ''}`} onClick={toggleSound} title="Procedural engine + wind audio">
+                  <span>♪ Engine &amp; wind sound</span><span className="fly-drawer-state">{sound ? 'ON' : 'OFF'}</span>
+                </button>
+                <button className={`fly-drawer-item ${showEngine ? 'on' : ''}`} onClick={() => setShowEngine((v) => !v)} title="Live engine + fuel panel">
+                  <span>⚙ Engine &amp; fuel panel</span><span className="fly-drawer-state">{showEngine ? 'ON' : 'OFF'}</span>
+                </button>
+                <button className={`fly-drawer-item ${showBoard ? 'on' : ''}`} onClick={() => setShowBoard((v) => !v)} title="Real aircraft on the ground at your field + departure slot">
+                  <span>🛫 Departures board</span><span className="fly-drawer-state">{showBoard ? 'ON' : 'OFF'}</span>
+                </button>
+                <div className="fly-drawer-sec">Start &amp; capture</div>
+                <button className={`fly-drawer-item ${coldDark ? 'on' : ''}`} onClick={() => setColdDark((v) => !v)} title="Start cold & dark and run the real startup checklist">
+                  <span>❄ Cold &amp; dark start</span><span className="fly-drawer-state">{coldDark ? 'ON' : 'READY'}</span>
+                </button>
+                <button className={`fly-drawer-item ${photo ? 'on' : ''}`} onClick={() => setPhoto((v) => !v)} title="Hide all UI for a clean cinematic view (H)">
+                  <span>⛶ Photo mode</span><span className="fly-drawer-state">{photo ? 'ON' : 'OFF'}</span>
+                </button>
+                <div className="fly-drawer-div" />
+                <button className="fly-drawer-item" onClick={hardReload} title="Clear cached assets and reload the latest version">
+                  <span>↻ Clear cache &amp; reload</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="viewer-toggle fly-mode" style={{ margin: 0 }} title="Fly with the keyboard, or click the real flight-deck controls">
-          {MODES.map((m) => (
-            <button key={m.id} className={mode === m.id ? 'on' : ''} onClick={() => setMode(m.id)}>{m.name}</button>
-          ))}
+
+        {/* ROW 2 — the camera views + reset, always one tap away */}
+        <div className="fly-bar-row fly-bar-views">
+          <div className="viewer-toggle" style={{ margin: 0 }}>
+            {VIEWS.map((v) => (
+              <button key={v.id} className={view === v.id ? 'on' : ''} onClick={() => setView(v.id)}>{v.name}</button>
+            ))}
+          </div>
+          {/* quick-access badges so the two most immersive toggles stay one tap
+              away without opening the drawer */}
+          <button className={`fly-quick ${photo ? 'on' : ''}`} onClick={() => setPhoto((v) => !v)} title="Hide all UI for a clean cinematic view (H)">⛶ Photo</button>
+          <button className={`fly-quick ${sound ? 'on' : ''}`} onClick={toggleSound} title="Procedural engine + wind audio">{sound ? '♪ On' : '♪ Off'}</button>
+          <span className="fly-spacer" />
+          <span className="fly-blurb">{weather.blurb}</span>
+          <button className="fly-reset" onClick={reset}>↺ Reset</button>
         </div>
-        <button className={`fly-reset ${sound ? 'on' : ''}`} onClick={toggleSound} title="Procedural engine + wind audio">
-          {sound ? '♪ Sound on' : '♪ Sound off'}
-        </button>
-        <button className={`fly-reset ${showEngine ? 'on' : ''}`} onClick={() => setShowEngine((v) => !v)} title="Live engine + fuel panel">
-          ⚙ Engine
-        </button>
-        <button className={`fly-reset ${showBoard ? 'on' : ''}`} onClick={() => setShowBoard((v) => !v)} title="Real aircraft on the ground at your field + departure slot">
-          🛫 Departures
-        </button>
-        <button className={`fly-reset ${coldDark ? 'on' : ''}`} onClick={() => setColdDark((v) => !v)} title="Start cold & dark and run the real startup checklist">
-          {coldDark ? '❄ Cold & dark' : '✈ Ready'}
-        </button>
-        <button className={`fly-reset ${photo ? 'on' : ''}`} onClick={() => setPhoto((v) => !v)} title="Hide all UI for a clean cinematic view (H)">
-          ⛶ Photo
-        </button>
-        <button className="fly-reset" onClick={reset}>↺ Reset</button>
-        <button className="fly-reset" onClick={hardReload} title="Clear cached assets and reload the latest version">↻ Clear cache</button>
-        <span className="fly-blurb">{weather.blurb}</span>
       </div>
 
       <div className={`fly-stage ${photo ? 'photo' : ''}`}>

@@ -612,35 +612,80 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .fly-page .fly-help { font-size: 10.5px; gap: 12px; margin: 0; min-height: 0; }
 /* on short screens drop the help row entirely — the coach + on-screen hints
    still cover the key bindings, and the stage reclaims the height */
-@media (max-height: 760px) { .fly-page .fly-help { display: none; } }
+@media (max-height: 760px) {
+  .fly-page .fly-help { display: none; }
+  /* collapse the two control rows into one wrapping strip so the taller two-row
+     bar doesn't eat the stage where vertical space is scarce (esp. deck mode).
+     `display: contents` dissolves each row wrapper so all controls flow into the
+     one wrapping .fly-topbar flex line. */
+  .fly-topbar { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+  .fly-bar-row { display: contents; }
+  .fly-bar-main .fly-spacer { display: none; }    /* no push-apart in a wrapping line */
+  .fly-blurb { display: none; }                   /* the WX field already says it */
+  .fly-page { padding-top: 4px; gap: 4px; }
+}
 /* Cockpit-deck mode adds a 4th row for the flight-deck panel; still one screen */
 .fly-page.has-deck { grid-template-rows: auto 1fr auto auto; }
 .fly-page.has-deck .fly-stage { min-height: 0; }
-/* control strip: single row, horizontal-scroll on overflow instead of wrapping
-   into extra rows that would steal the stage's vertical space */
-.fly-topbar {
-  display: flex; align-items: center; gap: 10px;
-  flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
-  scrollbar-width: thin; padding-bottom: 2px;
-}
-.fly-topbar > * { flex: 0 0 auto; }   /* controls keep their size, don't shrink */
+/* control panel: two calm rows instead of one overloaded scrolling strip.
+   Row 1 = essentials (home, aircraft, route, weather, ⋯ options); row 2 = the
+   camera views + reset. The 6 secondary toggles now live in the ⋯ drawer. */
+.fly-topbar { display: flex; flex-direction: column; gap: 6px; }
+.fly-bar-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fly-spacer { flex: 1 1 auto; min-width: 8px; }
 /* back-to-site link — the immersive fly page hides the global nav, so this is
-   the way out. Pinned sticky at the left of the scrolling strip so it's ALWAYS
-   reachable even when the controls overflow horizontally. */
+   the way out. */
 .fly-home {
-  position: sticky; left: 0; z-index: 2;
-  background: var(--bg); box-shadow: 8px 0 8px -4px var(--bg);
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 12px; border: 1px solid var(--border-2); border-radius: 3px;
+  padding: 7px 12px; border: 1px solid var(--border-2); border-radius: 6px;
   color: var(--fg); text-decoration: none;
   font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
 }
 .fly-home:hover { border-color: var(--accent); color: var(--accent); }
-.fly-topbar select { background: var(--panel); color: var(--fg); border: 1px solid var(--border); padding: 7px 10px; font-family: var(--mono); font-size: 12px; border-radius: 3px; }
-.fly-reset { background: none; border: 1px solid var(--border-2); color: var(--fg); padding: 7px 12px; cursor: pointer; font-family: var(--mono); font-size: 11px; text-transform: uppercase; border-radius: 3px; }
+
+/* labelled select: a small key chip ("AC", "FROM"…) fused to the dropdown so
+   each control reads at a glance instead of guessing from its contents */
+.fly-field { display: inline-flex; align-items: stretch; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--panel); }
+.fly-field-k { display: inline-flex; align-items: center; padding: 0 8px; background: var(--panel-2); color: var(--muted); font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; border-right: 1px solid var(--border); }
+.fly-field select { background: transparent; color: var(--fg); border: none; padding: 7px 8px; font-family: var(--mono); font-size: 12px; }
+.fly-field:focus-within { border-color: var(--accent); }
+.fly-arrow { color: var(--muted); font-family: var(--mono); }
+
+.fly-reset { background: none; border: 1px solid var(--border-2); color: var(--fg); padding: 7px 12px; cursor: pointer; font-family: var(--mono); font-size: 11px; text-transform: uppercase; border-radius: 6px; }
 .fly-reset:hover { border-color: var(--accent); color: var(--accent); }
 .fly-reset.on { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
 .fly-blurb { color: var(--muted); font-size: 12.5px; }
+
+/* quick-access badges on the views row (photo / sound) — pill toggles that keep
+   the two most immersive options one tap away without opening the drawer */
+.fly-quick { background: none; border: 1px solid var(--border-2); color: var(--muted); padding: 6px 12px; cursor: pointer; font-family: var(--mono); font-size: 11px; border-radius: 20px; }
+.fly-quick:hover { border-color: var(--accent); color: var(--accent); }
+.fly-quick.on { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+
+/* ⋯ options drawer: a popover anchored under the button, holding the secondary
+   toggles grouped into small sections */
+.fly-options { position: relative; }
+.fly-drawer {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+  min-width: 236px; display: flex; flex-direction: column; gap: 3px;
+  background: rgba(12, 14, 17, 0.97); border: 1px solid var(--border-2);
+  border-radius: 10px; padding: 8px; backdrop-filter: blur(8px);
+  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.7);
+}
+.fly-drawer-sec { color: var(--muted); font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 6px 2px; }
+.fly-drawer-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  width: 100%; background: none; border: 1px solid transparent; color: var(--fg);
+  padding: 8px 8px; cursor: pointer; font-family: var(--mono); font-size: 12px;
+  border-radius: 6px; text-align: left;
+}
+.fly-drawer-item:hover { background: var(--panel-2); border-color: var(--border); }
+.fly-drawer-item.on { color: var(--accent); }
+.fly-drawer-state { color: var(--muted); font-size: 10px; letter-spacing: 0.08em; }
+.fly-drawer-item.on .fly-drawer-state { color: var(--accent); }
+.fly-drawer-div { height: 1px; background: var(--border); margin: 4px 2px; }
+.fly-drawer .viewer-toggle { width: 100%; }
+.fly-drawer .viewer-toggle button { flex: 1; }
 .fly-stage { position: relative; min-height: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #0d1117; }
 .fly-stage canvas { display: block; }
 
@@ -967,6 +1012,34 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 @media (max-width: 900px) {
   .ck-lower { grid-template-columns: 1fr; }
   .ck-fcu { flex-wrap: wrap; }
+}
+
+/* Short viewports (laptops ≤ 820px tall): the deck is flex:0 0 auto and takes
+   its full ~527px natural height, which crushes the 1fr .fly-stage to almost
+   nothing in deck mode. Shrink every deck element and cap the whole panel so the
+   3D world always keeps a usable slice; the deck scrolls internally if it must. */
+@media (max-height: 820px) {
+  .ck { gap: 5px; padding: 7px; max-height: 46vh; overflow-y: auto; }
+  .ck-fcu { padding: 5px 8px; gap: 6px; }
+  .ck-win { padding: 3px 6px; gap: 2px; }
+  .ck-win-val { font-size: 15px; min-width: 48px; }
+  .ck-step { height: 20px; }
+  .ck-push { min-width: 40px; padding: 4px 5px; }
+  .ck-lower { gap: 6px; }
+  .ck-panel { padding: 6px 8px 7px; }
+  .ck-panel-title { margin-bottom: 5px; }
+  .ck-grp { margin-bottom: 4px; }
+  .ck-eng-gauge { width: 66px; }
+  .ck-ecam-engines { gap: 8px; }
+  .ck-toggle-body { width: 22px; height: 28px; }
+  .ck-toggle.on .ck-toggle-nub { transform: translateY(-11px); }
+  .ck-thr-slider, .ck-spd-slider { height: 90px; }
+}
+/* Very short (≤ 680px): trim harder so the stage still breathes */
+@media (max-height: 680px) {
+  .ck { max-height: 42vh; }
+  .ck-eng-gauge { width: 56px; }
+  .ck-thr-slider, .ck-spd-slider { height: 70px; }
 }
 
 /* /components — how every part is built */
@@ -1454,7 +1527,11 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 @media (max-width: 480px) {
   .count-strip { grid-template-columns: 1fr 1fr; }
   .sim-specs { grid-template-columns: repeat(2, 1fr); }
-  .fly-topbar { gap: 6px; }
-  .fly-topbar select, .fly-topbar .viewer-toggle button { font-size: 10px; padding: 5px 8px; }
+  .fly-topbar { gap: 5px; }
+  .fly-bar-row { gap: 6px; }
+  .fly-field select, .fly-topbar .viewer-toggle button { font-size: 10px; padding: 5px 6px; }
+  .fly-field-k { font-size: 8.5px; padding: 0 6px; }
+  .fly-blurb { display: none; }              /* reclaim width on phones */
+  .fly-drawer { min-width: 210px; }
   .fly-help { font-size: 11px; gap: 10px; }
 }
