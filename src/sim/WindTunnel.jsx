@@ -165,6 +165,7 @@ export default function WindTunnel({ aircraft }) {
           loop
           muted
           playsInline
+          preload="metadata"
         />
         <div className="sim-readout">
           {Object.entries({
