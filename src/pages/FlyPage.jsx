@@ -536,12 +536,28 @@ export default function FlyPage() {
         {s.crashed && (
           <div className="fly-crash">
             <h3>IMPACT</h3>
-            <p>Touchdown at {s.touchdownVs} fpm{Math.abs(s.phi) > 0.25 ? ' with a wing low' : ''}. A firm landing is −200 to −400 fpm.</p>
+            {s.landingScore && (
+              <div className="fly-grade fly-grade--crash" aria-label={`Landing grade ${s.landingScore.grade}`}>
+                <span className="fly-grade-badge">{s.landingScore.grade}</span>
+                <span className="fly-grade-stars" aria-hidden>{'★'.repeat(s.landingScore.stars)}{'☆'.repeat(5 - s.landingScore.stars)}</span>
+              </div>
+            )}
+            <p>{s.landingScore?.note ?? `Touchdown at ${s.touchdownVs} fpm.`} A firm landing is −200 to −400 fpm.</p>
             <button onClick={reset}>↺ Fly again (Enter)</button>
           </div>
         )}
-        {!s.crashed && s.onGround && s.landedHard && (
-          <div className="fly-coach warn">Hard landing: {s.touchdownVs} fpm — inspection required in the real world.</div>
+        {/* GAME: a scored landing card on a successful touchdown — grade, stars,
+            and the number — so flying becomes "can you beat your best landing?" */}
+        {!s.crashed && s.onGround && s.landingScore && s.v < 30 && (
+          <div className={`fly-grade-card fly-grade-card--${s.landingScore.grade.toLowerCase()}`}>
+            <div className="fly-grade-head">
+              <span className="fly-grade-badge">{s.landingScore.grade}</span>
+              <span className="fly-grade-score">{s.landingScore.score}<small>/100</small></span>
+            </div>
+            <div className="fly-grade-stars" aria-hidden>{'★'.repeat(s.landingScore.stars)}{'☆'.repeat(5 - s.landingScore.stars)}</div>
+            <p className="fly-grade-note">{s.landingScore.note}</p>
+            <button onClick={reset}>↺ Fly again (Enter)</button>
+          </div>
         )}
       </div>
 

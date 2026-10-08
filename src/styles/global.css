@@ -712,6 +712,31 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .fly-crash p { color: #ffd7d5; margin: 0; }
 .fly-crash button { margin-top: 10px; background: #f85149; color: #fff; border: none; padding: 10px 22px; font-family: var(--mono); text-transform: uppercase; cursor: pointer; border-radius: 4px; }
 
+/* GAME: the scored-landing card — grade + stars + the number, so a touchdown
+   feels like a result you want to beat. Grade colour runs green → red. */
+.fly-grade-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  min-width: 260px; background: rgba(13, 17, 23, 0.94); border: 1px solid var(--border-2);
+  border-radius: 10px; padding: 18px 22px; text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5); animation: fly-grade-pop 0.42s cubic-bezier(.16,1,.3,1); }
+@keyframes fly-grade-pop { from { opacity: 0; transform: translate(-50%, -46%) scale(0.92); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+.fly-grade-head { display: flex; align-items: baseline; justify-content: center; gap: 14px; }
+.fly-grade-badge { font-family: var(--mono); font-size: 26px; font-weight: 700; letter-spacing: 0.14em; }
+.fly-grade-score { font-family: var(--mono); font-size: 20px; color: var(--fg); }
+.fly-grade-score small { font-size: 12px; color: var(--muted); }
+.fly-grade-stars { margin-top: 8px; font-size: 20px; letter-spacing: 3px; color: #e3b341; }
+.fly-grade-note { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+.fly-grade-card button { margin-top: 14px; background: var(--panel); color: var(--fg); border: 1px solid var(--border-2);
+  padding: 9px 20px; font-family: var(--mono); text-transform: uppercase; font-size: 12px; cursor: pointer; border-radius: 5px; }
+.fly-grade-card button:hover { border-color: #58a6ff; }
+.fly-grade-card--butter .fly-grade-badge { color: #3fb950; }
+.fly-grade-card--smooth .fly-grade-badge { color: #56d364; }
+.fly-grade-card--firm   .fly-grade-badge { color: #e3b341; }
+.fly-grade-card--hard   .fly-grade-badge { color: #db8f3a; }
+.fly-grade-card--rough  .fly-grade-badge { color: #f85149; }
+.fly-grade { display: flex; align-items: center; gap: 12px; }
+.fly-grade--crash .fly-grade-badge { color: #f85149; font-size: 22px; }
+.fly-grade--crash .fly-grade-stars { color: #8b949e; font-size: 16px; margin: 0; }
+
 .fly-help { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 12px; align-items: center; }
 .fly-help .dim { margin-left: auto; font-family: var(--mono); }
 

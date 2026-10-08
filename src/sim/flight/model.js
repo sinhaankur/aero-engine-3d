@@ -171,6 +171,36 @@ export function deriveAircraft(aircraft) {
 // Runway geometry shared by the sim and the 3D scene (metres, centred on z=0).
 export const RUNWAY = { halfLen: 1600, width: 45, heading: 0, threshold: 1500 }
 
+// ── GAME: grade a landing the moment the wheels touch ─────────────────────────
+// Scores the touchdown the way pilots actually judge one: sink rate first (the
+// big one), then how level the wings were and how close to the centreline. A
+// clean grease is ~ -100 to -200 fpm, wings level, on the line. Returns a 0–100
+// score + a punchy grade + a one-line note, so flying becomes "can you beat it?"
+function scoreLanding(s, vsFpm, crashed) {
+  const sink = Math.abs(vsFpm)
+  const bankDeg = Math.abs(s.phi) * 180 / Math.PI
+  const offCtr = Math.abs(s.x)              // metres off the centreline
+  if (crashed) {
+    return { score: 0, grade: 'CRASH', stars: 0,
+             note: sink > 900 ? `Slammed it at ${Math.round(sink)} fpm.`
+                              : `Touched down ${Math.round(bankDeg)}° wing-low — a wingtip strike.` }
+  }
+  // sink-rate score: perfect under 200 fpm, tapering to 0 by 600 fpm
+  const sinkScore = sink <= 200 ? 100 : Math.max(0, 100 - (sink - 200) * (100 / 400))
+  // wings-level score: perfect under 2°, 0 by 10°
+  const bankScore = bankDeg <= 2 ? 100 : Math.max(0, 100 - (bankDeg - 2) * (100 / 8))
+  // centreline score: perfect within 3 m, 0 by 20 m
+  const ctrScore = offCtr <= 3 ? 100 : Math.max(0, 100 - (offCtr - 3) * (100 / 17))
+  const score = Math.round(sinkScore * 0.6 + bankScore * 0.25 + ctrScore * 0.15)
+  let grade, stars, note
+  if (sink <= 150 && score >= 92) { grade = 'BUTTER'; stars = 5; note = `${Math.round(sink)} fpm — you greased it. Textbook.` }
+  else if (score >= 82)           { grade = 'SMOOTH'; stars = 4; note = `${Math.round(sink)} fpm — a really nice landing.` }
+  else if (score >= 68)           { grade = 'FIRM';   stars = 3; note = `${Math.round(sink)} fpm — safe, a touch firm.` }
+  else if (score >= 50)           { grade = 'HARD';   stars = 2; note = `${Math.round(sink)} fpm — the passengers felt that.` }
+  else                            { grade = 'ROUGH';  stars = 1; note = `${Math.round(sink)} fpm${bankDeg > 4 ? `, ${Math.round(bankDeg)}° wing-low` : ''} — walk it off.` }
+  return { score, grade, stars, note }
+}
+
 // Build a runway descriptor from a real length; the sim/scene are centred on
 // z=0 so the near threshold sits at +halfLen and departures run toward −z.
 export function runwayFor(lenM = 3200) {
@@ -198,7 +228,7 @@ export function createState(ac, rwy = RUNWAY, coldDark = false) {
     speedbrake: 0,   // 0..1 spoiler/speedbrake deployment
     onGround: true,
     stalled: false, buffet: 0,
-    crashed: false, landedHard: false, touchdownVs: null,
+    crashed: false, landedHard: false, touchdownVs: null, landingScore: null,
     t: 0,
     fuelKg: ac ? ac.mass * 0.12 : 8000,
     coldDark,
@@ -441,11 +471,16 @@ export function stepFlight(s, ac, controls, wx, dt) {
     s.touchdownVs = Math.round(vsFpm)
     if (vsFpm < -900 || Math.abs(s.phi) > 0.25) {
       s.crashed = true
+      s.landingScore = scoreLanding(s, vsFpm, true)
     } else {
       s.onGround = true
       s.landedHard = vsFpm < -500
       s.gamma = 0
       s.h = 0
+      // GAME: grade the landing the moment the wheels touch — sink rate, how
+      // level the wings were, and how close to the approach speed. A real
+      // "can you grease it?" score, from the physics we already computed.
+      s.landingScore = scoreLanding(s, vsFpm, false)
     }
   }
 
