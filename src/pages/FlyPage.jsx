@@ -208,6 +208,15 @@ export default function FlyPage() {
     else { audio.start(); setSound(true) } // start() resumes the context (user gesture)
   }
 
+  // the cinematic music bed rides on the same audio engine; toggling it starts
+  // the sound engine if needed (so Music can be turned on on its own).
+  const [music, setMusic] = useState(true)
+  const toggleMusic = () => {
+    const audio = audioRef.current
+    if (!sound) { audio.start(); setSound(true) }   // music needs the engine running
+    setMusic(audio.toggleMusic())
+  }
+
   // ---- Tower ATC: run the controller ~2 Hz while the tower view is active ----
   useEffect(() => {
     if (view !== 'tower') return
@@ -306,6 +315,9 @@ export default function FlyPage() {
                 <button className={`fly-drawer-item ${sound ? 'on' : ''}`} onClick={toggleSound} title="Procedural engine + wind audio">
                   <span>♪ Engine &amp; wind sound</span><span className="fly-drawer-state">{sound ? 'ON' : 'OFF'}</span>
                 </button>
+                <button className={`fly-drawer-item ${sound && music ? 'on' : ''}`} onClick={toggleMusic} title="A calm cinematic score that follows the flight">
+                  <span>♫ Flight music</span><span className="fly-drawer-state">{sound && music ? 'ON' : 'OFF'}</span>
+                </button>
                 <button className={`fly-drawer-item ${showEngine ? 'on' : ''}`} onClick={() => setShowEngine((v) => !v)} title="Live engine + fuel panel">
                   <span>⚙ Engine &amp; fuel panel</span><span className="fly-drawer-state">{showEngine ? 'ON' : 'OFF'}</span>
                 </button>
@@ -339,6 +351,7 @@ export default function FlyPage() {
               away without opening the drawer */}
           <button className={`fly-quick ${photo ? 'on' : ''}`} onClick={() => setPhoto((v) => !v)} title="Hide all UI for a clean cinematic view (H)">⛶ Photo</button>
           <button className={`fly-quick ${sound ? 'on' : ''}`} onClick={toggleSound} title="Procedural engine + wind audio">{sound ? '♪ On' : '♪ Off'}</button>
+          <button className={`fly-quick ${sound && music ? 'on' : ''}`} onClick={toggleMusic} title="Calm cinematic score that follows the flight">{sound && music ? '♫ On' : '♫ Off'}</button>
           <span className="fly-spacer" />
           <span className="fly-blurb">{weather.blurb}</span>
           <button className="fly-reset" onClick={reset}>↺ Reset</button>

@@ -101,11 +101,39 @@ export class FlightAudio {
     // ---- transient bus (clunks, warnings) ----
     const fxGain = ctx.createGain(); fxGain.gain.value = 0.9; fxGain.connect(master)
 
+    // ---- MUSIC: a calm, cinematic ambient pad, synthesized live (no samples,
+    //      no download — same ethos as the engine sound). Three detuned saw
+    //      voices through a gentle lowpass + slow tremolo give a warm, breathing
+    //      chord. Its own bus so it sits UNDER the engine and fades independently;
+    //      the chord + brightness shift subtly with flight phase in update(). ----
+    const musicBus = ctx.createGain(); musicBus.gain.value = 0
+    const musicLP = ctx.createBiquadFilter(); musicLP.type = 'lowpass'
+    musicLP.frequency.value = 900; musicLP.Q.value = 0.4
+    musicLP.connect(musicBus); musicBus.connect(master)
+    // slow tremolo on the whole pad so it "breathes"
+    const trem = ctx.createOscillator(); trem.type = 'sine'; trem.frequency.value = 0.08
+    const tremGain = ctx.createGain(); tremGain.gain.value = 0.18
+    const padGain = ctx.createGain(); padGain.gain.value = 0.82
+    trem.connect(tremGain); tremGain.connect(padGain.gain)
+    padGain.connect(musicLP)
+    // three voices (root, fifth, octave-ish) lightly detuned for width
+    const voices = [0, 0, 0].map((_, i) => {
+      const o = ctx.createOscillator(); o.type = 'sawtooth'
+      const g = ctx.createGain(); g.gain.value = i === 0 ? 0.5 : 0.28
+      const vf = ctx.createBiquadFilter(); vf.type = 'lowpass'; vf.frequency.value = 1200
+      o.connect(vf); vf.connect(g); g.connect(padGain)
+      o.start()
+      return { o, g, vf }
+    })
+    trem.start()
+
     this.nodes = {
       master, fanBP, fanBP2, fanGain, fan2Gain, fanTone, fanToneGain,
       core, coreGain, coreNoiseFilter, coreNoiseGain,
       windFilter, windLP, windGain, airFilter, airGain, fxGain, noiseBuf,
+      musicBus, musicLP, voices,
     }
+    this._musicOn = true
     return true
   }
 
@@ -227,5 +255,41 @@ export class FlightAudio {
     // warnings
     if (out && out.overspeed) this._warn(880)
     if (state.stalled) this._warn(520)
+
+    // --- MUSIC: a quiet cinematic pad that follows the flight's mood ---
+    if (n.voices && this._musicOn) {
+      // a calm, open chord — Dmaj-ish (D, A, F#) so it never sounds tense.
+      // Climb lifts the chord + opens the filter (lift, optimism); a good
+      // landing resolves warm; a crash cuts it. Phase comes from the model.
+      const phase = state.phase || 'parked'
+      let root = 110          // A2 — low, warm bed
+      let bright = 850
+      let level = 0.0
+      if (state.crashed) { level = 0.0 }
+      else if (phase === 'parked') { level = 0.05; bright = 650 }
+      else if (phase === 'takeoff') { level = 0.10; root = 110; bright = 1100 }
+      else if (phase === 'climb') { level = 0.14; root = 123.47; bright = 1500 }   // lift → brighter + up a tone
+      else if (phase === 'cruise') { level = 0.11; root = 110; bright = 950 }
+      else if (phase === 'descent' || phase === 'approach') { level = 0.09; root = 98; bright = 700 } // settle down
+      else if (phase === 'landed') { level = state.landedHard ? 0.06 : 0.13; bright = 1000 } // warm resolve on a sweet landing
+      // the triad, lightly detuned per voice for width
+      const ratios = [1, 1.5, 2.498] // root, fifth, ~major-tenth
+      const detune = [0, 1.004, 0.996]
+      n.voices.forEach((v, i) => {
+        smooth(v.o.frequency, root * ratios[i] * detune[i], 0.5)
+      })
+      smooth(n.musicLP.frequency, bright, 0.6)
+      smooth(n.musicBus.gain, level, 0.8)
+    }
+  }
+
+  /** Mute/unmute just the music bed, leaving the engine + world sound running. */
+  toggleMusic() {
+    if (!this.ctx) return this._musicOn
+    this._musicOn = !this._musicOn
+    if (!this._musicOn && this.nodes.musicBus) {
+      this.nodes.musicBus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4)
+    }
+    return this._musicOn
   }
 }
