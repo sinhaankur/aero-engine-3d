@@ -506,15 +506,25 @@ function Runner({ simRef }) {
     }
     sim._acc = acc
 
-    // WASM collision: did the hull hit a solid obstacle this frame? Only check
-    // while airborne + low enough to matter (downtown towers reach ~200 m). Cheap.
+    // WASM collision: did the hull hit a solid obstacle this frame? Gated hard so
+    // it's nearly free: only airborne, below the tallest towers (~230 m), AND
+    // within ~2 km of the downtown cluster — out over open country we skip the
+    // Rapier step entirely, so the physics world costs nothing when nothing's near.
     const s = sim.state
     if (sim._collide && collisionReady() && !s.onGround && s.h < 230) {
-      const r = checkCollision(s.x, s.h, -s.z) // scene space: z is negated vs model
-      if (r.hit) {
-        s.crashed = true
-        s.touchdownVs = Math.round((s.v / 0.3048) * -60 * Math.sin(Math.max(0, -s.gamma) + 0.2))
-        s.landingScore = { score: 0, grade: 'CRASH', stars: 0, note: 'Flew into a building.' }
+      // scene-space position (z negated vs the model)
+      const px = s.x, pz = -s.z
+      // only step the Rapier world when within reach of the downtown/suburb mass
+      // (centre 2600,-3200, ~4.6 km radius) — over open country it's skipped, so
+      // the physics world is free until you're actually near buildings.
+      const nearCity = Math.hypot(px - 2600, pz + 3200) < 4600
+      if (nearCity) {
+        const r = checkCollision(px, s.h, pz)
+        if (r.hit) {
+          s.crashed = true
+          s.touchdownVs = Math.round((s.v / 0.3048) * -60 * Math.sin(Math.max(0, -s.gamma) + 0.2))
+          s.landingScore = { score: 0, grade: 'CRASH', stars: 0, note: 'Flew into a building.' }
+        }
       }
     }
   })
