@@ -313,7 +313,7 @@ export function autoflight(s, ac, controls, out, dt) {
  * speedbrake 0..1}.
  * Returns derived readouts for the HUD.
  */
-export function stepFlight(s, ac, controls, wx, dt) {
+export function stepFlight(s, ac, controls, wx, dt, assist = true) {
   dt = Math.min(dt, 0.05)
   s.t += dt
   const atm = isa(s.h, wx.isaDev)
@@ -397,7 +397,13 @@ export function stepFlight(s, ac, controls, wx, dt) {
     // bank: rate-command, max ~30°/s, capped at 67° (protections-ish)
     s.phi += controls.roll * 0.9 * dt + turb * 0.15 * dt
     s.phi = Math.max(-1.17, Math.min(1.17, s.phi))
-    if (Math.abs(controls.roll) < 0.02) s.phi *= Math.pow(0.5, dt / 1.2) // spiral damping toward level
+    // hands-off, the wings roll back toward level. ASSIST rolls level roughly
+    // twice as fast (0.6 s vs 1.2 s half-life) and auto-levels from a steeper
+    // bank, so heading is far easier to hold — no constant aileron babysitting.
+    if (Math.abs(controls.roll) < 0.02) {
+      s.phi *= Math.pow(0.5, dt / (assist ? 0.6 : 1.2))
+      if (assist && Math.abs(s.phi) < 0.01) s.phi = 0
+    }
   } else {
     s.phi = 0
   }
@@ -414,8 +420,14 @@ export function stepFlight(s, ac, controls, wx, dt) {
   } else {
     alphaCmd = 0.06 + controls.pitch * 0.14
   }
-  s.alpha += (alphaCmd - s.alpha) * Math.min(1, dt * 2.5) + turb * 0.01
   const effStall = ac.alphaStall + (flap.dCl > 0 ? 0.02 : 0)
+  // ASSIST (on by default — "normal law"): hold commanded AoA just below the
+  // stall so full back-stick gives max performance without departing, the way a
+  // real FBW airliner protects you. This is the single biggest thing that makes
+  // the sim DOABLE: you can haul back to climb or flare and it won't bite. Turn
+  // assist off for the raw, stallable model.
+  if (assist && !s.onGround) alphaCmd = Math.min(alphaCmd, effStall - 0.01)
+  s.alpha += (alphaCmd - s.alpha) * Math.min(1, dt * 2.5) + turb * 0.01
 
   // --- aero forces ---
   let cl = ac.clAlpha * (s.alpha - ac.alpha0) + flap.dCl
@@ -485,7 +497,13 @@ export function stepFlight(s, ac, controls, wx, dt) {
   if (!s.onGround && s.h <= 0.01) {
     const vsFpm = vy / FT * 60
     s.touchdownVs = Math.round(vsFpm)
-    if (vsFpm < -900 || Math.abs(s.phi) > 0.25) {
+    // ASSIST widens the survivable window so a merely-firm arrival is a landing,
+    // not a crash: tolerate ~1200 fpm sink and ~20° bank (vs 900 fpm / 14° raw).
+    // The landing SCORE still grades honestly — you just won't get a game-over
+    // for a heavy-but-safe touchdown while you're learning.
+    const maxSink = assist ? 1200 : 900
+    const maxBank = assist ? 0.35 : 0.25
+    if (vsFpm < -maxSink || Math.abs(s.phi) > maxBank) {
       s.crashed = true
       s.landingScore = scoreLanding(s, vsFpm, true)
     } else {

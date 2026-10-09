@@ -642,14 +642,16 @@ function AircraftModel({ url, simRef, groupRef }) {
 }
 
 function Runner({ simRef }) {
-  // Bring up the Rapier (WASM) collision world once, seeded with the SAME
-  // building layout the scene draws — so you can fly INTO a building you see.
-  useEffect(() => {
-    let alive = true
-    const obstacles = buildingLayout().map((b) => ({ pos: [b.x, b.h / 2, b.z], size: [b.w, b.h, b.d] }))
-    initCollision(obstacles).then((ok) => { if (alive && simRef.current) simRef.current._collide = ok })
-    return () => { alive = false; disposeCollision() }
-  }, [simRef])
+  // Rapier is ~4.3 MB of WASM and ONLY does building collision near the city.
+  // Loading it on mount made every /fly session pay that download even on a
+  // flight that never goes near a building. Instead we lazy-arm it: the WASM is
+  // fetched the first time the aircraft comes within a generous PRE-ARM radius of
+  // the city (wider than the active collision radius, so the download + world
+  // build finish before you're actually among the towers). A flight that heads
+  // the other way never touches it. Fetched at most once (initCollision is
+  // idempotent); disposed on unmount.
+  const armingRef = useRef(false)
+  useEffect(() => () => { disposeCollision() }, [])
 
   useFrame((_, dt) => {
     const sim = simRef.current
@@ -663,7 +665,7 @@ function Runner({ simRef }) {
     let n = 0
     while (acc >= STEP && n < 6) {                   // at most 6 sub-steps/frame
       autoflight(sim.state, sim.ac, sim.controls, sim.out, STEP)
-      sim.out = stepFlight(sim.state, sim.ac, sim.controls, sim.weather, STEP)
+      sim.out = stepFlight(sim.state, sim.ac, sim.controls, sim.weather, STEP, sim.assist !== false)
       acc -= STEP
       n++
     }
@@ -674,13 +676,25 @@ function Runner({ simRef }) {
     // within ~2 km of the downtown cluster — out over open country we skip the
     // Rapier step entirely, so the physics world costs nothing when nothing's near.
     const s = sim.state
+    // distance to the city centre (scene space; z negated vs the model)
+    const px = s.x, pz = -s.z
+    const distCity = Math.hypot(px - 2600, pz + 3200)
+
+    // LAZY-ARM: the first time we get within ~10 km of the city, kick off the
+    // Rapier WASM load (idempotent). The pre-arm radius is roughly double the
+    // active collision radius so the download + collider build complete before
+    // you're actually among the towers.
+    if (!armingRef.current && distCity < 10000) {
+      armingRef.current = true
+      const obstacles = buildingLayout().map((b) => ({ pos: [b.x, b.h / 2, b.z], size: [b.w, b.h, b.d] }))
+      initCollision(obstacles).then((ok) => { if (simRef.current) simRef.current._collide = ok })
+    }
+
     if (sim._collide && collisionReady() && !s.onGround && s.h < 230) {
-      // scene-space position (z negated vs the model)
-      const px = s.x, pz = -s.z
       // only step the Rapier world when within reach of the downtown/suburb mass
       // (centre 2600,-3200, ~4.6 km radius) — over open country it's skipped, so
       // the physics world is free until you're actually near buildings.
-      const nearCity = Math.hypot(px - 2600, pz + 3200) < 4600
+      const nearCity = distCity < 4600
       if (nearCity) {
         const r = checkCollision(px, s.h, pz)
         if (r.hit) {

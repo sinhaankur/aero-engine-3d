@@ -55,6 +55,7 @@ export default function FlyPage() {
   const [coldDark, setColdDark] = useState(false)
   const [photo, setPhoto] = useState(false)
   const [showBoard, setShowBoard] = useState(false)
+  const [assist, setAssist] = useState(true)      // handling assist / "easy mode", on by default
   const [cleared, setCleared] = useState(false)   // departure-slot clearance
   const [optionsOpen, setOptionsOpen] = useState(false) // ⋯ options drawer
   const optionsRef = useRef(null)
@@ -105,6 +106,7 @@ export default function FlyPage() {
   }
   simRef.current.ac = ac
   simRef.current.weather = weather
+  simRef.current.assist = assist
 
   const reset = () => {
     const st = createState(ac, rwy, coldDark)
@@ -360,6 +362,10 @@ export default function FlyPage() {
                 </button>
                 <button className={`fly-drawer-item ${showBoard ? 'on' : ''}`} onClick={() => setShowBoard((v) => !v)} title="Real aircraft on the ground at your field + departure slot">
                   <span>🛫 Departures board</span><span className="fly-drawer-state">{showBoard ? 'ON' : 'OFF'}</span>
+                </button>
+                <div className="fly-drawer-sec">Difficulty</div>
+                <button className={`fly-drawer-item ${assist ? 'on' : ''}`} onClick={() => setAssist((v) => !v)} title="FBW-style protection: can't stall, wings self-level, forgiving touchdown. Off = raw, stallable model.">
+                  <span>🛟 Handling assist (easy)</span><span className="fly-drawer-state">{assist ? 'ON' : 'OFF'}</span>
                 </button>
                 <div className="fly-drawer-sec">Start &amp; capture</div>
                 <button className={`fly-drawer-item ${coldDark ? 'on' : ''}`} onClick={() => setColdDark((v) => !v)} title="Start cold & dark and run the real startup checklist">
