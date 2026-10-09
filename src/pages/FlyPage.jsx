@@ -10,6 +10,7 @@ import { FlightAudio } from '../sim/flight/audio.js'
 import EngineLive from '../sim/flight/EngineLive.jsx'
 import AirportBoard from '../sim/flight/AirportBoard.jsx'
 import { checklistProgress } from '../sim/flight/procedures.js'
+import { flightObjective } from '../sim/flight/objective.js'
 import { useFlightData } from '../live/useFlightData.js'
 import { hardReload } from '../lib/hardReload.js'
 
@@ -115,22 +116,26 @@ export default function FlyPage() {
     forceTick((n) => n + 1)
   }
 
-  // GAME: when a successful landing scores, record a new personal best for this
-  // aircraft (persisted). Fires once per landing. A fresh best is celebrated in UI.
-  const st0 = simRef.current.state
-  const landed = !!(st0?.onGround && st0?.landingScore && st0?.airborneOnce && !st0?.crashed)
-  useEffect(() => {
+  // GAME: record a new personal best per aircraft (persisted), exactly once per
+  // landing. The sim mutates simRef.current.state in place in the Canvas loop
+  // WITHOUT re-rendering, so a derived boolean + effect only fired by luck of
+  // another re-render (and could read a stale score). Instead we check the live
+  // state on each HUD tick (see the 25 Hz effect below) via this ref-guarded
+  // function — it sees the authoritative landingScore the frame it's written.
+  const recordLanding = useRef(null)
+  recordLanding.current = () => {
     const st = simRef.current.state
     if (!st?.landingScore || st.crashed || !st.onGround || scoredThisLanding.current) return
     scoredThisLanding.current = true
     const key = aircraft.name
-    const prev = bestLanding[key]?.score ?? -1
-    if (st.landingScore.score > prev) {
-      const next = { ...bestLanding, [key]: { score: st.landingScore.score, grade: st.landingScore.grade } }
-      setBestLanding(next)
+    setBestLanding((prevBest) => {
+      const prev = prevBest[key]?.score ?? -1
+      if (st.landingScore.score <= prev) return prevBest
+      const next = { ...prevBest, [key]: { score: st.landingScore.score, grade: st.landingScore.grade } }
       try { localStorage.setItem('aero.bestLanding', JSON.stringify(next)) } catch { /* private mode */ }
-    }
-  }, [landed]) // eslint-disable-line react-hooks/exhaustive-deps
+      return next
+    })
+  }
 
   // variant / departure / start-state change → fresh state
   useEffect(() => { reset() }, [acKey, fromCode, coldDark]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -211,6 +216,10 @@ export default function FlyPage() {
   useEffect(() => {
     const iv = setInterval(() => {
       if (simRef.current.out) setHud({ ...simRef.current.out })
+      // persist a best landing the moment the sim records a score (ref-guarded,
+      // fires once per touchdown) — reliable because it reads the live state,
+      // not a render-derived snapshot
+      recordLanding.current?.()
     }, 40)
     return () => clearInterval(iv)
   }, [])
@@ -279,6 +288,9 @@ export default function FlyPage() {
   const checklist = checklistProgress(s)
   // live leg progress: distance flown → distance-to-go / ETA / % along the route
   const leg = legProgress(from, to, s.flownNm, s.gsKt)
+  // flight DIRECTION: a phase-aware "what to do now" directive + course cue, so
+  // there's always a clear objective — fly the leg and grease the landing
+  const objective = flightObjective(s, ac, leg, route, from, to)
 
   return (
     <div className={`fly-page ${mode === 'deck' ? 'has-deck' : ''}`}>
@@ -377,6 +389,7 @@ export default function FlyPage() {
           <button className={`fly-quick ${photo ? 'on' : ''}`} onClick={() => setPhoto((v) => !v)} title="Hide all UI for a clean cinematic view (H)">⛶ Photo</button>
           <button className={`fly-quick ${sound ? 'on' : ''}`} onClick={toggleSound} title="Procedural engine + wind audio">{sound ? '♪ On' : '♪ Off'}</button>
           <button className={`fly-quick ${sound && music ? 'on' : ''}`} onClick={toggleMusic} title="Calm cinematic score that follows the flight">{sound && music ? '♫ On' : '♫ Off'}</button>
+          <button className="fly-quick" onClick={hardReload} title="Clear cached assets and reload the latest version">↻ Clear cache</button>
           <span className="fly-spacer" />
           <span className="fly-blurb">{weather.blurb}</span>
           <button className="fly-reset" onClick={reset}>↺ Reset</button>
@@ -415,6 +428,34 @@ export default function FlyPage() {
               : <>{Math.round(leg.toGo).toLocaleString()} nm to go · GS {Math.round(s.gsKt)} kt · ETE {isFinite(leg.etaH) ? `${Math.floor(leg.etaH)}h ${Math.round((leg.etaH % 1) * 60)}m` : '—'}</>}
           </span>
         </div>
+        )}
+
+        {/* flight DIRECTOR: the always-there objective — what to do right now to
+            fly this leg and score the landing, with a course-deviation cue */}
+        {view !== 'globe' && (
+          <div className={`fly-objective fly-objective--${objective.tone}`}>
+            <div className="fly-obj-head">
+              <span className="fly-obj-dot" />
+              <span className="fly-obj-title">{objective.title}</span>
+              {objective.target && (
+                <span className="fly-obj-target"><span>{objective.target.label}</span><b>{objective.target.value}</b></span>
+              )}
+            </div>
+            <p className="fly-obj-detail">{objective.detail}</p>
+            {/* course-deviation bar: centre = on course, the bug slides to the side
+                you need to turn toward (clamped to ±30°) */}
+            {!objective.done && !s.onGround && (
+              <div className="fly-obj-course" title="Course to destination">
+                <span className="fly-obj-course-track" />
+                <span
+                  className="fly-obj-course-bug"
+                  style={{ left: `${50 + Math.max(-50, Math.min(50, (objective.crsErr / 30) * 50))}%` }}
+                />
+                <span className="fly-obj-course-l">L</span>
+                <span className="fly-obj-course-r">R</span>
+              </div>
+            )}
+          </div>
         )}
 
         {/* cinematic moving-map HUD on the globe view */}

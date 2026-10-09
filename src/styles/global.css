@@ -703,9 +703,31 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .fly-readout b { color: var(--fg); font-weight: 600; }
 .fly-readout b.on { color: var(--accent); }
 
-.fly-coach { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); background: rgba(13, 17, 23, 0.88); border: 1px solid var(--border-2); border-radius: 6px; padding: 10px 16px; font-size: 13px; color: var(--fg); max-width: 620px; text-align: center; }
+.fly-coach { position: absolute; top: 112px; left: 50%; transform: translateX(-50%); background: rgba(13, 17, 23, 0.88); border: 1px solid var(--border-2); border-radius: 6px; padding: 10px 16px; font-size: 13px; color: var(--fg); max-width: 620px; text-align: center; }
 .fly-coach.warn { border-color: #d29922; color: #e3b341; top: auto; bottom: 120px; }
 .fly-coach kbd, .fly-help kbd { background: var(--panel); border: 1px solid var(--border-2); border-radius: 3px; padding: 0 5px; font-family: var(--mono); font-size: 11px; }
+
+/* flight director / objective banner — the always-there "what to do now" */
+.fly-objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: min(560px, calc(100% - 28px)); background: rgba(13, 17, 23, 0.88); border: 1px solid var(--border-2); border-left: 3px solid var(--accent); border-radius: 6px; padding: 9px 14px; backdrop-filter: blur(5px); pointer-events: none; z-index: 4; }
+.fly-objective--warn { border-left-color: #d29922; }
+.fly-objective--done { border-left-color: #3fb950; }
+.fly-obj-head { display: flex; align-items: center; gap: 8px; }
+.fly-obj-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); flex: none; }
+.fly-objective--warn .fly-obj-dot { background: #d29922; box-shadow: 0 0 8px #d29922; }
+.fly-objective--done .fly-obj-dot { background: #3fb950; box-shadow: 0 0 8px #3fb950; animation: none; }
+.fly-obj-title { font-weight: 700; font-size: 13.5px; color: var(--fg); letter-spacing: 0.01em; }
+.fly-obj-target { margin-left: auto; display: flex; align-items: baseline; gap: 5px; font-family: var(--mono); }
+.fly-obj-target span { color: var(--muted); font-size: 10px; letter-spacing: 0.06em; }
+.fly-obj-target b { color: var(--accent); font-size: 13px; }
+.fly-obj-detail { margin: 4px 0 0; font-size: 11.5px; color: var(--ink); line-height: 1.35; }
+.fly-obj-course { position: relative; margin-top: 8px; height: 10px; }
+.fly-obj-course-track { position: absolute; left: 10%; right: 10%; top: 50%; height: 2px; background: #2a2f38; border-radius: 2px; }
+.fly-obj-course-track::after { content: ''; position: absolute; left: 50%; top: -3px; width: 2px; height: 8px; background: var(--muted); transform: translateX(-50%); }
+.fly-obj-course-bug { position: absolute; top: 50%; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid var(--accent); transform: translate(-50%, -60%); transition: left 0.3s ease-out; }
+.fly-objective--warn .fly-obj-course-bug { border-bottom-color: #d29922; }
+.fly-obj-course-l, .fly-obj-course-r { position: absolute; top: -1px; font-family: var(--mono); font-size: 9px; color: var(--muted); }
+.fly-obj-course-l { left: 2px; } .fly-obj-course-r { right: 2px; }
+.fly-stage.photo .fly-objective { display: none; }
 
 .fly-crash { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: rgba(70, 10, 10, 0.55); backdrop-filter: blur(2px); }
 .fly-crash h3 { margin: 0; color: #f85149; font-size: 34px; letter-spacing: 0.2em; font-family: var(--mono); }

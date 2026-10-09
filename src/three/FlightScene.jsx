@@ -182,6 +182,109 @@ function InstancedBoxes({ items, material, geometry = unitBox }) {
  * and a taxiway. Geometry mirrors sim RUNWAY (±1600 m, 45 m wide).
  */
 const twyLineMat = new THREE.MeshStandardMaterial({ color: '#d7b53a', roughness: 0.8 })
+const concreteMat = new THREE.MeshStandardMaterial({ color: '#3a3f46', roughness: 0.95 })
+const terminalMat = new THREE.MeshStandardMaterial({ color: '#4a525c', roughness: 0.6, metalness: 0.15 })
+const glassMat = new THREE.MeshStandardMaterial({ color: '#16222e', roughness: 0.15, metalness: 0.5, emissive: '#1a3450', emissiveIntensity: 0 })
+const jetwayMat = new THREE.MeshStandardMaterial({ color: '#8a929c', roughness: 0.7 })
+
+/**
+ * A real terminal complex beside the runway so the field reads as an airport,
+ * not a lone strip: a curved concrete apron, a terminal building with a glazed
+ * frontage, three finger-piers with jetways reaching out to aircraft stands
+ * (each marked with a stand line + number), a maintenance hangar, and apron
+ * flood masts that light up at night. Placed on the taxiway side (+x) toward the
+ * departure threshold so you taxi out past it on the way to the runway.
+ */
+function Terminal({ night, thr }) {
+  // apron edge + stand lights, instanced
+  const apronLights = useMemo(() => {
+    const a = []
+    for (let i = 0; i < 10; i++) a.push({ x: 150 + i * 22, y: 0.3, z: thr - 120, w: 0.5, h: 0.5, l: 0.5 })
+    return a
+  }, [thr])
+  const standLines = useMemo(() => {
+    const a = []
+    // three stand lead-in lines fanning off the apron
+    for (const sx of [190, 250, 310]) {
+      for (let k = 0; k < 8; k++) a.push({ x: sx, y: 0.05, z: thr - 150 - k * 8, w: 0.5, l: 5 })
+    }
+    return a
+  }, [thr])
+  const floodMat = useMemo(() => new THREE.MeshStandardMaterial({
+    color: '#fff6d8', emissive: '#ffe9a8', emissiveIntensity: night ? 3 : 0.4,
+  }), [night])
+
+  // the terminal glazing glows warm from inside at night (shared material)
+  useEffect(() => { glassMat.emissiveIntensity = night ? 1.1 : 0 }, [night])
+
+  return (
+    <group position={[0, 0, 0]}>
+      {/* apron: a big concrete slab in front of the terminal */}
+      <mesh position={[250, 0.02, thr - 260]} material={concreteMat}>
+        <boxGeometry args={[240, 0.05, 260]} />
+      </mesh>
+      <InstancedBoxes items={standLines} material={paintMat} />
+
+      {/* terminal building: a long low block with a glazed airside frontage and a
+          stepped control/office section at one end */}
+      <group position={[330, 0, thr - 180]}>
+        <mesh position={[0, 9, 0]} material={terminalMat} castShadow>
+          <boxGeometry args={[60, 18, 150]} />
+        </mesh>
+        {/* glazed frontage facing the apron (−x side) */}
+        <mesh position={[-30.1, 8, 0]} material={glassMat}>
+          <boxGeometry args={[0.4, 14, 150]} />
+        </mesh>
+        {/* curved roof cap */}
+        <mesh position={[0, 18.3, 0]} material={terminalMat}>
+          <boxGeometry args={[62, 1.2, 152]} />
+        </mesh>
+        {/* office/ops tower block at the north end */}
+        <mesh position={[8, 16, -70]} material={terminalMat} castShadow>
+          <boxGeometry args={[30, 32, 26]} />
+        </mesh>
+      </group>
+
+      {/* three finger-piers + jetways reaching out to the stands */}
+      {[190, 250, 310].map((sx) => (
+        <group key={sx} position={[sx, 0, thr - 175]}>
+          {/* pier walkway from the terminal out to the stand */}
+          <mesh position={[45, 3, 0]} material={jetwayMat}>
+            <boxGeometry args={[70, 4, 7]} />
+          </mesh>
+          {/* the jetway tunnel angling down to the aircraft door */}
+          <mesh position={[4, 3.4, 10]} rotation={[0, -0.5, 0]} material={jetwayMat}>
+            <boxGeometry args={[22, 3.4, 4]} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* maintenance hangar further down the apron — a big arched shed */}
+      <group position={[300, 0, thr - 420]}>
+        <mesh position={[0, 11, 0]} material={terminalMat} castShadow>
+          <boxGeometry args={[80, 22, 70]} />
+        </mesh>
+        {/* dark door opening facing the apron */}
+        <mesh position={[-40.1, 9, 0]}>
+          <boxGeometry args={[0.4, 16, 55]} />
+          <meshStandardMaterial color="#0c0f13" roughness={1} />
+        </mesh>
+        <mesh position={[0, 22.6, 0]} material={terminalMat}>
+          <boxGeometry args={[82, 1.4, 72]} />
+        </mesh>
+      </group>
+
+      {/* apron flood masts — tall poles with a lamp head that glow at night */}
+      {[[170, thr - 150], [170, thr - 360], [360, thr - 300]].map(([mx, mz], i) => (
+        <group key={i} position={[mx, 0, mz]}>
+          <mesh position={[0, 12, 0]}><cylinderGeometry args={[0.4, 0.6, 24, 6]} /><meshStandardMaterial color="#6b7178" /></mesh>
+          <mesh position={[0, 24, 0]} material={floodMat}><boxGeometry args={[4, 1.2, 1.5]} /></mesh>
+        </group>
+      ))}
+      <InstancedBoxes items={apronLights} material={floodMat} geometry={unitSphere} />
+    </group>
+  )
+}
 
 // the reciprocal runway designator for the far threshold: opposite heading
 // (±18) and swapped L/R (a "27R" one way is "09L" the other).
@@ -259,6 +362,9 @@ function Runway({ night, halfLen = 1600, airport }) {
       <mesh position={[75, 0.018, 0]} material={asphaltMat}><boxGeometry args={[22, 0.036, HL * 1.6]} /></mesh>
       <mesh position={[47, 0.018, thr - 160]} material={asphaltMat}><boxGeometry args={[60, 0.036, 22]} /></mesh>
       <InstancedBoxes items={twyDashes} material={twyLineMat} />
+
+      {/* terminal, apron, jetways + hangar beside the runway */}
+      <Terminal night={night} thr={thr} />
 
       {/* painted runway designators — the real ID on the departure threshold and
           its reciprocal on the far end, so each airport reads as itself */}
@@ -508,9 +614,13 @@ function AircraftModel({ url, simRef, groupRef }) {
     g.position.set(s.x, s.h + H0, s.z)
     g.rotation.order = 'YXZ'
     g.rotation.set(s.theta, -s.psi, -s.phi)
-    if (s.buffet > 0.02) {
-      g.position.y += Math.sin(s.t * 43) * 0.12 * s.buffet
-      g.rotation.z += Math.sin(s.t * 37) * 0.01 * s.buffet
+    // Stall buffet only — a rapid airframe shudder is CORRECT when actually
+    // stalled (s.buffet → 1), but it must not bleed into normal flight. Gated at
+    // a higher threshold and at a slightly lower frequency so it reads as a heavy
+    // judder, not a vibration, and smooth cruise stays rock-steady.
+    if (s.buffet > 0.15) {
+      g.position.y += Math.sin(s.t * 34) * 0.10 * s.buffet
+      g.rotation.z += Math.sin(s.t * 29) * 0.008 * s.buffet
     }
     updateParts(anim, Math.min(dt, 0.05), {
       n1: out ? out.n1 / 100 : 0.05,
@@ -834,9 +944,16 @@ function SunLight({ simRef, sunDir, intensity, color, shadows }) {
 function Atmosphere({ simRef, baseColor, visM }) {
   const { scene } = useThree()
   const base = useMemo(() => new THREE.Color(baseColor), [baseColor])
-  const space = useMemo(() => new THREE.Color('#03050c'), [])   // high-altitude sky
-  const horizon = useMemo(() => new THREE.Color('#16294c'), []) // thin bright band
+  // The real sky doesn't fade straight to black. Rayleigh scattering thins with
+  // density, so climbing you pass through: surface blue → a deep "overview"
+  // cobalt (the colour from ~10 km, a jet's cruise) → near-black space with a
+  // thin bright limb still glowing on the horizon. Three stops, not two, is what
+  // reads as real — the mid cobalt is the altitude most flights actually see.
+  const cruise = useMemo(() => new THREE.Color('#1b3a6b'), [])  // ~10 km cobalt
+  const space = useMemo(() => new THREE.Color('#02040a'), [])   // upper-stratosphere black
+  const limb = useMemo(() => new THREE.Color('#2e5a9c'), [])    // bright scattering band
   const tmp = useMemo(() => new THREE.Color(), [])
+  const tmp2 = useMemo(() => new THREE.Color(), [])
   const fog = useMemo(() => new THREE.Fog(baseColor, visM * 0.12, visM), [baseColor, visM])
 
   useEffect(() => {
@@ -847,22 +964,29 @@ function Atmosphere({ simRef, baseColor, visM }) {
 
   useFrame(() => {
     const h = simRef.current?.state?.h || 0
-    // 0 at sea level, 1 by ~13 km. The sky noticeably deepens from ~2 km up
-    // (cruise for a regional leg) so climbing reads as leaving the surface.
-    const f = Math.min(1, h / 13000)
-    const darken = Math.pow(f, 0.7)   // meaningful shift even at a few km
-    // surface sky → deep space, warm horizon band blended through the middle
-    tmp.copy(base).lerp(horizon, Math.min(1, darken * 1.2)).lerp(space, Math.pow(f, 1.3))
+    // Two overlapping bands keyed to the real atmosphere: most of the colour
+    // shift happens in the troposphere (0–11 km), then it settles toward space
+    // through the stratosphere (11–20 km). Splitting it means the big visible
+    // change lands where flights actually fly, not all crammed near the top.
+    const tropo = Math.min(1, h / 11000)             // 0 at SL, 1 at the tropopause
+    const strat = Math.min(1, Math.max(0, (h - 9000) / 11000)) // kicks in high up
+    // surface blue → cruise cobalt across the troposphere (eased so it deepens
+    // noticeably from just a couple of km up), then cobalt → black up high.
+    tmp.copy(base).lerp(cruise, Math.pow(tropo, 0.65)).lerp(space, Math.pow(strat, 1.2))
     if (scene.background?.isColor) scene.background.copy(tmp)
     else scene.background = tmp.clone()
-    // A ground-haze layer that thickens with altitude: as you climb, the fog
-    // near-plane closes in on the FAR ground so the surface washes out into the
-    // sky, instead of a crisp lawn clinging under the aircraft.
-    fog.color.copy(tmp)
-    // near stays close so distant terrain fogs; far shrinks with altitude so the
-    // 64 km ground sheet is swallowed by haze the higher you get
-    fog.near = 200 + h * 1.5
-    fog.far = Math.max(4000, visM * 1.1 - h * 3.2)
+    // FOG = the atmosphere's own haze, not a ground effect. Down low it's a thick
+    // near layer that softens the distant land (real low-level haze). As you climb
+    // the air around you clears (near pushes WAY out, so you're not flying inside
+    // milk) while the ground still washes into the horizon band far below. The fog
+    // colour blends toward the bright scattering limb so the horizon glows rather
+    // than matching the darkening dome above — the single biggest "real sky" tell.
+    tmp2.copy(tmp).lerp(limb, 0.35 * (1 - tropo))    // warm the horizon low down
+    fog.color.copy(tmp2)
+    // near opens up fast with altitude (clear air around the jet); far recedes
+    // only gently so distant terrain keeps fading into the horizon haze
+    fog.near = 300 + h * 6
+    fog.far = Math.max(8000, visM * 1.2 + h * 0.5)
   })
   return null
 }

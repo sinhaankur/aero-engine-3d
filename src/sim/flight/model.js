@@ -331,7 +331,19 @@ export function stepFlight(s, ac, controls, wx, dt) {
   // Base turbulence from the weather, amplified low down where mechanical
   // turbulence off the terrain is strongest (wind.shear → 1 near the deck).
   const lowLevel = 1 + wind.shear * (1.2 + (terrain.gustBoost * 2))
-  const turb = wx.turb * lowLevel * (Math.sin(s.t * 5.1) * 0.4 + Math.sin(s.t * 11.7 + 2) * 0.35 + Math.sin(s.t * 2.3 + 5) * 0.25)
+  // Real air doesn't buzz the airframe at a fixed high frequency — it pushes and
+  // the aircraft settles. The old sum had an ~11.7 rad/s (≈1.9 Hz) term that read
+  // as a constant visible shake even in a "clear day" (turb 0.05). Keep the slow,
+  // rolling eddies (the ones you actually feel) and LOW-PASS the result into a
+  // persisted gust state so each bump builds and decays instead of vibrating. The
+  // filtered signal is what drives attitude below — smooth on calm air, still
+  // lively in a storm because the amplitude, not the frequency, scales with wx.turb.
+  const rawGust = Math.sin(s.t * 1.7) * 0.5 + Math.sin(s.t * 3.9 + 2) * 0.32 + Math.sin(s.t * 0.7 + 5) * 0.18
+  const gustTgt = wx.turb * lowLevel * rawGust
+  // first-order lag: faster to respond in rough air, slow and gentle when calm
+  const gustK = Math.min(1, dt * (3 + wx.turb * 6))
+  s.turbState = (s.turbState || 0) + (gustTgt - (s.turbState || 0)) * gustK
+  const turb = s.turbState
   s.throttle = controls.throttle
   s.flap = controls.flap
   s.gear = controls.gear
