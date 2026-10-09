@@ -6,6 +6,7 @@ import { useGLTF } from './gltf.js'
 import * as THREE from 'three'
 import CanvasFallback from './CanvasFallback.jsx'
 import { stepFlight, autoflight } from '../sim/flight/model.js'
+import { initCollision, checkCollision, collisionReady, disposeCollision } from '../sim/flight/collision.js'
 import { collectParts, updateParts } from './modelAnim.js'
 
 /**
@@ -314,22 +315,27 @@ function Runway({ night, halfLen = 1600, airport }) {
 const buildingGeo = new THREE.BoxGeometry(1, 1, 1)
 const buildingMat = new THREE.MeshStandardMaterial({ color: '#2d333b', roughness: 0.9 })
 
+// The building layout — a deterministic seeded PRNG so the VISUALS and the
+// Rapier COLLIDERS share one source of truth (fly into a building you can see,
+// and the physics catches it). Exported for the collision layer.
+export function buildingLayout() {
+  let seed = 7
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const arr = []
+  for (let i = 0; i < 60; i++) {
+    const ang = rnd() * Math.PI * 2
+    const dist = 500 + rnd() * 4500
+    const x = Math.cos(ang) * dist
+    const z = Math.sin(ang) * dist
+    if (Math.abs(x) < 150 && Math.abs(z) < 2200) continue // clear the runway corridor
+    arr.push({ x, z, w: 14 + rnd() * 40, h: 8 + rnd() * 55, d: 14 + rnd() * 40 })
+  }
+  return arr
+}
+
 function Buildings() {
   const ref = useRef()
-  const items = useMemo(() => {
-    let seed = 7
-    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    const arr = []
-    for (let i = 0; i < 60; i++) {
-      const ang = rnd() * Math.PI * 2
-      const dist = 500 + rnd() * 4500
-      const x = Math.cos(ang) * dist
-      const z = Math.sin(ang) * dist
-      if (Math.abs(x) < 150 && Math.abs(z) < 2200) continue // clear the runway corridor
-      arr.push({ x, z, w: 14 + rnd() * 40, h: 8 + rnd() * 55, d: 14 + rnd() * 40 })
-    }
-    return arr
-  }, [])
+  const items = useMemo(() => buildingLayout(), [])
 
   useEffect(() => {
     const m = ref.current
@@ -442,6 +448,15 @@ function AircraftModel({ url, simRef, groupRef }) {
 }
 
 function Runner({ simRef }) {
+  // Bring up the Rapier (WASM) collision world once, seeded with the SAME
+  // building layout the scene draws — so you can fly INTO a building you see.
+  useEffect(() => {
+    let alive = true
+    const obstacles = buildingLayout().map((b) => ({ pos: [b.x, b.h / 2, b.z], size: [b.w, b.h, b.d] }))
+    initCollision(obstacles).then((ok) => { if (alive && simRef.current) simRef.current._collide = ok })
+    return () => { alive = false; disposeCollision() }
+  }, [simRef])
+
   useFrame((_, dt) => {
     const sim = simRef.current
     if (!sim || sim.paused || sim.state.crashed) return
@@ -459,6 +474,18 @@ function Runner({ simRef }) {
       n++
     }
     sim._acc = acc
+
+    // WASM collision: did the hull hit a solid obstacle this frame? Only check
+    // while airborne + low enough to matter (buildings top out ~63 m). Cheap.
+    const s = sim.state
+    if (sim._collide && collisionReady() && !s.onGround && s.h < 90) {
+      const r = checkCollision(s.x, s.h, -s.z) // scene space: z is negated vs model
+      if (r.hit) {
+        s.crashed = true
+        s.touchdownVs = Math.round((s.v / 0.3048) * -60 * Math.sin(Math.max(0, -s.gamma) + 0.2))
+        s.landingScore = { score: 0, grade: 'CRASH', stars: 0, note: 'Flew into a building.' }
+      }
+    }
   })
   return null
 }

@@ -43,6 +43,11 @@ export default defineConfig({
         // deploys and lets the lazy viewer routes share one copy.
         manualChunks: {
           three: ['three', '@react-three/fiber', '@react-three/drei'],
+          // Rapier is the WASM physics engine (~4 MB) — heavy and changes rarely.
+          // Its own long-lived, lazily-loaded chunk so it's cached across deploys
+          // and ONLY downloads when you open the Fly page (the encyclopedia never
+          // pays for it).
+          rapier: ['@dimforge/rapier3d-compat'],
         },
       },
     },
