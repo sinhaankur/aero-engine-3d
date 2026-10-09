@@ -78,6 +78,10 @@ export const WEATHER = {
     name: 'Winter ops', isaDev: -25, windKt: 12, windDir: 30, gustKt: 4, turb: 0.2,
     visKm: 25, sky: 'cold', blurb: 'ISA−25 °C: dense air, short roll, strong climb. Cold air is engine power.',
   },
+  night: {
+    name: 'Clear night', isaDev: -3, windKt: 6, windDir: 240, gustKt: 2, turb: 0.08,
+    visKm: 50, sky: 'night', blurb: 'Calm, clear night — runway alight, the city glowing below, stars overhead.',
+  },
 }
 
 /**

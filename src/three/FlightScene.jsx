@@ -35,6 +35,9 @@ const SKIES = {
   haze: { bg: '#b09a6e', sun: 1.1, hemi: 0.5,  ground: '#4a4228', elev: 18, azim: 200, turbidity: 9.0,  rayleigh: 2.4, mieCoefficient: 0.012, mieDirectionalG: 0.90, sunTint: '#ffdca0' },
   storm:{ bg: '#2e3540', sun: 0.5, hemi: 0.55, ground: '#1b221e', elev: 8,  azim: 210, turbidity: 12.0, rayleigh: 3.0, mieCoefficient: 0.020, mieDirectionalG: 0.80, sunTint: '#c9d2dc' },
   cold: { bg: '#a9c2d9', sun: 1.2, hemi: 0.7,  ground: '#c8d3da', elev: 22, azim: 130, turbidity: 4.0,  rayleigh: 2.0, mieCoefficient: 0.005, mieDirectionalG: 0.86, sunTint: '#eaf2ff' },
+  // Night: sun just below the horizon (deep twilight glow), dim cool moonlight as
+  // the key, a dark bluish dome — so the lit runway + glowing city carry the scene.
+  night: { bg: '#070a14', sun: 0.18, hemi: 0.22, ground: '#0a0f14', elev: -6, azim: 300, turbidity: 2.0, rayleigh: 0.6, mieCoefficient: 0.003, mieDirectionalG: 0.8, sunTint: '#9fb4e0' },
 }
 
 // Unit sun direction from elevation/azimuth (degrees). Elevation 0 = horizon,
@@ -313,7 +316,47 @@ function Runway({ night, halfLen = 1600, airport }) {
 // Buildings as a single InstancedMesh — one draw call for the whole skyline
 // instead of 60. A unit box is scaled per instance via the instance matrix.
 const buildingGeo = new THREE.BoxGeometry(1, 1, 1)
-const buildingMat = new THREE.MeshStandardMaterial({ color: '#2d333b', roughness: 0.9 })
+
+// A procedural window-grid texture: a dark facade studded with small windows,
+// most dark, some lit warm. Used as BOTH the colour map (so towers read as glass)
+// and the emissive map (so the lit windows glow at night). One shared texture →
+// no per-instance cost. Built once.
+function makeFacadeTextures() {
+  const SZ = 128
+  const mk = (emissive) => {
+    const c = document.createElement('canvas'); c.width = c.height = SZ
+    const ctx = c.getContext('2d')
+    ctx.fillStyle = emissive ? '#000' : '#242a33'
+    ctx.fillRect(0, 0, SZ, SZ)
+    let seed = 99
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    const cols = 8, rows = 10, mw = SZ / cols, mh = SZ / rows
+    for (let r = 0; r < rows; r++) {
+      for (let col = 0; col < cols; col++) {
+        const lit = rnd() < 0.42
+        if (emissive) {
+          if (lit) { ctx.fillStyle = rnd() < 0.8 ? '#ffd989' : '#bcd4ff'; ctx.globalAlpha = 0.6 + rnd() * 0.4 }
+          else continue
+        } else {
+          ctx.globalAlpha = 1
+          ctx.fillStyle = lit ? '#2f3946' : '#1b212a'
+        }
+        ctx.fillRect(col * mw + mw * 0.2, r * mh + mh * 0.2, mw * 0.6, mh * 0.55)
+      }
+    }
+    ctx.globalAlpha = 1
+    const tex = new THREE.CanvasTexture(c)
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+    return tex
+  }
+  return { colorMap: mk(false), emissiveMap: mk(true) }
+}
+const FACADE = makeFacadeTextures()
+const buildingMat = new THREE.MeshStandardMaterial({
+  color: '#30383f', roughness: 0.78, metalness: 0.1,
+  map: FACADE.colorMap, emissiveMap: FACADE.emissiveMap,
+  emissive: '#ffcf87', emissiveIntensity: 0,   // lit at night via the scene
+})
 
 // The building layout — a deterministic seeded PRNG so the VISUALS and the
 // Rapier COLLIDERS share one source of truth (fly into a building you can see,
@@ -364,7 +407,7 @@ export function buildingLayout() {
   return arr
 }
 
-function Buildings() {
+function Buildings({ night }) {
   const ref = useRef()
   const items = useMemo(() => buildingLayout(), [])
 
@@ -381,6 +424,16 @@ function Buildings() {
     m.instanceMatrix.needsUpdate = true
     m.computeBoundingSphere()
   }, [items])
+
+  // Windows glow at night; by day the facade is just glass. The texture repeats
+  // down the height so taller towers get more window rows (a unit box UV × ~ the
+  // building's real floor count).
+  useEffect(() => {
+    buildingMat.emissiveIntensity = night ? 1.0 : 0
+    FACADE.colorMap.repeat.set(2, 6)
+    FACADE.emissiveMap.repeat.set(2, 6)
+    FACADE.colorMap.needsUpdate = FACADE.emissiveMap.needsUpdate = true
+  }, [night])
 
   return <instancedMesh ref={ref} args={[buildingGeo, buildingMat, items.length]} frustumCulled={false} />
 }
@@ -616,7 +669,7 @@ function CameraRig({ simRef, groupRef, view, dims }) {
  * already there, take over — so leaving the surface reads the way it does from a
  * real flight deck. The dome sits on a huge sphere so it's always beyond the fog.
  */
-function FlightSky({ sky, simRef }) {
+function FlightSky({ sky, simRef, isNight }) {
   const skyRef = useRef()
   const starsRef = useRef()
   const sunPos = useMemo(() => {
@@ -628,13 +681,10 @@ function FlightSky({ sky, simRef }) {
     const h = simRef.current?.state?.h || 0
     // The scattering dome owns the surface layer; above ~14 km there's almost no
     // atmosphere to scatter, so hand off to the deep-space background + stars.
-    // drei's <Sky> shader has no opacity, so we fade the whole dome by shrinking
-    // it below the far plane once it's no longer wanted (a clean on/off with a
-    // little hysteresis via the height threshold).
     if (skyRef.current) skyRef.current.visible = h < 15000
-    // Stars are always in the scene; they only read against the dark high-altitude
-    // sky, so a simple visibility gate from ~6 km up is enough and costs nothing.
-    if (starsRef.current) starsRef.current.visible = h > 6000
+    // Stars read against a dark sky — high altitude by day, but ALL THE WAY DOWN
+    // on a clear night (the whole point of a night flight is the stars overhead).
+    if (starsRef.current) starsRef.current.visible = isNight || h > 6000
   })
 
   return (
@@ -1154,7 +1204,7 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
   const sunDir = useMemo(() => sunVector(sky.elev, sky.azim), [sky])
   const envSunPos = useMemo(() => sunDir.clone().multiplyScalar(12), [sunDir])
 
-  const night = weather.sky === 'storm'
+  const night = weather.sky === 'storm' || weather.sky === 'night'
   return (
     <CanvasFallback label="3D flight view unavailable on this device">
       <Canvas
@@ -1175,7 +1225,7 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
             whole world hangs on "Loading world…". Catch it here so the scene keeps
             rendering as pieces resolve. */}
         <Suspense fallback={null}>
-        <FlightSky sky={sky} simRef={simRef} />
+        <FlightSky sky={sky} simRef={simRef} isNight={night} />
         {!night && <SunGlare sunDir={sunDir} tint={sky.sunTint} strength={sky.sun / 1.5} />}
         <CloudDeck skyId={weather.sky} simRef={simRef} />
         <Atmosphere simRef={simRef} baseColor={sky.bg} visM={visM} />
@@ -1208,7 +1258,7 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
             the NASA map imperatively when it loads, so the world never blocks. */}
         <RealGround simRef={simRef} detailTex={groundTex} lat={airport?.lat ?? 51.47} lon={airport?.lon ?? -0.45} />
         <Runway night={night} halfLen={runwayHalfLen} airport={airport} />
-        <Buildings />
+        <Buildings night={night} />
 
         <Suspense fallback={<Loader />}>
           <AircraftModel url={modelUrl} simRef={simRef} groupRef={groupRef} />
