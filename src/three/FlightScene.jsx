@@ -318,17 +318,48 @@ const buildingMat = new THREE.MeshStandardMaterial({ color: '#2d333b', roughness
 // The building layout — a deterministic seeded PRNG so the VISUALS and the
 // Rapier COLLIDERS share one source of truth (fly into a building you can see,
 // and the physics catches it). Exported for the collision layer.
+//
+// Built as a real PLACE, not a sparse ring: a dense downtown of towers a few km
+// off the approach, mid-rise suburbs fanning out from it, and scattered distant
+// settlements to 15 km — so flying away from the field you pass over a city, then
+// countryside with towns, instead of an empty void. Still ONE instanced mesh.
 export function buildingLayout() {
   let seed = 7
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
   const arr = []
-  for (let i = 0; i < 60; i++) {
-    const ang = rnd() * Math.PI * 2
-    const dist = 500 + rnd() * 4500
-    const x = Math.cos(ang) * dist
-    const z = Math.sin(ang) * dist
-    if (Math.abs(x) < 150 && Math.abs(z) < 2200) continue // clear the runway corridor
-    arr.push({ x, z, w: 14 + rnd() * 40, h: 8 + rnd() * 55, d: 14 + rnd() * 40 })
+  const clearRunway = (x, z) => Math.abs(x) < 180 && Math.abs(z) < 2400
+
+  // --- DOWNTOWN: a dense cluster of tall towers, offset from the runway ---
+  const cx = 2600, cz = -3200     // city centre, out past the departure end
+  for (let i = 0; i < 90; i++) {
+    const a = rnd() * Math.PI * 2
+    const d = rnd() * rnd() * 1400          // rnd² → packed toward the centre
+    const x = cx + Math.cos(a) * d
+    const z = cz + Math.sin(a) * d
+    if (clearRunway(x, z)) continue
+    const coreT = 1 - d / 1400               // taller toward the core
+    arr.push({ x, z, w: 16 + rnd() * 26, h: 20 + coreT * coreT * 150 + rnd() * 30, d: 16 + rnd() * 26 })
+  }
+  // --- SUBURBS: mid-rise ring fanning out from downtown ---
+  for (let i = 0; i < 140; i++) {
+    const a = rnd() * Math.PI * 2
+    const d = 1400 + rnd() * 3200
+    const x = cx + Math.cos(a) * d
+    const z = cz + Math.sin(a) * d
+    if (clearRunway(x, z)) continue
+    arr.push({ x, z, w: 14 + rnd() * 26, h: 8 + rnd() * 34, d: 14 + rnd() * 26 })
+  }
+  // --- DISTANT TOWNS: small clusters scattered to the horizon ---
+  for (let t = 0; t < 8; t++) {
+    const ta = rnd() * Math.PI * 2
+    const td = 6000 + rnd() * 9000
+    const tx = Math.cos(ta) * td, tz = Math.sin(ta) * td
+    for (let i = 0; i < 12; i++) {
+      const x = tx + (rnd() - 0.5) * 900
+      const z = tz + (rnd() - 0.5) * 900
+      if (clearRunway(x, z)) continue
+      arr.push({ x, z, w: 14 + rnd() * 24, h: 8 + rnd() * 40, d: 14 + rnd() * 24 })
+    }
   }
   return arr
 }
@@ -476,9 +507,9 @@ function Runner({ simRef }) {
     sim._acc = acc
 
     // WASM collision: did the hull hit a solid obstacle this frame? Only check
-    // while airborne + low enough to matter (buildings top out ~63 m). Cheap.
+    // while airborne + low enough to matter (downtown towers reach ~200 m). Cheap.
     const s = sim.state
-    if (sim._collide && collisionReady() && !s.onGround && s.h < 90) {
+    if (sim._collide && collisionReady() && !s.onGround && s.h < 230) {
       const r = checkCollision(s.x, s.h, -s.z) // scene space: z is negated vs model
       if (r.hit) {
         s.crashed = true
