@@ -25,6 +25,43 @@ function withBase(path) {
   return import.meta.env.BASE_URL.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
 }
 
+/**
+ * One-shot device tier for adaptive quality. The projector (Android 11 WebView)
+ * and cheap phones choke on the full DPR + cloud count + rain; desktops want the
+ * crisp version. We pick a tier ONCE from cheap signals — device memory, logical
+ * cores, a coarse mobile/UA check, and whether the GL context reports a software
+ * renderer — and scale DPR, cloud puffs and optional effects off it. Computed
+ * lazily and cached so it costs nothing after the first read.
+ */
+let _qualityTier = null
+function qualityTier() {
+  if (_qualityTier) return _qualityTier
+  let score = 2 // assume "high" until a signal knocks it down
+  try {
+    const mem = navigator.deviceMemory || 4            // GB (Chrome-only; 4 default)
+    const cores = navigator.hardwareConcurrency || 4
+    const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
+    if (mem <= 2 || cores <= 2) score = 0
+    else if (mem <= 4 || cores <= 4 || mobile) score = 1
+    // a software / SwiftShader GL renderer means no real GPU — force low
+    const c = document.createElement('canvas')
+    const gl = c.getContext('webgl') || c.getContext('experimental-webgl')
+    const dbg = gl && gl.getExtension('WEBGL_debug_renderer_info')
+    const rend = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || '') : ''
+    if (/swiftshader|software|llvmpipe|basic render/i.test(rend)) score = 0
+  } catch { /* any failure → keep the mid default */ }
+  _qualityTier = score === 0 ? 'low' : score === 1 ? 'mid' : 'high'
+  return _qualityTier
+}
+
+// Per-tier knobs. dprMax caps the render resolution; cloudMul scales puff counts;
+// rain/sunGlare/contrails gate the optional cosmetic passes on the weakest tier.
+const QUALITY = {
+  low:  { dprMax: 1,    cloudMul: 0.4, rain: false, contrails: false },
+  mid:  { dprMax: 1.35, cloudMul: 0.7, rain: true,  contrails: true },
+  high: { dprMax: 1.75, cloudMul: 1,   rain: true,  contrails: true },
+}
+
 // Each weather sky drives both the fallback background colour AND a physical
 // drei <Sky> (Preetham scattering). `elev`/`azim` place the sun in the dome;
 // `turbidity`/`rayleigh` set the haze thickness and blue depth; `mie*` the
@@ -641,6 +678,45 @@ function AircraftModel({ url, simRef, groupRef }) {
   )
 }
 
+/**
+ * Grounding "blob" shadow. The real shadow-map pass renders the whole /fly scene
+ * black (see the Canvas note), so instead we lay a soft dark ellipse on the ground
+ * directly under the aircraft. It sits where the gear is, scales with the model's
+ * footprint, and FADES + SPREADS as the jet climbs (a shadow softens and weakens
+ * with height) — the single biggest cue that the aircraft is really on, and
+ * lifting off, the ground. One sprite, no shadow pass, costs nothing. Tinted to
+ * the sky so it's a soft grey on an overcast day, near-black in bright sun.
+ */
+function BlobShadow({ simRef, dims, dark = '#05070a' }) {
+  const ref = useRef()
+  const matRef = useRef()
+  // footprint ~ the span; a touch oblong toward the fuselage
+  const baseR = useMemo(() => Math.max(10, (dims?.wingspanM || 34) * 0.62), [dims])
+  useFrame(() => {
+    const s = simRef.current?.state
+    const r = ref.current
+    const m = matRef.current
+    if (!s || !r || !m) return
+    const agl = Math.max(0, s.h)
+    // gone by ~400 m AGL; strongest on the deck
+    const fade = Math.max(0, 1 - agl / 400)
+    m.opacity = 0.42 * fade
+    r.visible = fade > 0.01
+    // spread + soften with height so lift-off reads as the shadow pulling away
+    const spread = baseR * (1 + agl / 160)
+    r.position.set(s.x, 0.12, s.z)
+    r.scale.set(spread * 2, spread * 1.3, 1)
+  })
+  // a flat ground plane (not a camera-facing sprite) carrying the soft radial
+  // falloff texture, so the blob stays pinned to the surface under the jet
+  return (
+    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.12, 0]} visible={false}>
+      <planeGeometry args={[1, 1]} />
+      <meshBasicMaterial ref={matRef} map={softSprite()} color={dark} transparent opacity={0} depthWrite={false} />
+    </mesh>
+  )
+}
+
 function Runner({ simRef }) {
   // Rapier is ~4.3 MB of WASM and ONLY does building collision near the city.
   // Loading it on mount made every /fly session pay that download even on a
@@ -845,7 +921,7 @@ const CLOUD_DECKS = {
   cold: { lowM: 650,  highM: 2100, count: 12, opacity: 0.75, spread: 3200 },
 }
 
-function CloudDeck({ skyId, simRef }) {
+function CloudDeck({ skyId, simRef, cloudMul = 1 }) {
   const cfg = CLOUD_DECKS[skyId]
   const groupRef = useRef()
   // deterministic scatter across both bands so the deck is stable frame to frame
@@ -853,7 +929,9 @@ function CloudDeck({ skyId, simRef }) {
     if (!cfg) return []
     let seed = 91
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    const make = (baseM, spreadMul, scaleBase) => Array.from({ length: cfg.count }, () => ({
+    // scale the puff count by the device tier — fewer clouds on weak GPUs
+    const count = Math.max(3, Math.round(cfg.count * cloudMul))
+    const make = (baseM, spreadMul, scaleBase) => Array.from({ length: count }, () => ({
       x: (rnd() - 0.5) * cfg.spread * 2 * spreadMul,
       y: baseM + (rnd() - 0.5) * 400,
       z: (rnd() - 0.5) * cfg.spread * 2 * spreadMul,
@@ -862,7 +940,7 @@ function CloudDeck({ skyId, simRef }) {
     }))
     // low band clusters tighter + smaller (nearby cumulus); high band spreads wide
     return [...make(cfg.lowM, 0.7, 300), ...make(cfg.highM, 1.1, 340)]
-  }, [cfg])
+  }, [cfg, cloudMul])
 
   // slide the whole deck to stay centred on the jet (in x/z only — the band keeps
   // its real altitude) so you never run out of cloud, without spawning thousands
@@ -1343,6 +1421,8 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
   const envSunPos = useMemo(() => sunDir.clone().multiplyScalar(12), [sunDir])
 
   const night = weather.sky === 'storm' || weather.sky === 'night'
+  // adaptive quality: pick a device tier once and scale DPR / clouds / effects
+  const q = useMemo(() => QUALITY[qualityTier()], [])
   return (
     <CanvasFallback label="3D flight view unavailable on this device">
       <Canvas
@@ -1353,8 +1433,14 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
         // producing a broken/black shadow map. The scene is fully lit by the
         // directional + hemisphere + environment lights without it. Do not
         // re-enable shadows without a small dedicated shadow-catcher + testing.
-        dpr={[1, 1.75]}
-        gl={{ powerPreference: 'high-performance', antialias: true }}
+        dpr={[1, q.dprMax]}
+        gl={{ powerPreference: 'high-performance', antialias: qualityTier() !== 'low' }}
+        onCreated={({ gl }) => {
+          // ACES Filmic tone mapping with a slight exposure lift — richer
+          // highlights on the metal + a less flat sky than the default linear map
+          gl.toneMapping = THREE.ACESFilmicToneMapping
+          gl.toneMappingExposure = night ? 1.0 : 1.12
+        }}
         camera={{ position: [150, 40, 1700], fov: 45, near: 0.5, far: 90000 }}
       >
         {/* One Suspense INSIDE the Canvas: several drei helpers here (Sky, Clouds,
@@ -1365,7 +1451,7 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
         <Suspense fallback={null}>
         <FlightSky sky={sky} simRef={simRef} isNight={night} />
         {!night && <SunGlare sunDir={sunDir} tint={sky.sunTint} strength={sky.sun / 1.5} />}
-        <CloudDeck skyId={weather.sky} simRef={simRef} />
+        <CloudDeck skyId={weather.sky} simRef={simRef} cloudMul={q.cloudMul} />
         <Atmosphere simRef={simRef} baseColor={sky.bg} visM={visM} />
         <hemisphereLight intensity={sky.hemi} color="#dfe9f2" groundColor="#3a4450" />
         {/* sun key light, aimed from the real sky-sun direction so the lit side of
@@ -1401,8 +1487,10 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
         <Suspense fallback={<Loader />}>
           <AircraftModel url={modelUrl} simRef={simRef} groupRef={groupRef} />
         </Suspense>
-        {weather.sky === 'storm' && <Rain />}
-        <Contrails simRef={simRef} dims={dims} />
+        {/* soft grounding shadow under the jet (no shadow-map pass needed) */}
+        <BlobShadow simRef={simRef} dims={dims} dark={night ? '#01020a' : '#0a0d12'} />
+        {weather.sky === 'storm' && q.rain && <Rain count={qualityTier() === 'mid' ? 1400 : 2500} />}
+        {q.contrails && <Contrails simRef={simRef} dims={dims} />}
         <TouchdownSmoke simRef={simRef} />
         <Runner simRef={simRef} />
         <CameraRig simRef={simRef} groupRef={groupRef} view={view} dims={dims} />

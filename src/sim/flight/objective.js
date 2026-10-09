@@ -21,6 +21,33 @@ function vrefOf(ac) {
   return 1.3 * vsLdg
 }
 
+/**
+ * A per-leg CHALLENGE — a concrete, named goal that gives the flight replay
+ * value beyond "don't crash". Deterministic from the route (same leg → same
+ * challenge, so you can practise and beat it), scaled a little by distance so a
+ * long haul asks for a cleaner result. Evaluate it against the landing score
+ * with `gradeChallenge(challenge, state)` once down.
+ */
+export function legChallenge(from, to, legNm) {
+  // deterministic pick from the airport codes so each route has its own goal
+  let seed = 0
+  for (const ch of `${from.code}${to.code}`) seed = (seed * 31 + ch.charCodeAt(0)) % 100000
+  const pick = seed % 3
+  // tighter sink target on longer legs (you've had time to set up a stable approach)
+  const sink = legNm > 2000 ? 200 : legNm > 600 ? 250 : 300
+  if (pick === 0) return { id: 'greaser', label: `Grease it: touch down under ${sink} fpm`, test: (s) => Math.abs(s.touchdownVs || 999) <= sink }
+  if (pick === 1) return { id: 'centreline', label: 'Stay on the centreline: land within 12 m', test: (s) => Math.abs(s.x) <= 12 }
+  return { id: 'stable', label: `Stable approach: ${sink} fpm, wings level, on centreline`,
+           test: (s) => Math.abs(s.touchdownVs || 999) <= sink + 50 && Math.abs(s.x) <= 20 && Math.abs(s.phi) < 0.08 }
+}
+
+/** Did the landing meet the challenge? Call once on a successful (non-crash)
+ *  touchdown; returns { met, label }. */
+export function gradeChallenge(challenge, s) {
+  if (!challenge || s.crashed) return { met: false, label: challenge?.label || '' }
+  return { met: !!challenge.test(s), label: challenge.label }
+}
+
 // A sensible cruise altitude for the leg: short hops stay low, longer legs go
 // higher, capped to a light-jet-friendly band so guidance is always reachable.
 function cruiseAltFt(legNm) {

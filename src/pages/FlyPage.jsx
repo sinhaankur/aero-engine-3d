@@ -10,7 +10,7 @@ import { FlightAudio } from '../sim/flight/audio.js'
 import EngineLive from '../sim/flight/EngineLive.jsx'
 import AirportBoard from '../sim/flight/AirportBoard.jsx'
 import { checklistProgress } from '../sim/flight/procedures.js'
-import { flightObjective } from '../sim/flight/objective.js'
+import { flightObjective, legChallenge, gradeChallenge } from '../sim/flight/objective.js'
 import { useFlightData } from '../live/useFlightData.js'
 import { hardReload } from '../lib/hardReload.js'
 
@@ -107,6 +107,7 @@ export default function FlyPage() {
   simRef.current.ac = ac
   simRef.current.weather = weather
   simRef.current.assist = assist
+  simRef.current.courseDeg = route.brg   // great-circle course to the destination
 
   const reset = () => {
     const st = createState(ac, rwy, coldDark)
@@ -164,11 +165,15 @@ export default function FlyPage() {
         case 'KeyA':
           s.apOn = !s.apOn
           if (s.apOn) {
-            // engage ALT-hold at the current altitude, wings level
+            // "fly the leg": hold the current altitude AND turn onto the
+            // great-circle course to the destination, so you can engage the AP
+            // for the cruise instead of hand-flying the whole way. Disengaged by
+            // any manual pitch input (below) or pressing A again.
             s.apAlt = s.h
             s.fcuAlt = Math.round((s.h / 0.3048) / 100) * 100
             s.apVsMode = false
-            s.apHdgMode = false
+            s.apHdgMode = true
+            s.fcuHdg = simRef.current.courseDeg ?? Math.round((s.psi * 180) / Math.PI)
           }
           break
         case 'Space': simRef.current.paused = !simRef.current.paused; e.preventDefault(); break
@@ -293,6 +298,9 @@ export default function FlyPage() {
   // flight DIRECTION: a phase-aware "what to do now" directive + course cue, so
   // there's always a clear objective — fly the leg and grease the landing
   const objective = flightObjective(s, ac, leg, route, from, to)
+  // per-leg CHALLENGE: a concrete named goal for replay value (deterministic per
+  // route, so you can practise and beat it)
+  const challenge = useMemo(() => legChallenge(from, to, leg.total), [from, to, leg.total])
 
   return (
     <div className={`fly-page ${mode === 'deck' ? 'has-deck' : ''}`}>
@@ -448,6 +456,7 @@ export default function FlyPage() {
               )}
             </div>
             <p className="fly-obj-detail">{objective.detail}</p>
+            {!objective.done && <p className="fly-obj-challenge">◎ {challenge.label}</p>}
             {/* course-deviation bar: centre = on course, the bug slides to the side
                 you need to turn toward (clamped to ±30°) */}
             {!objective.done && !s.onGround && (
@@ -602,7 +611,7 @@ export default function FlyPage() {
             <div><span>Fuel</span><b>{Math.round(s.fuelKg)} kg</b></div>
             <div><span>Thrust</span><b>{Math.round(hud.T / 1000)} kN</b></div>
             <div><span>L / W</span><b>{(hud.L / hud.W).toFixed(2)}</b></div>
-            <div><span>AP</span><b className={s.apOn ? 'on' : ''}>{s.apOn ? `ALT ${Math.round((s.apAlt || 0) / 0.3048)} ft` : 'OFF'}</b></div>
+            <div><span>AP</span><b className={s.apOn ? 'on' : ''}>{s.apOn ? `${Math.round((s.apAlt || 0) / 0.3048)}ft · ${String(Math.round(s.fcuHdg || 0)).padStart(3, '0')}°` : 'OFF'}</b></div>
           </div>
         )}
 
@@ -636,6 +645,7 @@ export default function FlyPage() {
         {!s.crashed && s.onGround && s.landingScore && s.v < 30 && (() => {
           const best = bestLanding[aircraft.name]
           const isNewBest = best && s.landingScore.score >= best.score && s.landingScore.stars >= 4
+          const ch = gradeChallenge(challenge, s)
           return (
             <div className={`fly-grade-card fly-grade-card--${s.landingScore.grade.toLowerCase()} ${isNewBest ? 'is-best' : ''}`}>
               {isNewBest && <div className="fly-grade-new" aria-hidden>✦ NEW BEST ✦</div>}
@@ -645,6 +655,7 @@ export default function FlyPage() {
               </div>
               <div className="fly-grade-stars" aria-hidden>{'★'.repeat(s.landingScore.stars)}{'☆'.repeat(5 - s.landingScore.stars)}</div>
               <p className="fly-grade-note">{s.landingScore.note}</p>
+              <p className={`fly-grade-challenge ${ch.met ? 'met' : 'miss'}`}>{ch.met ? '✓ Challenge met' : '✗ Challenge missed'} — {ch.label}</p>
               {best && <p className="fly-grade-best">Best in the {shortName(aircraft.name)}: {best.score} ({best.grade})</p>}
               <button onClick={reset}>↺ Fly again (Enter)</button>
             </div>
@@ -663,7 +674,7 @@ export default function FlyPage() {
         <span><kbd>F</kbd>/<kbd>V</kbd> flaps</span>
         <span><kbd>G</kbd> gear</span>
         <span><kbd>B</kbd> brakes</span>
-        <span><kbd>A</kbd> alt-hold AP</span>
+        <span><kbd>A</kbd> AP: fly the leg</span>
         <span><kbd>C</kbd> camera</span>
         <span><kbd>H</kbd> photo</span>
         <span><kbd>Space</kbd> pause</span>
