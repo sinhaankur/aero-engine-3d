@@ -61,6 +61,13 @@ export default function FlyPage() {
   if (audioRef.current == null) audioRef.current = new FlightAudio()
   const [, forceTick] = useState(0)
 
+  // GAME: remember your BEST landing (persisted, per aircraft) so there's always
+  // a number to beat. Read once; updated when a landing scores higher.
+  const [bestLanding, setBestLanding] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('aero.bestLanding') || '{}') } catch { return {} }
+  })
+  const scoredThisLanding = useRef(false)
+
   // live ADS-B feed — used only to show the real aircraft on the ground at the
   // selected departure field (the "departures board"); poll slowly here
   const { flights, status: liveStatus } = useFlightData({ intervalMs: 30000 })
@@ -104,8 +111,26 @@ export default function FlyPage() {
     simRef.current.controls = { pitch: 0, roll: 0, yaw: 0, throttle: 0, flap: st.flap, gear: true, brakes: st.brakes, speedbrake: 0 }
     simRef.current.out = null
     setCleared(false)   // a fresh flight needs a fresh departure clearance
+    scoredThisLanding.current = false   // ready to record the next landing
     forceTick((n) => n + 1)
   }
+
+  // GAME: when a successful landing scores, record a new personal best for this
+  // aircraft (persisted). Fires once per landing. A fresh best is celebrated in UI.
+  const st0 = simRef.current.state
+  const landed = !!(st0?.onGround && st0?.landingScore && st0?.airborneOnce && !st0?.crashed)
+  useEffect(() => {
+    const st = simRef.current.state
+    if (!st?.landingScore || st.crashed || !st.onGround || scoredThisLanding.current) return
+    scoredThisLanding.current = true
+    const key = aircraft.name
+    const prev = bestLanding[key]?.score ?? -1
+    if (st.landingScore.score > prev) {
+      const next = { ...bestLanding, [key]: { score: st.landingScore.score, grade: st.landingScore.grade } }
+      setBestLanding(next)
+      try { localStorage.setItem('aero.bestLanding', JSON.stringify(next)) } catch { /* private mode */ }
+    }
+  }, [landed]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // variant / departure / start-state change → fresh state
   useEffect(() => { reset() }, [acKey, fromCode, coldDark]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -561,17 +586,23 @@ export default function FlyPage() {
         )}
         {/* GAME: a scored landing card on a successful touchdown — grade, stars,
             and the number — so flying becomes "can you beat your best landing?" */}
-        {!s.crashed && s.onGround && s.landingScore && s.v < 30 && (
-          <div className={`fly-grade-card fly-grade-card--${s.landingScore.grade.toLowerCase()}`}>
-            <div className="fly-grade-head">
-              <span className="fly-grade-badge">{s.landingScore.grade}</span>
-              <span className="fly-grade-score">{s.landingScore.score}<small>/100</small></span>
+        {!s.crashed && s.onGround && s.landingScore && s.v < 30 && (() => {
+          const best = bestLanding[aircraft.name]
+          const isNewBest = best && s.landingScore.score >= best.score && s.landingScore.stars >= 4
+          return (
+            <div className={`fly-grade-card fly-grade-card--${s.landingScore.grade.toLowerCase()} ${isNewBest ? 'is-best' : ''}`}>
+              {isNewBest && <div className="fly-grade-new" aria-hidden>✦ NEW BEST ✦</div>}
+              <div className="fly-grade-head">
+                <span className="fly-grade-badge">{s.landingScore.grade}</span>
+                <span className="fly-grade-score">{s.landingScore.score}<small>/100</small></span>
+              </div>
+              <div className="fly-grade-stars" aria-hidden>{'★'.repeat(s.landingScore.stars)}{'☆'.repeat(5 - s.landingScore.stars)}</div>
+              <p className="fly-grade-note">{s.landingScore.note}</p>
+              {best && <p className="fly-grade-best">Best in the {shortName(aircraft.name)}: {best.score} ({best.grade})</p>}
+              <button onClick={reset}>↺ Fly again (Enter)</button>
             </div>
-            <div className="fly-grade-stars" aria-hidden>{'★'.repeat(s.landingScore.stars)}{'☆'.repeat(5 - s.landingScore.stars)}</div>
-            <p className="fly-grade-note">{s.landingScore.note}</p>
-            <button onClick={reset}>↺ Fly again (Enter)</button>
-          </div>
-        )}
+          )
+        })()}
       </div>
 
       {mode === 'deck' && <Cockpit simRef={simRef} ac={ac} />}
