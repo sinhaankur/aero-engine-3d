@@ -183,43 +183,60 @@ export default function FlyPage() {
       if (e.code.startsWith('Arrow')) e.preventDefault()
     }
     const up = (e) => keys.delete(e.code)
-    // 60 Hz key → control mapping. Keyboard is binary (0/±1); ramping each axis
-    // toward its target instead of snapping gives a natural spring-loaded-stick
-    // feel — no more twitchy on/off pitch and roll. Release eases back to
-    // neutral. (The physics model still applies its own alpha/bank smoothing.)
-    const RAMP = 0.14, RETURN = 0.22
-    const ease = (cur, tgt) => {
-      const k = tgt === 0 ? RETURN : RAMP
+    // Key → control mapping, driven by requestAnimationFrame (NOT setInterval).
+    // setInterval(16) drifts, fires out of phase with the render, and can bunch up
+    // behind a busy frame — so stick inputs arrived late and unevenly, which is a
+    // big part of the "twitchy / laggy" feel. rAF runs in lockstep with the frame
+    // the physics is stepped on, so an input is applied the same frame it's drawn.
+    //
+    // Keyboard is binary (0/±1); we ramp each axis toward its target for a natural
+    // spring-loaded-stick feel. The ramp is now TIME-BASED — `1 - e^(-rate·dt)`
+    // gives the same response regardless of refresh rate (identical at 30/60/144
+    // Hz) instead of the old per-tick factor that got snappier the faster you ran.
+    const RAMP_RATE = 9.2, RETURN_RATE = 14   // per-second; return is quicker than push
+    const ease = (cur, tgt, dt) => {
+      const k = 1 - Math.exp(-(tgt === 0 ? RETURN_RATE : RAMP_RATE) * dt)
       return cur + (tgt - cur) * k
     }
-    const iv = setInterval(() => {
+    let raf = 0
+    let prev = performance.now()
+    const loop = (now) => {
+      raf = requestAnimationFrame(loop)
+      const dt = Math.min(0.05, (now - prev) / 1000) // clamp hitches so a stall doesn't jump the stick
+      prev = now
       const c = simRef.current.controls
       const pTgt = (keys.has('ArrowUp') ? 1 : 0) - (keys.has('ArrowDown') ? 1 : 0)
       const rTgt = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0)
       const yTgt = (keys.has('KeyE') ? 1 : 0) - (keys.has('KeyQ') ? 1 : 0)
-      c.pitch = ease(c.pitch || 0, pTgt)
-      c.roll = ease(c.roll || 0, rTgt)
-      c.yaw = ease(c.yaw || 0, yTgt)
+      c.pitch = ease(c.pitch || 0, pTgt, dt)
+      c.roll = ease(c.roll || 0, rTgt, dt)
+      c.yaw = ease(c.yaw || 0, yTgt, dt)
       // snap tiny residuals to zero so controls fully centre
       if (Math.abs(c.pitch) < 0.008) c.pitch = 0
       if (Math.abs(c.roll) < 0.008) c.roll = 0
       if (Math.abs(c.yaw) < 0.008) c.yaw = 0
-      if (keys.has('KeyW')) c.throttle = Math.min(1, c.throttle + 0.012)
-      if (keys.has('KeyS')) c.throttle = Math.max(0, c.throttle - 0.015)
+      // throttle slews at a fixed real rate (per second) rather than per tick
+      if (keys.has('KeyW')) c.throttle = Math.min(1, c.throttle + 0.75 * dt)
+      if (keys.has('KeyS')) c.throttle = Math.max(0, c.throttle - 0.95 * dt)
       if (simRef.current.state.apOn && (keys.has('ArrowUp') || keys.has('ArrowDown'))) {
         simRef.current.state.apOn = false // manual input disconnects AP
       }
-    }, 16)
+    }
+    raf = requestAnimationFrame(loop)
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     return () => {
-      clearInterval(iv)
+      cancelAnimationFrame(raf)
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
   }, [])
 
-  // ---- HUD refresh at 25 Hz ----
+  // ---- HUD refresh for the SLOW text (route strip, objective, readouts) ----
+  // The PFD now self-drives off simRef at ~25 Hz WITHOUT re-rendering this page
+  // (see PFD.jsx), so this interval only feeds the surrounding text — which the
+  // eye reads fine at ~8 Hz. Dropping it from 25 Hz to 8 Hz cuts full-page React
+  // reconciliation to a third while the instruments stay smooth.
   useEffect(() => {
     const iv = setInterval(() => {
       if (simRef.current.out) setHud({ ...simRef.current.out })
@@ -227,7 +244,7 @@ export default function FlyPage() {
       // fires once per touchdown) — reliable because it reads the live state,
       // not a render-derived snapshot
       recordLanding.current?.()
-    }, 40)
+    }, 125)
     return () => clearInterval(iv)
   }, [])
 
@@ -398,12 +415,12 @@ export default function FlyPage() {
               <button key={v.id} className={view === v.id ? 'on' : ''} onClick={() => setView(v.id)}>{v.name}</button>
             ))}
           </div>
-          {/* quick-access badges so the two most immersive toggles stay one tap
-              away without opening the drawer */}
+          {/* Just the two immersion toggles you actually reach for mid-flight stay
+              one tap away. Music lives in the drawer (you set it once); Clear-cache
+              is a destructive reload and has no business beside the flight controls —
+              both were redundant duplicates of drawer items and only added clutter. */}
           <button className={`fly-quick ${photo ? 'on' : ''}`} onClick={() => setPhoto((v) => !v)} title="Hide all UI for a clean cinematic view (H)">⛶ Photo</button>
           <button className={`fly-quick ${sound ? 'on' : ''}`} onClick={toggleSound} title="Procedural engine + wind audio">{sound ? '♪ On' : '♪ Off'}</button>
-          <button className={`fly-quick ${sound && music ? 'on' : ''}`} onClick={toggleMusic} title="Calm cinematic score that follows the flight">{sound && music ? '♫ On' : '♫ Off'}</button>
-          <button className="fly-quick" onClick={hardReload} title="Clear cached assets and reload the latest version">↻ Clear cache</button>
           <span className="fly-spacer" />
           <span className="fly-blurb">{weather.blurb}</span>
           <button className="fly-reset" onClick={reset}>↺ Reset</button>
@@ -559,7 +576,9 @@ export default function FlyPage() {
 
         {/* instruments — mounted in the glareshield in cockpit view */}
         <div className={`fly-hud ${view === 'cockpit' ? 'deck' : 'mini'}`}>
-          <PFD out={hud} state={s} ac={ac} weatherName={weather.name} />
+          {/* self-driving: samples simRef on its own rAF so it stays at ~25 Hz
+              without re-rendering this page (see PFD.jsx) */}
+          <PFD simRef={simRef} ac={ac} weatherName={weather.name} />
         </div>
 
         {/* Tower ATC radio panel */}

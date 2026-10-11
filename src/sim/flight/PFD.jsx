@@ -6,6 +6,7 @@
  * + VS right, heading strip below, FMA-ish annunciators on top. All values
  * come straight from the flight model's readouts each frame.
  */
+import { useEffect, useRef, useState } from 'react'
 
 const W = 460
 const H = 380
@@ -244,7 +245,14 @@ function FMA({ state, out }) {
   )
 }
 
-export default function PFD({ out, state, ac, weatherName }) {
+/**
+ * Static inner render: pure of any timing. Takes an already-sampled `out`/`state`
+ * snapshot so it can be driven either by parent props (legacy) or by PFD's own
+ * self-refresh loop (see below). Memoised shallowly on the primitive readouts that
+ * actually move the instrument, so a snapshot that rounds to the same pixels skips
+ * the SVG rebuild entirely.
+ */
+function PFDView({ out, state, ac, weatherName }) {
   if (!out) return null
   // stall speed in IAS terms: Vs = sqrt(2W / (rho0 · S · CLmax))
   const vsKt = Math.sqrt((2 * ac.mass * 9.81) / (1.225 * ac.S * (ac.clMaxClean + ac.flaps[state.flap].dCl))) / 0.514444
@@ -291,3 +299,67 @@ export default function PFD({ out, state, ac, weatherName }) {
     </svg>
   )
 }
+
+/**
+ * Self-driving PFD wrapper.
+ *
+ * The instrument needs ~25 Hz to feel alive, but it USED to get that by having
+ * FlyPage call setHud 25×/s — which re-rendered the ENTIRE page (route strip,
+ * objective director, readouts, help bar…) 25×/s on top of the Canvas loop. That
+ * steady React churn is a big part of what felt janky even on desktop.
+ *
+ * Instead the PFD now samples the live sim ref on its OWN rAF and holds its
+ * display snapshot in local state, so only this ~460×380 SVG re-renders at speed —
+ * the parent page is left alone. If a `simRef` is passed we self-drive; otherwise
+ * we fall back to the old prop-driven path so nothing else has to change.
+ *
+ * We also COALESCE: the instrument only moves in integer pixels, so we quantise
+ * the readouts and skip the state update (and the SVG rebuild) when nothing the
+ * eye can see has changed — a plane sitting still or in dead-steady cruise stops
+ * re-rendering the PFD entirely.
+ */
+export default function PFD({ simRef, out: outProp, state: stateProp, ac, weatherName }) {
+  const [snap, setSnap] = useState(() =>
+    outProp ? { out: outProp, state: stateProp } : null)
+  const last = useRef('')
+
+  useEffect(() => {
+    if (!simRef) return undefined
+    let raf = 0
+    // a compact fingerprint of only the readouts that move a pixel on the PFD — if
+    // it's unchanged frame to frame we don't setState, so a steady display is free
+    const fingerprint = (o, s) => (
+      `${Math.round(o.iasKt)}|${Math.round(o.altFt)}|${(o.vsFpm / 50) | 0}|` +
+      `${Math.round(o.hdg)}|${(s.theta * 60) | 0}|${(s.phi * 60) | 0}|` +
+      `${Math.round(o.n1)}|${o.mach.toFixed(3)}|${o.aoaDeg.toFixed(1)}|` +
+      `${s.flap}|${s.gear ? 1 : 0}|${s.apOn ? 1 : 0}|${s.athrOn ? 1 : 0}|` +
+      `${s.stalled ? 1 : 0}|${o.overspeed ? 1 : 0}|${state_phase(s)}`
+    )
+    const tick = () => {
+      raf = requestAnimationFrame(tick)
+      const sim = simRef.current
+      const o = sim?.out
+      const s = sim?.state
+      if (!o || !s) return
+      const fp = fingerprint(o, s)
+      if (fp === last.current) return   // nothing visible changed — skip the rebuild
+      last.current = fp
+      // shallow snapshots so React sees new refs; the SVG reads primitives off them
+      setSnap({ out: o, state: s })
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [simRef])
+
+  // prop-driven fallback (no simRef): mirror incoming props into the snapshot
+  useEffect(() => {
+    if (simRef || !outProp) return
+    setSnap({ out: outProp, state: stateProp })
+  }, [simRef, outProp, stateProp])
+
+  if (!snap?.out) return null
+  return <PFDView out={snap.out} state={snap.state} ac={ac} weatherName={weatherName} />
+}
+
+// small helper kept out of the hot fingerprint string literal for readability
+function state_phase(s) { return s.onGround ? (s.airborneOnce ? 'G1' : 'G0') : 'A' }

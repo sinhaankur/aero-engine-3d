@@ -100,18 +100,33 @@ function ParallaxDriver() {
  * segment, not the full pathname, so moving between e.g. two aircraft pages
  * cross-fades content without a full page teardown.
  */
+// Heavy, interactive routes own a full-viewport WebGL Canvas. Animating a
+// `translateY` transform on their wrapper forces the browser to composite and
+// repaint that Canvas for the whole transition — which is exactly the kind of jank
+// that reads as "clunky" when you land on /fly or /live. For these we use a pure
+// opacity fade (no transform) so nothing in the Canvas is being moved mid-mount.
+const HEAVY_ROUTES = new Set(['fly', 'live', 'simulate'])
+
 function AnimatedOutlet() {
   const { pathname } = useLocation()
   const reduce = useReducedMotion()
   const seg = pathname.split('/').filter(Boolean)[0] || 'home'
+  const heavy = HEAVY_ROUTES.has(seg)
 
-  const variants = reduce
+  // reduced-motion OR a heavy Canvas route → plain fade, no transform. Content
+  // pages keep the subtle glide that gives the site its unhurried, drafted feel.
+  const variants = (reduce || heavy)
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
     : {
-        initial: { opacity: 0, y: 14 },
+        initial: { opacity: 0, y: 12 },
         animate: { opacity: 1, y: 0 },
-        exit: { opacity: 0, y: -8 },
+        exit: { opacity: 0, y: -6 },
       }
+
+  // Snappier than the old flat 0.4 s: a quick fade in, a quicker fade out, so
+  // clicking around the site feels immediate instead of waiting on an animation.
+  // Heavy routes fade faster still (they have their own loading moment anyway).
+  const dur = reduce ? 0.18 : heavy ? 0.22 : 0.3
 
   return (
     <AnimatePresence mode="popLayout" initial={false}>
@@ -121,7 +136,7 @@ function AnimatedOutlet() {
         initial="initial"
         animate="animate"
         exit="exit"
-        transition={{ duration: reduce ? 0.2 : 0.4, ease: [0.2, 0.7, 0.3, 1] }}
+        transition={{ duration: dur, ease: [0.2, 0.7, 0.3, 1] }}
       >
         <Outlet />
       </m.div>
