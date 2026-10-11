@@ -147,6 +147,27 @@ deliberately deferred). `fieldElevFt` is already stashed on `simRef` for this.
 4. **DEM collision + AGL/MSL altitude** — fly into hills, altimeter reads MSL.
 5. **Keyed open imagery (option 3)** — real satellite colour, token via worker.
 
+## Phase 2 build notes (in progress)
+
+- **Dependency:** `three-tile@0.11.10` pins `three@0.171.0` (peer). Bumped our three
+  0.169 → 0.171 (fiber@8 >=0.133, drei@9 >=0.137 both tolerate it). **Regression
+  caught + fixed:** three@0.171's stricter GLSL validator rejected `rim * 1 * …`
+  (int literal) in `src/live/Earth.jsx`'s atmosphere shader — `${alpha}` emitted a
+  bare `1`; fixed with `.toFixed(3)`. All 3D pages (fly/live/simulate/aircraft)
+  smoke-tested clean after.
+- **DEM decode mismatch (IMPORTANT):** three-tile's built-in `terrain-rgb` loader
+  decodes **Mapbox** Terrain-RGB (`-10000 + (R<<16|G<<8|B)*0.1`), but our free
+  keyless source is **AWS Terrarium** (`(R*256+G+B/256) − 32768`) — the only
+  encoding that bucket serves. Feeding Terrarium to the Mapbox decoder = garbage
+  heights. Fix: register a custom Terrarium DEM loader via `registerDEMLoader`
+  (three-tile exposes it) with the Terrarium formula. (The built-in decode lives in
+  an inlined worker, so subclassing won't reach it — a small custom loader is the
+  clean path.)
+- **API confirmed:** `TileMap.create({imgSource, demSource, …})` is a
+  `THREE.Object3D`; `map.geo2world(lat,lon,alt)` + translate so the field sits at
+  origin; rotate the map group by `headingOffset(rwy)`; `map.update(camera)` each
+  frame. `TileSource` `url` template → point at the worker `/tile` proxy.
+
 ## Decisions (locked)
 
 1. **Imagery:** option 2 — real Terrarium *height* under the existing Blue Marble

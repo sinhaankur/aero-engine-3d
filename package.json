@@ -17,7 +17,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.27.0",
-    "three": "^0.169.0"
+    "three": "^0.171.0",
+    "three-tile": "0.11.10"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.3",

@@ -232,7 +232,7 @@ function rimFrag(power, tintDay, tintNight, alpha) {
       float rim = pow(1.0 - abs(dot(normalize(vNormalW), view)), ${power.toFixed(1)});
       float lit = smoothstep(-0.3, 0.75, dot(normalize(vP), normalize(uSun)));
       vec3 c = mix(${tintNight}, ${tintDay}, lit);
-      gl_FragColor = vec4(c, rim * ${alpha} * (0.35 + lit * 0.65));
+      gl_FragColor = vec4(c, rim * ${alpha.toFixed(3)} * (0.35 + lit * 0.65));
     }
   `
 }
