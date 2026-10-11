@@ -70,8 +70,10 @@ export function flightObjective(s, ac, leg, route, from, to) {
   const vref = vrefOf(ac)
 
   // course deviation: how far the current heading is off the great-circle course
-  // to the destination (−180..180, + = need to turn right)
-  const hdgDeg = ((s.psi * 180) / Math.PI + 360) % 360
+  // to the destination (−180..180, + = need to turn right). s.psi is runway-
+  // relative; add the runway→true offset so it compares against the TRUE route.brg
+  // (otherwise the cue was ~hdgOffset° wrong — the plane read 000° on a 270° rwy).
+  const hdgDeg = ((s.psi * 180) / Math.PI + (route.hdgOffset || 0) + 360) % 360
   let crsErr = (route.brg - hdgDeg + 540) % 360 - 180
 
   // defaults

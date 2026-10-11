@@ -252,7 +252,7 @@ function FMA({ state, out }) {
  * actually move the instrument, so a snapshot that rounds to the same pixels skips
  * the SVG rebuild entirely.
  */
-function PFDView({ out, state, ac, weatherName }) {
+function PFDView({ out, state, ac, weatherName, hdgDisplay }) {
   if (!out) return null
   // stall speed in IAS terms: Vs = sqrt(2W / (rho0 · S · CLmax))
   const vsKt = Math.sqrt((2 * ac.mass * 9.81) / (1.225 * ac.S * (ac.clMaxClean + ac.flaps[state.flap].dCl))) / 0.514444
@@ -287,7 +287,7 @@ function PFDView({ out, state, ac, weatherName }) {
         trendKt={trendKt}
       />
       <AltTape alt={out.altFt} vs={out.vsFpm} altSel={altSel} />
-      <HeadingTape hdg={out.hdg} />
+      <HeadingTape hdg={hdgDisplay != null ? hdgDisplay : out.hdg} />
 
       {out.overspeed && (
         <text x={CX} y={CY + 84} fill="#f85149" fontSize="15" fontWeight="800" textAnchor="middle" fontFamily="monospace">OVERSPEED</text>
@@ -341,11 +341,17 @@ export default function PFD({ simRef, out: outProp, state: stateProp, ac, weathe
       const o = sim?.out
       const s = sim?.state
       if (!o || !s) return
-      const fp = fingerprint(o, s)
+      // the compass reads TRUE: o.hdg is runway-relative (psi=0 = down the runway),
+      // so add the runway's true-heading offset for the real bearing (270° at 27R).
+      const hdgTrue = ((o.hdg + (sim.headingOffset || 0)) % 360 + 360) % 360
+      const fp = fingerprint(o, s) + '|' + Math.round(hdgTrue)
       if (fp === last.current) return   // nothing visible changed — skip the rebuild
       last.current = fp
-      // shallow snapshots so React sees new refs; the SVG reads primitives off them
-      setSnap({ out: o, state: s })
+      // shallow snapshots so React sees new refs; the SVG reads primitives off them.
+      // `hdgDisplay` overrides the heading tape with the true bearing. (Altitude is
+      // left AGL for now — showing MSL needs the AP/FCU + cruise-alt logic to move
+      // to MSL too, which belongs with the terrain-elevation work, not here.)
+      setSnap({ out: o, state: s, hdgDisplay: hdgTrue })
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
@@ -358,7 +364,7 @@ export default function PFD({ simRef, out: outProp, state: stateProp, ac, weathe
   }, [simRef, outProp, stateProp])
 
   if (!snap?.out) return null
-  return <PFDView out={snap.out} state={snap.state} ac={ac} weatherName={weatherName} />
+  return <PFDView out={snap.out} state={snap.state} ac={ac} weatherName={weatherName} hdgDisplay={snap.hdgDisplay} />
 }
 
 // small helper kept out of the hot fingerprint string literal for readability

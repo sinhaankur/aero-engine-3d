@@ -1523,7 +1523,11 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
 
   // The sun's world position/direction, shared by the key light, the sky dome and
   // the reflection environment so every highlight, shadow and specular agrees.
-  const sunDir = useMemo(() => sunVector(sky.elev, sky.azim), [sky])
+  // sky.azim is a TRUE bearing; the scene is built in the runway-relative frame
+  // (runway along −z), so rotate the sun by the runway's true heading to place it
+  // at its real bearing relative to the runway (sun to the west at a westbound 27R).
+  const rwyHdg = airport?.rwy?.hdgTrue || 0
+  const sunDir = useMemo(() => sunVector(sky.elev, sky.azim - rwyHdg), [sky, rwyHdg])
   const envSunPos = useMemo(() => sunDir.clone().multiplyScalar(12), [sunDir])
 
   const night = weather.sky === 'storm' || weather.sky === 'night'

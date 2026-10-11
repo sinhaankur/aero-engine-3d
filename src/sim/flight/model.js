@@ -205,11 +205,25 @@ function scoreLanding(s, vsFpm, crashed) {
   return { score, grade, stars, note }
 }
 
-// Build a runway descriptor from a real length; the sim/scene are centred on
-// z=0 so the near threshold sits at +halfLen and departures run toward −z.
-export function runwayFor(lenM = 3200) {
+// Build a runway descriptor from a real runway. The PHYSICS frame stays fixed —
+// the runway always runs along −z with psi=0 "down the runway" — so the flight
+// model is untouched. The real-world facts (true heading, field elevation) ride
+// along as metadata: `hdgTrue` is the magnetic/true takeoff heading used to make
+// the compass + great-circle course read in real bearings (see `headingOffset`
+// below), and `elevFt` lets the scene sit the field at its real altitude.
+export function runwayFor(lenM = 3200, hdgTrue = 0, elevFt = 0) {
   const halfLen = lenM / 2
-  return { halfLen, width: 45, heading: 0, threshold: halfLen - 100 }
+  return { halfLen, width: 45, heading: 0, hdgTrue, elevFt, threshold: halfLen - 100 }
+}
+
+// The offset between the sim's runway-relative frame (psi=0 = down the runway)
+// and TRUE north. Add it to a runway-relative heading to get a real compass
+// heading; subtract it from a true bearing to get a runway-relative one. This is
+// the single bridge that makes the compass read e.g. 270° at LHR 27R and the
+// great-circle course to the destination line up with the heading tape — without
+// rotating the physics frame.
+export function headingOffset(rwy = RUNWAY) {
+  return ((rwy.hdgTrue || 0) % 360 + 360) % 360
 }
 
 export function createState(ac, rwy = RUNWAY, coldDark = false) {

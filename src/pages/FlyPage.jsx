@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { FAMILIES, getAircraftForFamily, getAircraft } from '../data/index.js'
-import { WEATHER, deriveAircraft, createState, runwayFor } from '../sim/flight/model.js'
+import { WEATHER, deriveAircraft, createState, runwayFor, headingOffset } from '../sim/flight/model.js'
 import { AIRPORTS, AIRPORT_BY_CODE, distanceNm, bearingDeg, etaHours, legProgress } from '../data/airports.js'
 import PFD from '../sim/flight/PFD.jsx'
 import Cockpit from '../sim/flight/Cockpit.jsx'
@@ -84,10 +84,11 @@ export default function FlyPage() {
   // real departure / destination airports → runway + great-circle route
   const from = AIRPORT_BY_CODE[fromCode] || AIRPORTS[0]
   const to = AIRPORT_BY_CODE[toCode] || AIRPORTS[1]
-  const rwy = useMemo(() => runwayFor(from.rwy.lenM), [from])
+  const rwy = useMemo(() => runwayFor(from.rwy.lenM, from.rwy.hdgTrue, from.elevFt), [from])
   const route = useMemo(() => ({
     nm: Math.round(distanceNm(from, to)),
-    brg: Math.round(bearingDeg(from, to)),
+    brg: Math.round(bearingDeg(from, to)),       // TRUE great-circle bearing (shown to the user)
+    hdgOffset: headingOffset(runwayFor(from.rwy.lenM, from.rwy.hdgTrue, from.elevFt)),
     eta: etaHours(from, to),
   }), [from, to])
 
@@ -107,7 +108,13 @@ export default function FlyPage() {
   simRef.current.ac = ac
   simRef.current.weather = weather
   simRef.current.assist = assist
-  simRef.current.courseDeg = route.brg   // great-circle course to the destination
+  // The physics frame is runway-relative (psi=0 = down the runway), but route.brg
+  // is a TRUE great-circle bearing. Convert it into the runway frame so the AP
+  // steering + course cue work, and keep the offset so the compass can read true.
+  const hdgOff = headingOffset(rwy)
+  simRef.current.headingOffset = hdgOff
+  simRef.current.fieldElevFt = rwy.elevFt || 0   // real field elevation (for the terrain/altitude work)
+  simRef.current.courseDeg = ((route.brg - hdgOff) % 360 + 360) % 360   // course in the runway frame
 
   const reset = () => {
     const st = createState(ac, rwy, coldDark)
