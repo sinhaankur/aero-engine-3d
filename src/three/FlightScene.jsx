@@ -25,6 +25,12 @@ function withBase(path) {
   return import.meta.env.BASE_URL.replace(/\/$/, '') + '/' + path.replace(/^\//, '')
 }
 
+// drei's <Clouds> defaults to a cloud sprite fetched from rawcdn.githack.com —
+// that remote fetch fails/stalls on GitHub Pages and offline (the projector), so
+// the clouds suspended forever and NEVER rendered. Vendor the sprite locally (same
+// policy as the Draco/basis assets) and hand it to <Clouds texture={...}>.
+const CLOUD_TEX = withBase('/textures/sky/cloud.png')
+
 /**
  * One-shot device tier for adaptive quality. The projector (Android 11 WebView)
  * and cheap phones choke on the full DPR + cloud count + rain; desktops want the
@@ -1049,20 +1055,20 @@ function CloudDeck({ skyId, simRef, cloudMul = 1 }) {
           must scale with the cloud or the sprites are microscopic inside a huge
           box (that was the bug: default volume 6 in a 300 m cloud = invisible).
           ~0.16×scale makes ~50–115 m sprites that overlap into a solid cloud. */}
-      <Clouds material={THREE.MeshLambertMaterial} limit={puffs.length * 40}>
+      <Clouds material={THREE.MeshLambertMaterial} limit={puffs.length * 50} texture={CLOUD_TEX}>
         {puffs.map((p, i) => (
           <Cloud
             key={i}
             seed={p.seed}
             position={[p.x, p.y, p.z]}
-            bounds={[p.scale, p.scale * 0.4, p.scale]}
-            segments={26}
-            volume={p.scale * 0.16}
-            growth={p.scale * 0.05}
+            bounds={[p.scale, p.scale * 0.45, p.scale]}
+            segments={34}
+            volume={p.scale * 0.24}
+            growth={p.scale * 0.07}
             concentrate="inside"
             opacity={cfg.opacity}
             speed={0.05}
-            color="#f2f5fa"
+            color="#ffffff"
           />
         ))}
       </Clouds>
