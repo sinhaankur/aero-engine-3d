@@ -42,6 +42,12 @@ const CLOUD_TEX = withBase('/textures/sky/cloud.png')
 let _qualityTier = null
 function qualityTier() {
   if (_qualityTier) return _qualityTier
+  // manual override (?q=low|mid|high) — lets you force a tier to preview the
+  // volumetric clouds / adaptive effects regardless of the detected hardware.
+  try {
+    const q = new URLSearchParams(window.location.hash.split('?')[1] || window.location.search).get('q')
+    if (q === 'low' || q === 'mid' || q === 'high') { _qualityTier = q; return _qualityTier }
+  } catch { /* ignore */ }
   let score = 2 // assume "high" until a signal knocks it down
   try {
     const mem = navigator.deviceMemory || 4            // GB (Chrome-only; 4 default)
@@ -1016,6 +1022,9 @@ const CLOUD_DECKS = {
   storm:{ lowM: 320,  highM: 1300, count: 22, opacity: 0.95, spread: 2400 },
   cold: { lowM: 650,  highM: 2100, count: 12, opacity: 0.75, spread: 3200 },
 }
+// Volumetric coverage per sky (HIGH tier): higher = more/denser cloud. A clear
+// day is scattered fair-weather cumulus; a storm is a heavy overcast deck.
+const CLOUD_COVER = { day: 0.46, haze: 0.58, storm: 0.78, cold: 0.5 }
 
 function CloudDeck({ skyId, simRef, cloudMul = 1 }) {
   const cfg = CLOUD_DECKS[skyId]
@@ -1073,6 +1082,181 @@ function CloudDeck({ skyId, simRef, cloudMul = 1 }) {
         ))}
       </Clouds>
     </group>
+  )
+}
+
+/**
+ * Volumetric cloud layer (HIGH tier only).
+ *
+ * Instead of the billboard puffs (CloudDeck), this raymarches a real 3D density
+ * field for genuine cumulus you fly INTO and THROUGH — the single biggest "it's a
+ * real sky" upgrade on a capable GPU. Everything is self-contained: the density is
+ * procedural FBM value-noise generated IN THE SHADER (no external texture, so it
+ * works offline / on GitHub Pages, same policy as the vendored cloud sprite).
+ *
+ * How it stays cheap enough for a flight loop:
+ *  • One big slab (a camera-locked box) carrying a full-screen-ish raymarch; the
+ *    march is bounded to a horizontal cloud BAND (y in [base, base+thick]) and
+ *    exits early once transmittance is negligible.
+ *  • Fixed, modest step counts (primary + a short light march for self-shadowing).
+ *  • depthWrite off + transparent so it composites over the sky and under nothing
+ *    solid nearby (the band sits above the airport, so the runway is never inside).
+ *
+ * Lighting is the usual real-cloud stack: Beer–Lambert extinction for depth, a
+ * Henyey–Greenstein phase so the sun blooms through thin edges, and a powder term
+ * for the dark-base / bright-rim look. Colour is driven from the live sky + sun so
+ * it matches the dome and warms at a low sun.
+ */
+const CLOUD_VERT = /* glsl */`
+  varying vec3 vWorld;
+  void main() {
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorld = wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`
+const CLOUD_FRAG = /* glsl */`
+  precision highp float;
+  varying vec3 vWorld;
+  uniform vec3 uCam;        // camera world pos
+  uniform vec3 uSunDir;     // unit, toward the sun
+  uniform vec3 uSunCol;     // sun tint (lit cloud)
+  uniform vec3 uSkyCol;     // ambient sky tint (shadowed cloud)
+  uniform float uBase;      // cloud band bottom (world Y, metres)
+  uniform float uThick;     // band thickness (metres)
+  uniform float uCover;     // 0..1 coverage (higher = more/denser cloud)
+  uniform float uTime;      // seconds, drifts the field
+  uniform float uDensity;   // overall extinction scale
+
+  // --- hash / value-noise / fbm (no texture) ---
+  float hash(vec3 p){ p = fract(p*0.3183099 + 0.1); p *= 17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+  float vnoise(vec3 x){
+    vec3 i = floor(x); vec3 f = fract(x); f = f*f*(3.0-2.0*f);
+    return mix(mix(mix(hash(i+vec3(0,0,0)),hash(i+vec3(1,0,0)),f.x),
+                   mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+               mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),
+                   mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);
+  }
+  float fbm(vec3 p){
+    float s=0.0, a=0.5; mat3 m = mat3(0.0,0.8,0.6,-0.8,0.36,-0.48,-0.6,-0.48,0.64);
+    for(int i=0;i<5;i++){ s += a*vnoise(p); p = m*p*2.02; a *= 0.5; }
+    return s;
+  }
+  // density at a world point, confined to the band with a soft top/bottom falloff
+  float density(vec3 p){
+    float h = (p.y - uBase) / uThick;          // 0 at base, 1 at top
+    if(h < 0.0 || h > 1.0) return 0.0;
+    float edge = smoothstep(0.0,0.15,h) * smoothstep(1.0,0.75,h); // round the band
+    vec3 q = p * 0.00035;                        // ~3 km features
+    q.x += uTime * 0.012; q.z += uTime * 0.008;  // slow drift
+    float base = fbm(q);
+    float d = base - (1.0 - uCover);             // coverage threshold
+    d = max(d, 0.0) * edge;
+    // erode with higher-frequency detail for billowy edges
+    d -= 0.12 * fbm(q*4.0 + 3.0);
+    return clamp(d, 0.0, 1.0);
+  }
+
+  // Henyey–Greenstein phase
+  float hg(float c, float g){ float g2=g*g; return (1.0-g2)/(12.566*pow(1.0+g2-2.0*g*c,1.5)); }
+
+  void main(){
+    vec3 ro = uCam;
+    vec3 rd = normalize(vWorld - uCam);
+    // intersect the slab [uBase, uBase+uThick] in Y to bound the march
+    float t0, t1;
+    if(abs(rd.y) < 1e-4){ if(ro.y<uBase||ro.y>uBase+uThick){discard;} t0=0.0; t1=20000.0; }
+    else {
+      float a=(uBase-ro.y)/rd.y, b=(uBase+uThick-ro.y)/rd.y;
+      t0=min(a,b); t1=max(a,b);
+    }
+    t0=max(t0,0.0);
+    if(t1<=t0){ discard; }
+    t1=min(t1, t0+16000.0);               // cap the slab distance we traverse
+    const int STEPS=48;
+    float dt=(t1-t0)/float(STEPS);
+    float t=t0 + dt*hash(vWorld*0.7);      // jittered start kills banding
+    float cosA=dot(rd, uSunDir);
+    float phase=mix(hg(cosA,0.76), hg(cosA,-0.3), 0.3);
+    vec3 col=vec3(0.0); float trans=1.0;
+    for(int i=0;i<STEPS;i++){
+      if(trans<0.02) break;
+      vec3 p=ro+rd*t;
+      float dens=density(p);
+      if(dens>0.001){
+        // short light march toward the sun for self-shadowing
+        float ls=0.0; float lstep=uThick*0.12;
+        for(int j=1;j<=4;j++){ ls += density(p + uSunDir*lstep*float(j)); }
+        float sun=exp(-ls*lstep*uDensity*2.2);            // Beer–Lambert to the sun
+        float powder=1.0-exp(-dens*3.5);                   // dark base / bright rim
+        // bright sunlit cloud: a strong near-white direct term (sun tint lifted
+        // toward white) + a generous sky-ambient fill so shadowed sides stay light,
+        // not navy. Real cumulus are among the brightest things in the scene.
+        vec3 sunLit = mix(uSunCol, vec3(1.0), 0.5) * (1.4 + 3.0*phase) * sun;
+        vec3 ambient = mix(uSkyCol, vec3(1.0), 0.45) * 1.1;
+        vec3 lit = sunLit + ambient;
+        float ext=dens*uDensity*dt;
+        float absorb=exp(-ext);
+        col += trans*(1.0-absorb)*lit*powder;
+        trans*=absorb;
+      }
+      t+=dt;
+    }
+    float alpha=1.0-trans;
+    if(alpha<0.01) discard;
+    gl_FragColor=vec4(col, alpha);
+  }
+`
+
+function VolumetricClouds({ sky, simRef, sunDir, cover = 0.52 }) {
+  const meshRef = useRef()
+  const matRef = useRef()
+  const { camera } = useThree()
+  const uniforms = useMemo(() => ({
+    uCam: { value: new THREE.Vector3() },
+    uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+    uSunCol: { value: new THREE.Color('#fff4e0') },
+    uSkyCol: { value: new THREE.Color('#6fa3d8') },
+    uBase: { value: 1100 },
+    uThick: { value: 1400 },
+    uCover: { value: cover },
+    uTime: { value: 0 },
+    uDensity: { value: 0.05 },
+  }), [cover])
+
+  // keep sun + colours in step with the current sky
+  useEffect(() => {
+    uniforms.uSunDir.value.copy(sunDir)
+    uniforms.uSunCol.value.set(sky.sunTint)
+    uniforms.uSkyCol.value.set(sky.bg)
+    uniforms.uCover.value = cover
+  }, [sky, sunDir, cover, uniforms])
+
+  // the slab is a big box the camera stays inside; recentre it on the camera each
+  // frame (x/z) so the cloud band is always around you, and drift the field in time
+  useFrame((_, dt) => {
+    const cam = camera.position
+    if (meshRef.current) meshRef.current.position.set(cam.x, uniforms.uBase.value + uniforms.uThick.value / 2, cam.z)
+    uniforms.uCam.value.copy(cam)
+    uniforms.uTime.value += dt
+  })
+
+  return (
+    <mesh ref={meshRef} frustumCulled={false} renderOrder={-1}>
+      {/* big flat box spanning the band; the camera sits inside so back faces are
+          what we raymarch toward — render back faces, no depth write */}
+      <boxGeometry args={[60000, 1400, 60000]} />
+      <shaderMaterial
+        ref={matRef}
+        uniforms={uniforms}
+        vertexShader={CLOUD_VERT}
+        fragmentShader={CLOUD_FRAG}
+        transparent
+        depthWrite={false}
+        side={THREE.BackSide}
+        toneMapped
+      />
+    </mesh>
   )
 }
 
@@ -1566,7 +1750,14 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
         <Suspense fallback={null}>
         <FlightSky sky={sky} simRef={simRef} isNight={night} />
         {!night && <SunGlare sunDir={sunDir} tint={sky.sunTint} strength={sky.sun / 1.5} />}
-        <CloudDeck skyId={weather.sky} simRef={simRef} cloudMul={q.cloudMul} />
+        {/* Clouds: HIGH-tier GPUs get a raymarched volumetric layer you fly through;
+            mid/low keep the cheap billboard deck. Both only when the weather has a
+            cloud config (a crystal-clear day stays clean). */}
+        {CLOUD_DECKS[weather.sky] && (
+          qualityTier() === 'high'
+            ? <VolumetricClouds sky={sky} simRef={simRef} sunDir={sunDir} cover={CLOUD_COVER[weather.sky] ?? 0.5} />
+            : <CloudDeck skyId={weather.sky} simRef={simRef} cloudMul={q.cloudMul} />
+        )}
         <Atmosphere simRef={simRef} baseColor={sky.bg} visM={visM} />
         <hemisphereLight intensity={sky.hemi} color="#dfe9f2" groundColor="#3a4450" />
         {/* sun key light, aimed from the real sky-sun direction so the lit side of
