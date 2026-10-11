@@ -68,7 +68,7 @@ const QUALITY = {
 // sun-disc bloom. High sun + low turbidity = crisp clear day; low sun + high
 // turbidity = a heavy, golden storm/haze horizon.
 const SKIES = {
-  day:  { bg: '#6fa3d8', sun: 1.5, hemi: 0.65, ground: '#22301f', elev: 34, azim: 155, turbidity: 3.0,  rayleigh: 1.6, mieCoefficient: 0.006, mieDirectionalG: 0.85, sunTint: '#fff4e0' },
+  day:  { bg: '#4d8ad6', sun: 1.5, hemi: 0.65, ground: '#22301f', elev: 34, azim: 155, turbidity: 2.2,  rayleigh: 2.4, mieCoefficient: 0.005, mieDirectionalG: 0.84, sunTint: '#fff4e0' },
   haze: { bg: '#b09a6e', sun: 1.1, hemi: 0.5,  ground: '#4a4228', elev: 18, azim: 200, turbidity: 9.0,  rayleigh: 2.4, mieCoefficient: 0.012, mieDirectionalG: 0.90, sunTint: '#ffdca0' },
   storm:{ bg: '#2e3540', sun: 0.5, hemi: 0.55, ground: '#1b221e', elev: 8,  azim: 210, turbidity: 12.0, rayleigh: 3.0, mieCoefficient: 0.020, mieDirectionalG: 0.80, sunTint: '#c9d2dc' },
   cold: { bg: '#a9c2d9', sun: 1.2, hemi: 0.7,  ground: '#c8d3da', elev: 22, azim: 130, turbidity: 4.0,  rayleigh: 2.0, mieCoefficient: 0.005, mieDirectionalG: 0.86, sunTint: '#eaf2ff' },
@@ -93,7 +93,9 @@ function sunVector(elevDeg, azimDeg, out = new THREE.Vector3()) {
 // Land-cover palettes per weather/season. Earthlike patchwork of fields,
 // forest, bare soil, water — not a single flat green lawn.
 const LANDCOVER = {
-  day:  { base: '#33452a', fields: ['#3d5228', '#4a5c2e', '#5b6b34', '#6d7a3c', '#7c8347'], soil: '#6b5636', forest: '#22331c', water: '#2a4a63' },
+  // sunlit farmland greens — brighter and a touch yellower than before, which reads
+  // as real fields under ACES tone mapping instead of a dark olive murk.
+  day:  { base: '#5c7a43', fields: ['#6f8f45', '#7fa04e', '#8fae57', '#9db862', '#b2c072', '#c7bf6a'], soil: '#a98a56', forest: '#3f5a2c', water: '#3a6a90' },
   haze: { base: '#5a4e2e', fields: ['#6b5a30', '#7a6838', '#8a7742', '#9a854c', '#a8925a'], soil: '#8a6a3c', forest: '#4a4326', water: '#4a5a5a' },
   storm:{ base: '#26302a', fields: ['#2c3a26', '#33422b', '#3c4a30', '#455236', '#4d5a3c'], soil: '#4a4232', forest: '#1c261e', water: '#22303a' },
   cold: { base: '#cdd6dc', fields: ['#d6dee3', '#c4d0d8', '#dce4e8', '#b8c6d0', '#e2e8ec'], soil: '#a8b0b4', forest: '#8a9aa0', water: '#7a94a6' },
@@ -101,67 +103,115 @@ const LANDCOVER = {
 
 function useGroundTexture(skyId) {
   return useMemo(() => {
-    const SZ = 1024
+    // 2048 (was 1024) so the parcels stay crisp when the sheet is tiled tight
+    // enough that a field reads as a realistic few-hundred-metre parcel, not a
+    // kilometres-wide smear. A seamless tile (wrapped draws) lets us repeat it
+    // hard without a visible join.
+    const SZ = 2048
     const c = document.createElement('canvas')
     c.width = c.height = SZ
     const ctx = c.getContext('2d')
     const pal = LANDCOVER[skyId] || LANDCOVER.day
     let seed = 1337
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    // draw a shape AND its wrapped copies so the tile is seamless at the edges —
+    // no hard repeat seam however tightly it tiles.
+    const wrapped = (draw) => {
+      for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
+        ctx.save(); ctx.translate(ox * SZ, oy * SZ); draw(); ctx.restore()
+      }
+    }
 
     ctx.fillStyle = pal.base
     ctx.fillRect(0, 0, SZ, SZ)
 
-    // large soft regions of forest / open land (value-noise blobs)
-    for (let i = 0; i < 40; i++) {
-      const x = rnd() * SZ, y = rnd() * SZ, r = 60 + rnd() * 220
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r)
-      const col = rnd() < 0.4 ? pal.forest : pal.fields[(rnd() * pal.fields.length) | 0]
-      g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)')
-      ctx.fillStyle = g; ctx.globalAlpha = 0.5 + rnd() * 0.3
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
+    // large soft regions of open land / lighter pasture (value-noise blobs). Mostly
+    // field tints — only the occasional darker woodland — so the land reads bright
+    // and varied, not a dark mottled camouflage.
+    for (let i = 0; i < 50; i++) {
+      const x = rnd() * SZ, y = rnd() * SZ, r = 160 + rnd() * 480
+      const col = rnd() < 0.22 ? pal.forest : pal.fields[(rnd() * pal.fields.length) | 0]
+      const alpha = 0.35 + rnd() * 0.25
+      wrapped(() => {
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+        g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)')
+        ctx.fillStyle = g; ctx.globalAlpha = alpha
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
+      })
     }
     ctx.globalAlpha = 1
 
-    // agricultural field mosaic — rotated rectangular parcels in varied greens
-    for (let i = 0; i < 260; i++) {
+    // agricultural field mosaic — rotated rectangular parcels in varied greens,
+    // each OUTLINED with a darker hedgerow/track so from the air it reads as real
+    // enclosed farmland (the strongest "aerial farmland" cue) rather than fuzzy
+    // colour blobs. More, smaller parcels than before → finer, busier land.
+    for (let i = 0; i < 900; i++) {
       const x = rnd() * SZ, y = rnd() * SZ
-      const w = 24 + rnd() * 90, h = 18 + rnd() * 70
-      ctx.save(); ctx.translate(x, y); ctx.rotate((rnd() - 0.5) * 0.9)
-      ctx.fillStyle = pal.fields[(rnd() * pal.fields.length) | 0]
-      ctx.globalAlpha = 0.55 + rnd() * 0.4
-      ctx.fillRect(-w / 2, -h / 2, w, h)
-      // occasional bare-soil parcel
-      if (rnd() < 0.18) { ctx.fillStyle = pal.soil; ctx.fillRect(-w / 2, -h / 2, w, h) }
-      ctx.restore()
+      const w = 36 + rnd() * 150, h = 28 + rnd() * 120
+      const rot = (rnd() - 0.5) * 0.9
+      const soil = rnd() < 0.18
+      const fill = soil ? pal.soil : pal.fields[(rnd() * pal.fields.length) | 0]
+      const alpha = 0.6 + rnd() * 0.4
+      wrapped(() => {
+        ctx.save(); ctx.translate(x, y); ctx.rotate(rot)
+        ctx.globalAlpha = alpha
+        ctx.fillStyle = fill
+        ctx.fillRect(-w / 2, -h / 2, w, h)
+        // hedgerow border
+        ctx.globalAlpha = Math.min(1, alpha + 0.2)
+        ctx.strokeStyle = pal.forest; ctx.lineWidth = 1.6 + rnd() * 1.4
+        ctx.strokeRect(-w / 2, -h / 2, w, h)
+        ctx.restore()
+      })
     }
     ctx.globalAlpha = 1
 
-    // a meandering river + a couple of lakes
-    ctx.strokeStyle = pal.water; ctx.lineWidth = 6 + rnd() * 6; ctx.lineCap = 'round'
-    ctx.beginPath()
-    let rx = rnd() * SZ, ry = 0
-    ctx.moveTo(rx, ry)
-    while (ry < SZ) { rx += (rnd() - 0.5) * 120; ry += 30 + rnd() * 40; ctx.lineTo(rx, ry) }
-    ctx.stroke()
-    ctx.fillStyle = pal.water
-    for (let i = 0; i < 5; i++) {
-      const x = rnd() * SZ, y = rnd() * SZ, r = 12 + rnd() * 34
-      ctx.beginPath(); ctx.ellipse(x, y, r, r * (0.5 + rnd() * 0.5), rnd() * 6, 0, Math.PI * 2); ctx.fill()
+    // thin country lanes crisscrossing — faint pale lines between the fields
+    ctx.globalAlpha = 0.25
+    for (let i = 0; i < 26; i++) {
+      const vert = rnd() < 0.5
+      const p = rnd() * SZ
+      const jitter = () => (rnd() - 0.5) * 60
+      ctx.strokeStyle = pal.soil; ctx.lineWidth = 1 + rnd() * 1.5
+      wrapped(() => {
+        ctx.beginPath()
+        if (vert) { ctx.moveTo(p, 0); for (let y = 0; y <= SZ; y += 80) ctx.lineTo(p + jitter(), y) }
+        else { ctx.moveTo(0, p); for (let x = 0; x <= SZ; x += 80) ctx.lineTo(x, p + jitter()) }
+        ctx.stroke()
+      })
+    }
+    ctx.globalAlpha = 1
+
+    // a meandering river + a few lakes
+    ctx.strokeStyle = pal.water; ctx.lineWidth = 8 + rnd() * 10; ctx.lineCap = 'round'
+    const river = []
+    { let rx = rnd() * SZ, ry = -40; river.push([rx, ry]); while (ry < SZ + 40) { rx += (rnd() - 0.5) * 220; ry += 50 + rnd() * 70; river.push([rx, ry]) } }
+    wrapped(() => {
+      ctx.beginPath(); ctx.moveTo(river[0][0], river[0][1])
+      for (const [px, py] of river) ctx.lineTo(px, py)
+      ctx.stroke()
+    })
+    for (let i = 0; i < 8; i++) {
+      const x = rnd() * SZ, y = rnd() * SZ, r = 20 + rnd() * 70, ry2 = r * (0.5 + rnd() * 0.5), a = rnd() * 6
+      ctx.fillStyle = pal.water
+      wrapped(() => { ctx.beginPath(); ctx.ellipse(x, y, r, ry2, a, 0, Math.PI * 2); ctx.fill() })
     }
 
     // fine speckle for texture at low altitude
-    for (let i = 0; i < 4000; i++) {
+    for (let i = 0; i < 9000; i++) {
       ctx.fillStyle = `rgba(0,0,0,${rnd() * 0.05})`
       ctx.fillRect(rnd() * SZ, rnd() * SZ, 1.5, 1.5)
     }
 
     const tex = new THREE.CanvasTexture(c)
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-    // repeat only a handful of times across the 64 km sheet so the varied land
-    // reads as different places, not a stamped tile
-    tex.repeat.set(12, 12)
+    // tile tight so a parcel reads as real farmland: the sheet is 160 km, so a
+    // repeat of 80 makes one tile ~2 km → fields a few hundred m across. The
+    // seamless draw above hides the join.
+    tex.repeat.set(80, 80)
     tex.anisotropy = 8
+    tex.generateMipmaps = true
+    tex.minFilter = THREE.LinearMipmapLinearFilter
     return tex
   }, [skyId])
 }
@@ -185,7 +235,10 @@ function softSprite() {
 
 // Shared markings material so the many white boxes batch under one material.
 const paintMat = new THREE.MeshStandardMaterial({ color: '#d7dde3', roughness: 0.8 })
-const asphaltMat = new THREE.MeshStandardMaterial({ color: '#21252b', roughness: 0.96 })
+// asphalt is pushed BACK in depth (positive polygonOffset) so the paint markings
+// and the runway-number Text sitting just above it always win the depth test —
+// otherwise they z-fight the asphalt at grazing angles (the broken "27R" glitch).
+const asphaltMat = new THREE.MeshStandardMaterial({ color: '#21252b', roughness: 0.96, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 })
 const unitBox = new THREE.BoxGeometry(1, 1, 1)
 const unitSphere = new THREE.SphereGeometry(0.5, 6, 5)
 
@@ -406,14 +459,16 @@ function Runway({ night, halfLen = 1600, airport }) {
       {/* painted runway designators — the real ID on the departure threshold and
           its reciprocal on the far end, so each airport reads as itself */}
       {rwyId && (
-        <Text position={[0, 0.09, HL - 120]} rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={26} color="#eef4ff" anchorX="center" anchorY="middle" letterSpacing={0.08}>
+        <Text position={[0, 0.09, HL - 120]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={3}
+          fontSize={26} color="#eef4ff" anchorX="center" anchorY="middle" letterSpacing={0.08}
+          material-depthWrite={false} material-polygonOffset material-polygonOffsetFactor={-4} material-polygonOffsetUnits={-4}>
           {rwyId}
         </Text>
       )}
       {rwyRecip && (
-        <Text position={[0, 0.09, -(HL - 120)]} rotation={[-Math.PI / 2, 0, Math.PI]}
-          fontSize={26} color="#eef4ff" anchorX="center" anchorY="middle" letterSpacing={0.08}>
+        <Text position={[0, 0.09, -(HL - 120)]} rotation={[-Math.PI / 2, 0, Math.PI]} renderOrder={3}
+          fontSize={26} color="#eef4ff" anchorX="center" anchorY="middle" letterSpacing={0.08}
+          material-depthWrite={false} material-polygonOffset material-polygonOffsetFactor={-4} material-polygonOffsetUnits={-4}>
           {rwyRecip}
         </Text>
       )}
@@ -535,16 +590,39 @@ export function buildingLayout() {
     if (clearRunway(x, z)) continue
     arr.push({ x, z, w: 14 + rnd() * 26, h: 8 + rnd() * 34, d: 14 + rnd() * 26 })
   }
-  // --- DISTANT TOWNS: small clusters scattered to the horizon ---
-  for (let t = 0; t < 8; t++) {
-    const ta = rnd() * Math.PI * 2
-    const td = 6000 + rnd() * 9000
-    const tx = Math.cos(ta) * td, tz = Math.sin(ta) * td
-    for (let i = 0; i < 12; i++) {
-      const x = tx + (rnd() - 0.5) * 900
-      const z = tz + (rnd() - 0.5) * 900
+  // --- SECONDARY CITIES: a few more real skylines further out, so downtown
+  // isn't the only place in the world. Each is a mini-downtown with its own
+  // taller core, scattered 8–40 km out on different bearings. ---
+  for (let c = 0; c < 6; c++) {
+    const ca = rnd() * Math.PI * 2
+    const cd = 8000 + rnd() * 32000
+    const ccx = Math.cos(ca) * cd, ccz = Math.sin(ca) * cd
+    const n = 40 + ((rnd() * 40) | 0)
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * Math.PI * 2
+      const d = rnd() * rnd() * 1100
+      const x = ccx + Math.cos(a) * d
+      const z = ccz + Math.sin(a) * d
       if (clearRunway(x, z)) continue
-      arr.push({ x, z, w: 14 + rnd() * 24, h: 8 + rnd() * 40, d: 14 + rnd() * 24 })
+      const coreT = 1 - d / 1100
+      arr.push({ x, z, w: 14 + rnd() * 24, h: 14 + coreT * coreT * 110 + rnd() * 24, d: 14 + rnd() * 24 })
+    }
+  }
+  // --- DISTANT TOWNS: many small low-rise clusters scattered ALL THE WAY to the
+  // horizon fog-out (~70 km), so flying any direction you pass over inhabited land
+  // — towns, villages — instead of an empty plane. ~60 clusters × ~14 buildings,
+  // all in the one instanced mesh, so this is still a single draw call. ---
+  for (let t = 0; t < 60; t++) {
+    const ta = rnd() * Math.PI * 2
+    const td = 6000 + rnd() * rnd() * 64000      // rnd² biases nearer but reaches ~70 km
+    const tx = Math.cos(ta) * td, tz = Math.sin(ta) * td
+    const spread = 500 + rnd() * 1400
+    const n = 8 + ((rnd() * 16) | 0)
+    for (let i = 0; i < n; i++) {
+      const x = tx + (rnd() - 0.5) * spread
+      const z = tz + (rnd() - 0.5) * spread
+      if (clearRunway(x, z)) continue
+      arr.push({ x, z, w: 12 + rnd() * 22, h: 6 + rnd() * 30, d: 12 + rnd() * 22 })
     }
   }
   return arr
@@ -762,7 +840,13 @@ function Runner({ simRef }) {
     // you're actually among the towers.
     if (!armingRef.current && distCity < 10000) {
       armingRef.current = true
-      const obstacles = buildingLayout().map((b) => ({ pos: [b.x, b.h / 2, b.z], size: [b.w, b.h, b.d] }))
+      // Only build colliders for buildings near the downtown cluster — collision is
+      // gated to <4.6 km of the city centre below, so the thousands of distant
+      // horizon-filler buildings never need a physics body. Keep a generous 6 km
+      // radius so every tower you could actually hit is solid.
+      const obstacles = buildingLayout()
+        .filter((b) => Math.hypot(b.x - 2600, b.z + 3200) < 6000)
+        .map((b) => ({ pos: [b.x, b.h / 2, b.z], size: [b.w, b.h, b.d] }))
       initCollision(obstacles).then((ok) => { if (simRef.current) simRef.current._collide = ok })
     }
 
@@ -787,7 +871,12 @@ function Runner({ simRef }) {
 function CameraRig({ simRef, groupRef, view, dims }) {
   const { camera } = useThree()
   const tmp = useMemo(() => ({ a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3() }), [])
-  useFrame(() => {
+  // framerate-independent smoothing: a per-frame lerp factor of `1 - e^(-rate·dt)`
+  // gives the SAME time-constant whether the display runs at 30, 60 or 144 Hz —
+  // so the chase/tower cam glides identically everywhere and a dropped frame eases
+  // to catch up instead of snapping. `rate` is "how fast" (larger = tighter).
+  const smooth = (rate, dt) => 1 - Math.exp(-rate * Math.min(dt, 0.1))
+  useFrame((_, dt) => {
     const s = simRef.current?.state
     const g = groupRef.current
     if (!s || !g) return
@@ -839,12 +928,13 @@ function CameraRig({ simRef, groupRef, view, dims }) {
         Math.max(s.h + lift, 3),
         s.z - fz * dist + Math.sin(s.psi) * side,
       )
-      camera.position.lerp(tmp.a, dramatic ? 0.06 : 0.09)
+      // dramatic ≈ 3.7/s (slow, cinematic push); standard ≈ 5.6/s (responsive)
+      camera.position.lerp(tmp.a, smooth(dramatic ? 3.7 : 5.6, dt))
       camera.up.set(0, 1, 0)
       tmp.b.copy(g.position)
       camera.lookAt(tmp.b)
       const fov = dramatic ? 38 : 45
-      if (Math.abs(camera.fov - fov) > 0.3) { camera.fov += (fov - camera.fov) * 0.1; camera.updateProjectionMatrix() }
+      if (Math.abs(camera.fov - fov) > 0.3) { camera.fov += (fov - camera.fov) * smooth(6, dt); camera.updateProjectionMatrix() }
     } else {
       // tower: fixed cab beside the runway, tracking the aircraft like ATC
       tmp.a.set(150, 40, 1650)
@@ -915,9 +1005,9 @@ function FlightSky({ sky, simRef, isNight }) {
 // scattered layer nearby) all the way up (a higher broken deck you climb into).
 // count is per band; spread is the horizontal radius of the scatter.
 const CLOUD_DECKS = {
-  day:  { lowM: 750,  highM: 2400, count: 10, opacity: 0.7,  spread: 3400 },
-  haze: { lowM: 500,  highM: 1800, count: 14, opacity: 0.82, spread: 2800 },
-  storm:{ lowM: 320,  highM: 1300, count: 18, opacity: 0.95, spread: 2400 },
+  day:  { lowM: 900,  highM: 2600, count: 22, opacity: 0.85, spread: 4200 },
+  haze: { lowM: 500,  highM: 1800, count: 18, opacity: 0.82, spread: 2800 },
+  storm:{ lowM: 320,  highM: 1300, count: 22, opacity: 0.95, spread: 2400 },
   cold: { lowM: 650,  highM: 2100, count: 12, opacity: 0.75, spread: 3200 },
 }
 
@@ -1145,6 +1235,11 @@ function Contrails({ simRef, dims }) {
   const head = useRef(0)
   const tmpL = useMemo(() => new THREE.Vector3(), [])
   const tmpR = useMemo(() => new THREE.Vector3(), [])
+  // the trail's total remaining opacity — once every point has faded to ~0 we can
+  // stop touching the buffers entirely (no per-frame loop, no GPU re-upload) until
+  // the next contrail actually forms. This is the whole point of the optimisation:
+  // in cruise below the contrail band (the common case) this component costs nothing.
+  const alphaSum = useRef(0)
 
   useFrame((_, dt) => {
     const s = simRef.current?.state
@@ -1154,14 +1249,19 @@ function Contrails({ simRef, dims }) {
     // this sim's short hops rarely get that high, so trigger from ~15,000 ft so
     // you actually see them on a normal climb — a reasonable dramatic licence.
     const forming = altFt > 15000 && s.v > 80 && !s.onGround
-    // half-span offset, in world space, perpendicular to heading
-    const halfSpan = (dims?.wingspanM || 34) / 2
-    const cosP = Math.cos(s.psi), sinP = Math.sin(s.psi)
-    // right vector (perpendicular to the −z heading) = (cosψ, 0, sinψ)
-    const wx = cosP * halfSpan, wz = sinP * halfSpan
-    const yWing = s.h + (simRef.current?.groundClear || 2) * 0.4
+
+    // Nothing forming AND the existing trail has fully faded → there is no work to
+    // do and no reason to re-upload the (unchanged) buffers to the GPU. Bail. This
+    // is the common steady-state and makes the component free below the band.
+    if (!forming && alphaSum.current <= 0.001) return
 
     if (forming) {
+      // half-span offset, in world space, perpendicular to heading
+      const halfSpan = (dims?.wingspanM || 34) / 2
+      const cosP = Math.cos(s.psi), sinP = Math.sin(s.psi)
+      // right vector (perpendicular to the −z heading) = (cosψ, 0, sinψ)
+      const wx = cosP * halfSpan, wz = sinP * halfSpan
+      const yWing = s.h + (simRef.current?.groundClear || 2) * 0.4
       const i = head.current
       tmpL.set(s.x - wx, yWing, s.z - wz)
       tmpR.set(s.x + wx, yWing, s.z + wz)
@@ -1169,11 +1269,14 @@ function Contrails({ simRef, dims }) {
       positions[i * 6 + 3] = tmpR.x; positions[i * 6 + 4] = tmpR.y; positions[i * 6 + 5] = tmpR.z
       alphas[i * 2] = 1; alphas[i * 2 + 1] = 1
       head.current = (i + 1) % CONTRAIL_LEN
+      geom.current.attributes.position.needsUpdate = true
     }
-    // fade every point a little each frame (older = fainter), scaled by dt
+    // fade every point a little each frame (older = fainter), scaled by dt, and
+    // track the running sum so we know when the trail is fully gone
     const fade = Math.pow(0.5, dt / 6) // ~6 s half-life
-    for (let k = 0; k < alphas.length; k++) alphas[k] *= fade
-    geom.current.attributes.position.needsUpdate = true
+    let sum = 0
+    for (let k = 0; k < alphas.length; k++) { alphas[k] *= fade; sum += alphas[k] }
+    alphaSum.current = sum
     geom.current.attributes.alpha.needsUpdate = true
   })
 
@@ -1256,7 +1359,7 @@ const M_PER_DEG_LAT = 111320
 function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 1500000 }) {
   const { gl } = useThree()
   const matRef = useRef()
-  const detailMatRef = useRef()
+  const groundRef = useRef()
   // Load the NASA KTX2 IMPERATIVELY (non-suspending): the scene must never block
   // on it — a slow or failed transcode (e.g. software WebGL) would otherwise
   // freeze the whole world on "Loading…". We render the procedural detail ground
@@ -1281,27 +1384,15 @@ function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 15000
     return () => { alive = false; loader.dispose?.() }
   }, [gl])
 
-  // The NASA map is low-res at runway scale, so multiply in the high-frequency
-  // procedural field texture (fields/soil/speckle) tiled tightly — real land
-  // colour + coastlines from NASA, crisp surface detail underfoot from the field.
-  const DETAIL_SIZE = 80000 // matches the detail plane below
-  const detail = useMemo(() => {
-    if (!detailTex) return null
-    const d = detailTex.clone()
-    d.wrapS = d.wrapT = THREE.RepeatWrapping
-    d.repeat.set(DETAIL_SIZE / 1400, DETAIL_SIZE / 1400) // ~1.4 km detail tile
-    d.needsUpdate = true
-    return d
-  }, [detailTex])
-
-  // base ground texture: the procedural land tiled a handful of times across the
-  // 64 km sheet (varied land, not a stamped tile) — the instant, always-there
-  // surface under everything.
+  // base ground texture: the procedural land tiled tight across the 160 km sheet
+  // so a field reads as a realistic ~2 km parcel, not a kilometres-wide smear —
+  // the instant, always-there surface under everything. The texture is drawn
+  // seamlessly (see useGroundTexture) so this tight repeat shows no join.
   const groundBase = useMemo(() => {
     if (!detailTex) return null
     const d = detailTex.clone()
     d.wrapS = d.wrapT = THREE.RepeatWrapping
-    d.repeat.set(12, 12)
+    d.repeat.set(80, 80)
     d.needsUpdate = true
     return d
   }, [detailTex])
@@ -1325,41 +1416,50 @@ function RealGround({ simRef, detailTex, lat = 51.47, lon = -0.45, sizeM = 15000
   // near-ground detail overlay out with altitude — it only matters low down; at
   // cruise the clean NASA land should show through.
   useFrame(() => {
-    if (!tex) return
     const s = simRef.current?.state
     if (!s) return
+    // Keep the whole ground sheet CENTRED under the aircraft. The planes are fixed
+    // size, so a static sheet runs out ~32 km away and you fly off its edge into a
+    // void — the "not seamless" horizon. Snapping the group to the jet's scene
+    // position (x, −z → scene z) means an edge is ALWAYS the full half-extent away,
+    // out past where the horizon fog has faded everything to the sky colour, so the
+    // ground reads as endless. This is purely visual: the land itself is anchored by
+    // the texture offset below (driven by world position), so recentring the mesh
+    // doesn't move the terrain — it just stops the sheet from ending in view.
+    if (groundRef.current) groundRef.current.position.set(s.x, 0, -s.z)
+    if (!tex) return
     const du = (s.x / (M_PER_DEG_LAT * Math.cos(lat * Math.PI / 180)) / 360)
     const dv = (-s.z / M_PER_DEG_LAT / 180)
     tex.offset.set(u0 - spanU / 2 + du, 1 - (v0 + spanV / 2) - dv)
-    if (detailMatRef.current) {
-      // full detail on the deck, gone by ~3 km
-      detailMatRef.current.opacity = 0.5 * Math.max(0, 1 - s.h / 3000)
-    }
   })
 
   return (
-    <group>
+    <group ref={groundRef}>
       {/* ALWAYS-present base ground: the procedural land texture as a lit, opaque
           surface. This renders instantly (no async), so there's a proper lit
-          ground from frame one whether or not the NASA texture ever loads. */}
+          ground from frame one whether or not the NASA texture ever loads. Sized
+          to 160 km — well past the horizon fog-out (fog clears by ~72 km) — so the
+          sheet's edge is never in view and the horizon reads as a clean ground/sky
+          line. The whole group tracks the aircraft (see useFrame), so this extent
+          travels with you instead of running out ~32 km from the start point. */}
+      {/* The crisp procedural farmland is now the PRIMARY surface (it reads far
+          better up close than the soft global NASA map). It's the only layer that
+          writes depth; the NASA tint + detail ride on top with depthWrite off and
+          a polygonOffset so they never z-fight the base however flat they sit. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.06, 0]} receiveShadow>
-        <planeGeometry args={[64000, 64000]} />
+        <planeGeometry args={[160000, 160000]} />
         <meshStandardMaterial map={groundBase} roughness={1} />
       </mesh>
-      {/* real NASA land colour + coastlines, laid over the base once loaded */}
+      {/* real NASA land colour + coastlines, laid lightly OVER the farmland so the
+          far distance picks up real continental colour (coastlines, deserts) while
+          the bright procedural parcels still read near-field. Kept subtle so it
+          doesn't wash the fields into a flat dark continental tint. depthWrite off
+          + polygonOffset keeps it from fighting the base. */}
       {tex && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.06, 0]} renderOrder={1}>
           <planeGeometry args={[sizeM, sizeM]} />
-          <meshStandardMaterial ref={matRef} map={tex} roughness={1} />
-        </mesh>
-      )}
-      {/* high-frequency detail multiplied over the top so the surface has crisp
-          texture underfoot (the NASA map alone is soft at runway scale). Only
-          when the NASA layer is present — otherwise the base already IS detail. */}
-      {tex && detail && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
-          <planeGeometry args={[80000, 80000]} />
-          <meshBasicMaterial ref={detailMatRef} map={detail} transparent opacity={0.5} blending={THREE.MultiplyBlending} depthWrite={false} />
+          <meshBasicMaterial ref={matRef} map={tex} transparent opacity={0.28} depthWrite={false}
+            polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
         </mesh>
       )}
     </group>
@@ -1441,7 +1541,12 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
           gl.toneMapping = THREE.ACESFilmicToneMapping
           gl.toneMappingExposure = night ? 1.0 : 1.12
         }}
-        camera={{ position: [150, 40, 1700], fov: 45, near: 0.5, far: 90000 }}
+        // near raised 0.5 → 2 m: nothing in a cockpit view is closer than a couple
+        // of metres, and the old sub-metre near made the far/near ratio (~180k)
+        // destroy depth precision — the flat ground + runway z-fought ("glitch").
+        // 2 m vs 90 km is ~45k, which with the single depth-writing ground plane
+        // below (the overlays are depthWrite:false) leaves the ground rock-steady.
+        camera={{ position: [150, 40, 1700], fov: 45, near: 2, far: 90000 }}
       >
         {/* One Suspense INSIDE the Canvas: several drei helpers here (Sky, Clouds,
             Cloud, Environment) suspend while they lazy-load. Without a boundary in
@@ -1466,7 +1571,12 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
             real sun direction, warm-to-cool sky gradient overhead, dark ground
             below. This is what gives the jet its painted-aluminium sheen. */}
         <Environment resolution={128} frames={1}>
-          <color attach="background" args={['#000000']} />
+          {/* NB: no `<color attach="background">` here. drei attaches that to the
+              REAL scene, not the Environment's capture scene, so it painted the
+              whole sky black and fought the Atmosphere background every frame —
+              that was the "no sky" bug. The lightformers below are all the
+              reflection env needs; the visible sky is the <Sky> dome +
+              Atmosphere background. */}
           {/* overhead sky dome */}
           <Lightformer intensity={sky.hemi * 1.6} color={sky.bg} form="ring" scale={[20, 20, 1]} position={[0, 12, 0]} rotation={[Math.PI / 2, 0, 0]} />
           {/* bright sun disc for a strong specular highlight, at the sun's bearing */}
