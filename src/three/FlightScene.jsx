@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html, Environment, Lightformer, Text, Sky, Stars, Clouds, Cloud } from '@react-three/drei'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
@@ -8,6 +8,24 @@ import CanvasFallback from './CanvasFallback.jsx'
 import { stepFlight, autoflight } from '../sim/flight/model.js'
 import { initCollision, checkCollision, collisionReady, disposeCollision } from '../sim/flight/collision.js'
 import { collectParts, updateParts } from './modelAnim.js'
+
+// Real-world streamed terrain (three-tile + Terrarium DEM). Lazy so three-tile
+// never touches the base bundle — it only loads when the gate below opens.
+const TileTerrain = lazy(() => import('./TileTerrain.jsx'))
+
+// /fly real terrain is OPT-IN and network-gated: a capable tier, online, a worker
+// configured, and explicitly enabled via ?terrain=1 (or VITE_FLY_TERRAIN). Default
+// OFF so the shipped default stays the proven procedural ground until it's proven on
+// real hardware. When off, nothing changes; when on, it renders over the proc ground.
+function terrainEnabled() {
+  try {
+    const q = new URLSearchParams(window.location.hash.split('?')[1] || window.location.search)
+    if (q.get('terrain') === '0') return false
+    const on = q.get('terrain') === '1' || import.meta.env.VITE_FLY_TERRAIN === '1'
+    const tier = qualityTier()
+    return on && navigator.onLine !== false && !!import.meta.env.VITE_FLIGHT_API && tier !== 'low'
+  } catch { return false }
+}
 
 /**
  * The /fly world: a 3200 m runway on an endless field grid, weather-driven
@@ -1792,6 +1810,18 @@ export default function FlightScene({ simRef, modelUrl, dims, weather, view, run
             now synchronous — it renders the procedural base instantly and swaps in
             the NASA map imperatively when it loads, so the world never blocks. */}
         <RealGround simRef={simRef} detailTex={groundTex} lat={airport?.lat ?? 51.47} lon={airport?.lon ?? -0.45} />
+        {/* real-world streamed terrain (opt-in, network-gated) — renders over the
+            procedural ground near the field; proc ground stays as the fallback */}
+        {terrainEnabled() && (
+          <Suspense fallback={null}>
+            <TileTerrain
+              simRef={simRef}
+              lat={airport?.lat ?? 51.47}
+              lon={airport?.lon ?? -0.45}
+              headingDeg={rwyHdg}
+            />
+          </Suspense>
+        )}
         <Runway night={night} halfLen={runwayHalfLen} airport={airport} />
         <Buildings night={night} />
 

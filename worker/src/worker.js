@@ -271,6 +271,16 @@ export default {
       return json({ swept: true, aircraft: n })
     }
 
+    // Map tiles for /fly's real-world terrain: /tile/{layer}/{z}/{x}/{y}.png
+    //   dem → AWS Terrarium elevation (open, keyless)
+    //   img → open satellite/imagery basemap
+    // We proxy so the client never hits the upstream directly (keeps the upstream
+    // swappable + CORS-clean) and lean on an edge cache — tiles are immutable, so a
+    // long max-age means each tile is fetched upstream at most once per edge PoP.
+    if (url.pathname.startsWith('/tile/')) {
+      return serveTile(url, ctx)
+    }
+
     // global cloud-cover grid, on demand. Clouds move slowly, so we only refetch
     // (and write KV) when the cached grid is older than WX_TTL_S — a KV write at
     // most ~once/window no matter the traffic, and an edge cache in front so most
@@ -321,6 +331,58 @@ export default {
 
 function withCache(res) {
   res.headers.set('Cache-Control', 'public, max-age=10')
+  return res
+}
+
+// copy an upstream response through with our CORS headers attached (used for the
+// edge-cache-hit fast path so cached responses still carry CORS).
+function withCors(res) {
+  const r = new Response(res.body, res)
+  for (const [k, v] of Object.entries(CORS)) r.headers.set(k, v)
+  return r
+}
+
+// Tile upstreams. DEM is AWS Terrarium (open, keyless). Imagery defaults to OSM
+// standard tiles (open, ODbL) so terrain has real map colour out of the box; set
+// TILE_IMG_URL to a satellite provider's {z}/{x}/{y} template to upgrade without a
+// code change. ESRI World Imagery is deliberately NOT the default — its licence
+// forbids basemap use (see docs/fly-terrain-plan.md).
+const DEM_UPSTREAM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
+const IMG_UPSTREAM_DEFAULT = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+
+// Serve /tile/{layer}/{z}/{x}/{y}.png — proxy + long edge cache (tiles immutable).
+async function serveTile(url, ctx) {
+  const m = url.pathname.match(/^\/tile\/(dem|img)\/(\d+)\/(\d+)\/(\d+)\.png$/)
+  if (!m) return json({ error: 'bad tile path' }, 400)
+  const [, layer, z, x, y] = m
+
+  const edge = caches.default
+  const cacheKey = new Request(`https://flight-proxy.internal/tile/${layer}/${z}/${x}/${y}.png`)
+  const hit = await edge.match(cacheKey)
+  if (hit) return withCors(hit)
+
+  const tmpl = layer === 'dem' ? DEM_UPSTREAM : IMG_UPSTREAM_DEFAULT
+  const upstream = tmpl.replace('{z}', z).replace('{x}', x).replace('{y}', y)
+  let up
+  try {
+    up = await fetch(upstream, {
+      // OSM requires a UA; being a good citizen on both upstreams
+      headers: { 'User-Agent': 'aero-engine-3d/1.0 (+https://sinhaankur.github.io/aero-engine-3d)' },
+      cf: { cacheTtl: 2592000, cacheEverything: true }, // 30d at Cloudflare's edge
+    })
+  } catch (e) {
+    return json({ error: 'tile upstream failed', detail: String(e).slice(0, 120) }, 502)
+  }
+  if (!up.ok) return json({ error: `tile upstream ${up.status}` }, up.status === 404 ? 404 : 502)
+
+  const res = new Response(up.body, {
+    headers: {
+      'Content-Type': up.headers.get('Content-Type') || 'image/png',
+      'Cache-Control': 'public, max-age=2592000, immutable', // 30 days in the browser
+      ...CORS,
+    },
+  })
+  ctx.waitUntil(edge.put(cacheKey, res.clone()))
   return res
 }
 
