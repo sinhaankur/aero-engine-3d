@@ -1635,6 +1635,13 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 }
 .goesup-placeholder-mark { font-size: 60px; opacity: 0.5; }
 
+/* The Anatomy figures bring their own framed .iso-plate card, so their stage is
+   a bare container — no double border/background/padding. */
+.goesup-stage-figure { border: none; background: none; padding: 0; }
+.goesup-stage-figure .anatomy-fig { width: 100%; }
+.goesup-stage-figure .iso-svg,
+.goesup-stage-figure svg { width: 100%; height: auto; display: block; }
+
 .goesup-panel {
   border: 1px solid var(--border); border-radius: 12px; background: var(--panel);
   padding: 16px 18px;

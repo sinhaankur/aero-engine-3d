@@ -62,6 +62,15 @@ function LazyFig({ children, minHeight = 220 }) {
 
 const Turbofan = F('turbofan')
 
+// The four bespoke figures authored with the Anatomy skill (black-and-white,
+// animated, same card UI/UX). Each is a ~130 KB self-contained component, so
+// lazy-load them — only the section you scroll to pays for its figure.
+const SatelliteFigure = lazy(() => import('../figures/SatelliteFigure.jsx'))
+const StarlinkFigure = lazy(() => import('../figures/StarlinkFigure.jsx'))
+const RocketFigure = lazy(() => import('../figures/RocketFigure.jsx'))
+const UavFigure = lazy(() => import('../figures/UavFigure.jsx'))
+const CUSTOM = { satellite: SatelliteFigure, starlink: StarlinkFigure, rocket: RocketFigure, uav: UavFigure }
+
 // Section table of contents — drives the sticky jump-nav and the <section id>s.
 const SECTIONS = [
   { id: 'jet', label: 'Jet system' },
@@ -181,7 +190,7 @@ function ComponentPanel({ data }) {
           </li>
         ))}
       </ol>
-      <p className="goesup-soon">Interactive labelled figure in progress — the parts above are its legend.</p>
+      <p className="goesup-soon">Hover the figure — it's live; the parts above are its legend.</p>
     </div>
   )
 }
@@ -251,29 +260,32 @@ export default function FiguresPage() {
         </div>
       </section>
 
-      {/* ── BESPOKE SUBJECTS — labelled component panels until the figure lands ── */}
+      {/* ── BESPOKE SUBJECTS — the Anatomy figure + its labelled legend ── */}
       {[
         ['satellite', 'Satellite'],
         ['starlink', 'Starlink'],
         ['rocket', 'Rocket'],
-      ].map(([id, label]) => (
-        <section key={id} id={id} className="goesup-section">
-          <Reveal as="h2" className="section-title">{label}</Reveal>
-          <div className="goesup-figrow">
-            <div className="goesup-stage goesup-stage-placeholder">
-              <span className="goesup-placeholder-mark">◍</span>
+      ].map(([id, label]) => {
+        const Fig = CUSTOM[id]
+        return (
+          <section key={id} id={id} className="goesup-section">
+            <Reveal as="h2" className="section-title">{label}</Reveal>
+            <div className="goesup-figrow">
+              <div className="goesup-stage goesup-stage-figure">
+                <LazyFig minHeight={300}><Fig /></LazyFig>
+              </div>
+              <ComponentPanel data={COMPONENTS[id]} />
             </div>
-            <ComponentPanel data={COMPONENTS[id]} />
-          </div>
-        </section>
-      ))}
+          </section>
+        )
+      })}
 
-      {/* ── UAV — component panel + the region catalogue ── */}
+      {/* ── UAV — the figure, its legend, and the region catalogue ── */}
       <section id="uav" className="goesup-section">
         <Reveal as="h2" className="section-title">UAV / drone</Reveal>
         <div className="goesup-figrow">
-          <div className="goesup-stage goesup-stage-placeholder">
-            <span className="goesup-placeholder-mark">◍</span>
+          <div className="goesup-stage goesup-stage-figure">
+            <LazyFig minHeight={300}><UavFigure /></LazyFig>
           </div>
           <ComponentPanel data={COMPONENTS.uav} />
         </div>
