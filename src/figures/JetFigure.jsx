@@ -5,7 +5,7 @@
 // via the `theme` prop (the five anatomy-figures themes) by applying the
 // resolved --anatomy-* tokens as inline CSS vars on the wrapper.
 import { useEffect, useRef, useMemo } from 'react'
-import { resolveTheme } from 'anatomy-figures/themes'
+import { figureTheme } from './figure-theme.js'
 import data from './jet.data.json'
 
 let styleInjected = false
@@ -23,9 +23,7 @@ export default function JetFigure({ className, theme = 'blueprint' }) {
   const ref = useRef(null)
   // resolve the theme to { base, tokens }; tokens become inline CSS vars that
   // override the injected stylesheet's defaults, and base drives [data-theme].
-  const resolved = useMemo(() => {
-    try { return resolveTheme(theme) } catch { return { base: 'dark', tokens: {} } }
-  }, [theme])
+  const resolved = useMemo(() => figureTheme(theme), [theme])
 
   useEffect(() => {
     injectStyleOnce()
