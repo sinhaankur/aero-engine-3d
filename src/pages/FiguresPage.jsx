@@ -25,14 +25,6 @@ import { TURBOFAN_CYCLE } from '../data/engineParts.js'
 
 const THEMES = ['blueprint', 'dark', 'light', 'paper', 'sepia']
 
-// Rollup needs each import() to be a static literal specifier, so the figure
-// loaders live in one explicit map. (Subpath modules default-export the figure.)
-const LOADERS = {
-  turbofan: () => import('anatomy-figures/turbofan'),
-  afterburner: () => import('anatomy-figures/afterburner'),
-}
-const F = (slug) => lazy(LOADERS[slug])
-
 /** Mount `children` only once near the viewport, so a heavy figure's chunk isn't
  *  fetched until it's about to be seen. Keeps a placeholder to avoid layout jump. */
 function LazyFig({ children, minHeight = 220 }) {
@@ -60,11 +52,11 @@ function LazyFig({ children, minHeight = 220 }) {
   )
 }
 
-const Turbofan = F('turbofan')
-
-// The four bespoke figures authored with the Anatomy skill (black-and-white,
-// animated, same card UI/UX). Each is a ~130 KB self-contained component, so
-// lazy-load them — only the section you scroll to pays for its figure.
+// The five bespoke figures authored with the Anatomy skill (black-and-white,
+// animated, same card UI/UX). Each is a self-contained component, so lazy-load
+// them — only the section you scroll to pays for its figure. The jet replaces
+// the anatomy-figures library Turbofan, which didn't render reliably here.
+const JetFigure = lazy(() => import('../figures/JetFigure.jsx'))
 const SatelliteFigure = lazy(() => import('../figures/SatelliteFigure.jsx'))
 const StarlinkFigure = lazy(() => import('../figures/StarlinkFigure.jsx'))
 const RocketFigure = lazy(() => import('../figures/RocketFigure.jsx'))
@@ -234,10 +226,8 @@ export default function FiguresPage() {
       <section id="jet" className="goesup-section">
         <Reveal as="h2" className="section-title">Jet system</Reveal>
         <div className="goesup-figrow">
-          <div className="goesup-stage">
-            <LazyFig minHeight={300}>
-              <Turbofan theme={theme} style={{ width: '100%', height: 'auto' }} />
-            </LazyFig>
+          <div className="goesup-stage goesup-stage-figure">
+            <LazyFig minHeight={300}><JetFigure theme={theme} /></LazyFig>
           </div>
           <div className="goesup-panel">
             <p className="goesup-tagline">
