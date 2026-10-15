@@ -1642,6 +1642,35 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .goesup-stage-figure .iso-svg,
 .goesup-stage-figure svg { width: 100%; height: auto; display: block; }
 
+/* Interaction cue: a badge over the figure that says it's live + what the hover
+   does. It fades out once the user interacts (JS toggles data-engaged). This is
+   the main "it's intuitive" affordance — you can't tell these animate otherwise. */
+.goesup-figwrap { position: relative; }
+.goesup-cue {
+  position: absolute; left: 14px; top: 14px; z-index: 3;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 11px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-wash) 85%, transparent);
+  border: 1px solid var(--accent); color: var(--ink);
+  font-family: var(--mono, monospace); font-size: 11px; letter-spacing: 0.02em;
+  pointer-events: none; transition: opacity 0.4s ease;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+}
+.goesup-cue .goesup-cue-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 0 0 var(--accent);
+  animation: goesup-pulse 1.8s ease-out infinite;
+}
+@keyframes goesup-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent); }
+  70% { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.goesup-figwrap[data-engaged="true"] .goesup-cue { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .goesup-cue .goesup-cue-dot { animation: none; }
+}
+
 .goesup-panel {
   border: 1px solid var(--border); border-radius: 12px; background: var(--panel);
   padding: 16px 18px;

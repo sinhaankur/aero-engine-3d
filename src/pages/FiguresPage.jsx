@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Reveal, Stagger, StaggerItem } from '../lib/motion.jsx'
+import { m, useReducedMotion } from 'framer-motion'
+import { Reveal, Stagger, StaggerItem, EASE } from '../lib/motion.jsx'
 import { TURBOFAN_CYCLE } from '../data/engineParts.js'
 
 /**
@@ -50,6 +51,41 @@ function LazyFig({ children, minHeight = 220 }) {
       ) : null}
     </div>
   )
+}
+
+/**
+ * Wraps a lazy figure with the "it's live" affordance: a pulsing cue badge
+ * ("✦ Hover to …") that makes the interaction discoverable, and a gentle
+ * Framer-Motion hover-lift so the whole stage feels responsive. The cue fades
+ * the first time the user moves over the figure (data-engaged). `cue` is the
+ * verb for this figure ("push the throttle", "move the Sun", …).
+ */
+function FigureStage({ Fig, theme, cue, minHeight = 300 }) {
+  const reduce = useReducedMotion()
+  const [engaged, setEngaged] = useState(false)
+  return (
+    <m.div
+      className="goesup-stage goesup-stage-figure goesup-figwrap"
+      data-engaged={engaged ? 'true' : 'false'}
+      onPointerEnter={() => setEngaged(true)}
+      whileHover={reduce ? undefined : { y: -3 }}
+      transition={{ duration: 0.3, ease: EASE }}
+    >
+      <span className="goesup-cue" aria-hidden>
+        <span className="goesup-cue-dot" /> Hover to {cue}
+      </span>
+      <LazyFig minHeight={minHeight}><Fig theme={theme} /></LazyFig>
+    </m.div>
+  )
+}
+
+// the interaction verb shown in each figure's cue badge
+const CUES = {
+  jet: 'push the throttle',
+  satellite: 'move the Sun',
+  starlink: 'advance the orbits',
+  rocket: 'fly the ascent',
+  uav: 'aim the sensor',
 }
 
 // The five bespoke figures authored with the Anatomy skill (black-and-white,
@@ -169,19 +205,20 @@ const UAV_REGIONS = [
   },
 ]
 
-/** A reusable "key components + how it works" panel for not-yet-drawn subjects. */
+/** A reusable "key components + how it works" panel: a titled legend whose items
+ *  stagger in on scroll (Framer Motion, house ease), paired with its figure. */
 function ComponentPanel({ data }) {
   return (
     <div className="goesup-panel">
       <p className="goesup-tagline">{data.tagline}</p>
-      <ol className="goesup-parts">
+      <Stagger as="ol" className="goesup-parts" stagger={0.04}>
         {data.parts.map(([name, what]) => (
-          <li key={name}>
+          <StaggerItem as="li" key={name}>
             <span className="goesup-part-name">{name}</span>
             <span className="goesup-part-what">{what}</span>
-          </li>
+          </StaggerItem>
         ))}
-      </ol>
+      </Stagger>
       <p className="goesup-soon">Hover the figure — it's live; the parts above are its legend.</p>
     </div>
   )
@@ -201,9 +238,10 @@ export default function FiguresPage() {
         The machines that fly or reach orbit — a jet engine, a satellite, the
         Starlink constellation, a launch vehicle, a UAV — each shown so its{' '}
         <strong>key components are visible</strong> and you can read how it
-        actually works. Drawn in the style of the{' '}
+        actually works. <strong>Every figure is live: hover it to drive the
+        mechanism</strong> and watch the readout. Drawn in the style of the{' '}
         <a href="https://github.com/wheresryan22/anatomy" target="_blank" rel="noreferrer noopener">Anatomy</a>{' '}
-        skill. Pick a theme and jump to a section.
+        skill — pick a theme and jump to a section.
       </p>
 
       {/* sticky jump-nav + theme switcher: simple, easy to navigate */}
@@ -226,9 +264,7 @@ export default function FiguresPage() {
       <section id="jet" className="goesup-section">
         <Reveal as="h2" className="section-title">Jet system</Reveal>
         <div className="goesup-figrow">
-          <div className="goesup-stage goesup-stage-figure">
-            <LazyFig minHeight={300}><JetFigure theme={theme} /></LazyFig>
-          </div>
+          <FigureStage Fig={JetFigure} theme={theme} cue={CUES.jet} />
           <div className="goesup-panel">
             <p className="goesup-tagline">
               A high-bypass turbofan: a big fan moves a huge mass of air, most of
@@ -261,9 +297,7 @@ export default function FiguresPage() {
           <section key={id} id={id} className="goesup-section">
             <Reveal as="h2" className="section-title">{label}</Reveal>
             <div className="goesup-figrow">
-              <div className="goesup-stage goesup-stage-figure">
-                <LazyFig minHeight={300}><Fig theme={theme} /></LazyFig>
-              </div>
+              <FigureStage Fig={Fig} theme={theme} cue={CUES[id]} />
               <ComponentPanel data={COMPONENTS[id]} />
             </div>
           </section>
@@ -274,9 +308,7 @@ export default function FiguresPage() {
       <section id="uav" className="goesup-section">
         <Reveal as="h2" className="section-title">UAV / drone</Reveal>
         <div className="goesup-figrow">
-          <div className="goesup-stage goesup-stage-figure">
-            <LazyFig minHeight={300}><UavFigure theme={theme} /></LazyFig>
-          </div>
+          <FigureStage Fig={UavFigure} theme={theme} cue={CUES.uav} />
           <ComponentPanel data={COMPONENTS.uav} />
         </div>
 
