@@ -272,7 +272,7 @@ export default function FiguresPage() {
             <Reveal as="h2" className="section-title">{label}</Reveal>
             <div className="goesup-figrow">
               <div className="goesup-stage goesup-stage-figure">
-                <LazyFig minHeight={300}><Fig /></LazyFig>
+                <LazyFig minHeight={300}><Fig theme={theme} /></LazyFig>
               </div>
               <ComponentPanel data={COMPONENTS[id]} />
             </div>
@@ -285,7 +285,7 @@ export default function FiguresPage() {
         <Reveal as="h2" className="section-title">UAV / drone</Reveal>
         <div className="goesup-figrow">
           <div className="goesup-stage goesup-stage-figure">
-            <LazyFig minHeight={300}><UavFigure /></LazyFig>
+            <LazyFig minHeight={300}><UavFigure theme={theme} /></LazyFig>
           </div>
           <ComponentPanel data={COMPONENTS.uav} />
         </div>
