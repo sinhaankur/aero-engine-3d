@@ -1,0 +1,43 @@
+[
+  {
+    "id": "engine-leap-1a-hd",
+    "name": "CFM LEAP-1A",
+    "fan_dia": 1.98,
+    "fan_blades": 18,
+    "cowl_color": "#e7ebf0",
+    "fan_color": "#1b1d21",
+    "gearbox": false,
+    "_note": "High-bypass (~11:1), 3D-woven carbon-fibre fan blades."
+  },
+  {
+    "id": "engine-cfm56-5b",
+    "name": "CFM56-5B",
+    "fan_dia": 1.73,
+    "fan_blades": 36,
+    "cowl_color": "#eceff3",
+    "fan_color": "#23262b",
+    "gearbox": false,
+    "_note": "A320ceo workhorse, lower bypass (~5.5:1), titanium fan blades."
+  },
+  {
+    "id": "engine-v2500",
+    "name": "IAE V2500",
+    "fan_dia": 1.60,
+    "fan_blades": 22,
+    "cowl_color": "#e9edf1",
+    "fan_color": "#26292e",
+    "lip_polished": true,
+    "gearbox": false,
+    "_note": "Compact (~4.9:1), famous bright polished bare-metal inlet lip."
+  },
+  {
+    "id": "engine-pw1100g",
+    "name": "Pratt & Whitney PW1100G GTF",
+    "fan_dia": 2.06,
+    "fan_blades": 20,
+    "cowl_color": "#e7ebf0",
+    "fan_color": "#1d2024",
+    "gearbox": true,
+    "_note": "Geared turbofan, very high bypass (~12.5:1); has the reduction gearbox."
+  }
+]

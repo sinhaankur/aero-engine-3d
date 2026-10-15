@@ -18,6 +18,7 @@ const ProjectorPage = lazy(() => import('./pages/ProjectorPage.jsx'))
 const FlyPage = lazy(() => import('./pages/FlyPage.jsx'))
 const RoutesPage = lazy(() => import('./pages/RoutesPage.jsx'))
 const ComponentsPage = lazy(() => import('./pages/ComponentsPage.jsx'))
+const FiguresPage = lazy(() => import('./pages/FiguresPage.jsx'))
 
 // wrap a lazy page element in a Suspense boundary with a lightweight fallback
 const L = (El) => (
@@ -42,6 +43,7 @@ const router = createHashRouter([
       { path: 'fly', element: L(<FlyPage />) },
       { path: 'routes', element: L(<RoutesPage />) },
       { path: 'components', element: L(<ComponentsPage />) },
+      { path: 'figures', element: L(<FiguresPage />) },
       { path: 'compare', element: L(<ComparePage />) },
       { path: 'systems', element: L(<SystemsPage />) },
       { path: 'systems/:systemId', element: L(<SystemsPage />) },

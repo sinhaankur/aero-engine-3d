@@ -22,6 +22,7 @@ deploys on GitHub Pages at `https://sinhaankur.github.io/aero-engine-3d/`
 | Deploy site | just `git push` — `.github/workflows/deploy.yml` builds (Node 22) and publishes Pages |
 | Deploy flight proxy | `cd worker && npx wrangler deploy` |
 | Regenerate an airframe GLB | `blender --background --python blender/generate_airframe_hd.py -- <specs.json> <outdir>` (specs in `blender/specs/`) |
+| Regenerate the engine GLBs | `blender --background --python blender/generate_engine_hd.py -- blender/specs/engines/a320-engines.json <outdir>`, then Draco-compress into `public/models/` |
 | Full CFD run | `cfd/run_a320.sh` (needs FluidX3D checkout as sibling dir, or `FLUIDX3D_DIR`) |
 | Rebuild projector APKs | `cd projector && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew assembleRelease` |
 
@@ -81,6 +82,21 @@ at `~/Library/Android/sdk`.
   (`useGLTF.setDecoderPath`) — self-hosted, not gstatic, so models decode
   offline. Draco preserves node names, so the part-animation code is unaffected.
   Re-run the compression after regenerating any GLB.
+  `generate_engine_hd.py` is the **standalone turbofan generator** for the
+  exploded-view engine models (`/#/engine/<id>`); the airframe generator only
+  builds engines-on-a-wing. Spec-driven from `blender/specs/engines/*.json` (fan
+  diameter, blade count, `gearbox` flag); stations derive off the fan diameter.
+  **Its glTF node names are a hard contract with `src/data/engineParts.js`** —
+  `01_Nacelle_Cowl 01b_Inlet_Lip 02_Fan_Case 03_Spinner 04_Fan_Blades
+  05_Core_Casing 06_Combustor 07_Turbine 08_Exhaust_Nozzle 09_Exhaust_Plug
+  10_Pylon` (+ `11_Reduction_Gearbox` on the GTF). An object's `.name` becomes
+  the glTF node name. Rename nothing without editing engineParts.js in lockstep
+  or the explode/blueprint/cycle highlighting breaks. Air flows +X→−X.
+- `src/pages/FiguresPage.jsx` (`/#/figures`) — isometric-figure gallery from the
+  `anatomy-figures` npm pkg (companion to the Anatomy skill). Each figure is
+  ~1.5–2.7 MB, so figures are **lazy-loaded per-subpath-entry** (explicit
+  literal-specifier import() map + IntersectionObserver); never import from the
+  barrel or the one route chunks to ~20 MB.
 - `cfd/` — FluidX3D case files only (FluidX3D is never vendored).
   `export_stl.py` (GLB→STL via Blender), `setup_a320_windtunnel.cpp`,
   `run_a320.sh`. See `docs/cfd-pipeline.md` before touching.
@@ -125,6 +141,12 @@ at `~/Library/Android/sdk`.
 9. Policy: never scrape or commit proprietary CAD/models — everything is
    generated from public specs, and every safety figure carries a source
    attribution in `safety.sources`.
+10. **Blender MCP sandbox blocks `bpy.ops.wm.read_factory_settings`** — use
+    `bpy.ops.wm.read_homefile(use_empty=True, use_factory_startup=True)` to get a
+    clean scene in LLM-run code. Good loop for iterating a model: generate GLB on
+    disk → import into the live (scratch) Blender → `render_viewport_to_path` →
+    read the PNG to eyeball geometry. The repo's real `.blend`/`.glb` files are
+    never touched by this; the live session is a scratch default scene.
 
 ## Recipes
 
@@ -133,6 +155,11 @@ at `~/Library/Android/sdk`.
   generator, drop the GLB in `public/models/`, set `model` in the data.
 - **New CFD case**: copy the A320 case, update `si_length`, `si_S`, scenario
   constants; `export_stl.py` is variant-agnostic.
+- **Regenerate / add an engine model**: edit `blender/specs/engines/*.json`
+  (fan diameter, blade count, `gearbox` flag, cowl/fan colours), run
+  `generate_engine_hd.py`, Draco-compress the GLB into `public/models/` under the
+  `model` path in `src/data/engineParts.js` (`ENGINE_MODELS[*].model`). Keep the
+  glTF node names exactly as engineParts.js expects.
 - **Change a projector app's target URL**: edit `LAUNCH_URL` in
   `projector/app/build.gradle` (per flavor), rebuild, copy APKs to
   `public/apk/` (filenames `live-aviation.apk`, `universe-engine.apk`), push.
