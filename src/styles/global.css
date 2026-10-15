@@ -689,6 +689,18 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
 .fly-stage { position: relative; min-height: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #0d1117; }
 .fly-stage canvas { display: block; }
 
+/* Line view: a clean black-and-white render of the 3D world, Anatomy-style.
+   The filter is applied to the WebGL canvas ONLY, so the colour PFD, HUD and
+   route overlays stay readable — stripping the terrain/sky colour clutter makes
+   the horizon and aircraft pop, which is what makes it easier to hand-fly.
+   `will-change` keeps the filtered canvas on its own GPU layer so there's no
+   per-frame repaint cost. */
+.fly-stage.line canvas {
+  filter: grayscale(1) contrast(1.28) brightness(1.06);
+  will-change: filter;
+  transition: filter 0.4s ease;
+}
+
 .fly-hud { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); pointer-events: none; filter: drop-shadow(0 6px 22px rgba(0, 0, 0, 0.55)); }
 .fly-hud.big .pfd { width: min(500px, 44vw); }
 .fly-hud.mini .pfd { width: 280px; opacity: 0.94; }

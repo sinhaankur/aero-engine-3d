@@ -54,6 +54,15 @@ export default function FlyPage() {
   const [showEngine, setShowEngine] = useState(false)
   const [coldDark, setColdDark] = useState(false)
   const [photo, setPhoto] = useState(false)
+  // "Line view": a clean black-and-white render of the whole world (a canvas
+  // filter), Anatomy-style — strips colour clutter so the horizon, aircraft and
+  // PFD read clearly, which makes hand-flying easier. Remembers your choice.
+  const [line, setLine] = useState(() => {
+    try { return localStorage.getItem('aero.fly.line') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('aero.fly.line', line ? '1' : '0') } catch { /* private mode */ }
+  }, [line])
   const [showBoard, setShowBoard] = useState(false)
   const [assist, setAssist] = useState(true)      // handling assist / "easy mode", on by default
   const [cleared, setCleared] = useState(false)   // departure-slot clearance
@@ -169,6 +178,7 @@ export default function FlyPage() {
         case 'KeyB': c.brakes = !c.brakes; break
         case 'KeyC': setView((v) => VIEWS[(VIEWS.findIndex((x) => x.id === v) + 1) % VIEWS.length].id); break
         case 'KeyH': setPhoto((v) => !v); break
+        case 'KeyL': setLine((v) => !v); break
         case 'KeyA':
           s.apOn = !s.apOn
           if (s.apOn) {
@@ -406,6 +416,9 @@ export default function FlyPage() {
                 <button className={`fly-drawer-item ${photo ? 'on' : ''}`} onClick={() => setPhoto((v) => !v)} title="Hide all UI for a clean cinematic view (H)">
                   <span>⛶ Photo mode</span><span className="fly-drawer-state">{photo ? 'ON' : 'OFF'}</span>
                 </button>
+                <button className={`fly-drawer-item ${line ? 'on' : ''}`} onClick={() => setLine((v) => !v)} title="Clean black-and-white world — easier to read the horizon and fly (L)">
+                  <span>◳ Line view (B&amp;W)</span><span className="fly-drawer-state">{line ? 'ON' : 'OFF'}</span>
+                </button>
                 <div className="fly-drawer-div" />
                 <button className="fly-drawer-item" onClick={hardReload} title="Clear cached assets and reload the latest version">
                   <span>↻ Clear cache &amp; reload</span>
@@ -427,6 +440,7 @@ export default function FlyPage() {
               is a destructive reload and has no business beside the flight controls —
               both were redundant duplicates of drawer items and only added clutter. */}
           <button className={`fly-quick ${photo ? 'on' : ''}`} onClick={() => setPhoto((v) => !v)} title="Hide all UI for a clean cinematic view (H)">⛶ Photo</button>
+          <button className={`fly-quick ${line ? 'on' : ''}`} onClick={() => setLine((v) => !v)} title="Clean black-and-white world, easier to fly (L)">◳ Line</button>
           <button className={`fly-quick ${sound ? 'on' : ''}`} onClick={toggleSound} title="Procedural engine + wind audio">{sound ? '♪ On' : '♪ Off'}</button>
           <span className="fly-spacer" />
           <span className="fly-blurb">{weather.blurb}</span>
@@ -434,7 +448,7 @@ export default function FlyPage() {
         </div>
       </div>
 
-      <div className={`fly-stage ${photo ? 'photo' : ''}`}>
+      <div className={`fly-stage ${photo ? 'photo' : ''} ${line ? 'line' : ''}`}>
         <Suspense fallback={<div className="viewport-loading" style={{ height: '100%' }}>Loading world…</div>}>
           {view === 'globe' ? (
             <RouteGlobe from={from} to={to} progress={leg.frac} height="100%" cinematic />
@@ -703,6 +717,7 @@ export default function FlyPage() {
         <span><kbd>A</kbd> AP: fly the leg</span>
         <span><kbd>C</kbd> camera</span>
         <span><kbd>H</kbd> photo</span>
+        <span><kbd>L</kbd> line (B&amp;W)</span>
         <span><kbd>Space</kbd> pause</span>
         <span className="dim">Throttle {Math.round(c.throttle * 100)}%</span>
       </div>
