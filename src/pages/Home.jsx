@@ -6,6 +6,7 @@ import { ENGINES } from '../data/engines.js'
 import { ENGINE_MODELS } from '../data/engineParts.js'
 import { SYSTEMS } from '../data/systems.js'
 import { Stagger, StaggerItem, container, item, itemReduced } from '../lib/motion.jsx'
+import { NAV } from '../components/NavMenu.jsx'
 
 /**
  * Count a stat up from 0 on mount — a small premium flourish that fits the
@@ -37,16 +38,6 @@ const short = (name) => name.replace(/^(Airbus|Boeing) /, '')
  * masthead + live render up top, then three columns of the full catalog.
  */
 
-const EXPLORE = [
-  { to: '/fly', name: 'Fly', tag: { label: 'New', kind: 'live' }, desc: 'Fly any variant cockpit-level: real ISA atmosphere, weather, a working PFD — take off, cruise, land.' },
-  { to: '/live', name: 'Live traffic', tag: { label: 'Live', kind: 'live' }, desc: 'Every real aircraft in the sky right now, plotted on a 3D globe from ADS-B.' },
-  { to: '/routes', name: 'Routes', tag: { label: 'New', kind: 'live' }, desc: 'Pick two airports — see which variants can fly it, with the real flight-planning math.' },
-  { to: '/simulate', name: 'Simulate', tag: { label: 'Interactive', kind: 'live' }, desc: 'Pick any variant and drive lift, stalls, wind conditions, fuel flow and a real CFD wind tunnel.' },
-  { to: '/compare', name: 'Compare', tag: { label: 'Overlay', kind: 'live' }, desc: 'Overlay any two variants at true relative scale, with a full spec delta table.' },
-  { to: '/systems', name: 'Systems', tag: { label: 'Learn', kind: 'live' }, desc: 'How the electrics, hydraulics and fly-by-wire actually work, with live schematics.' },
-  { to: '/components', name: 'Components', tag: { label: 'New', kind: 'live' }, desc: 'How every part is built — material, process, technology required and what it costs.' },
-  { to: '/projector', name: 'Projector', tag: { label: 'APK', kind: 'soon' }, desc: 'Kiosk apps that turn a projector into a live aviation wall.' },
-]
 
 export default function Home() {
   const reduce = useReducedMotion()
@@ -189,20 +180,26 @@ export default function Home() {
           </div>
         </StaggerItem>
 
-        {/* experiences + reference */}
+        {/* experience + learn — mirrors the nav's L1/L2 groups so the IA reads
+            the same in the bar and on the page (one source of truth: NAV) */}
         <StaggerItem className="map-col">
-          <div className="map-col-head">
-            <span className="hash">//</span>
-            <span>Explore</span>
-          </div>
-          {EXPLORE.map((x) => (
-            <Link key={x.to} to={x.to} className="map-big">
-              <span className="name">
-                {x.name}
-                <span className={`idx-tag ${x.tag.kind}`}>{x.tag.label}</span>
-              </span>
-              <span className="desc">{x.desc}</span>
-            </Link>
+          {NAV.filter((g) => g.id === 'experience' || g.id === 'learn').map((g, gi) => (
+            <div key={g.id}>
+              <div className={`map-col-head ${gi > 0 ? 'map-col-head-2' : ''}`}>
+                <span className="hash">//</span>
+                <span>{g.label}</span>
+                <span className="count">{g.blurb}</span>
+              </div>
+              {g.items.map((it) => (
+                <Link key={it.to} to={it.to} className="map-big">
+                  <span className="name">
+                    {it.label}
+                    {it.live && <span className="idx-tag live">Live</span>}
+                  </span>
+                  <span className="desc">{it.desc}</span>
+                </Link>
+              ))}
+            </div>
           ))}
           <div className="map-col-head map-col-head-2">
             <span className="hash">//</span>
