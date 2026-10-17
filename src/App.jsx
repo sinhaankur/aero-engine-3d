@@ -4,6 +4,7 @@ import { AnimatePresence, LazyMotion, domAnimation, m, useReducedMotion } from '
 import { getFamily, getAircraft, getEngine } from './data/index.js'
 import { TECH_STACK } from './data/techStack.js'
 import { hardReload } from './lib/hardReload.js'
+import NavMenu from './components/NavMenu.jsx'
 
 const BASE_TITLE = 'Aircraft Design Archive'
 const BASE_DESC =
@@ -220,18 +221,7 @@ export default function App() {
         <Link to="/" className="brand">
           <span className="brand-mark">✈</span> ADA / Aircraft Design Archive
         </Link>
-        <nav className="topnav">
-          <Link to="/">Index</Link>
-          <Link to="/live">Live</Link>
-          <Link to="/fly">Fly</Link>
-          <Link to="/routes">Routes</Link>
-          <Link to="/simulate">Simulate</Link>
-          <Link to="/compare">Compare</Link>
-          <Link to="/systems">Systems</Link>
-          <Link to="/components">Components</Link>
-          <Link to="/figures">Figures</Link>
-          <Link to="/projector">Projector</Link>
-        </nav>
+        <NavMenu />
         <button
           type="button"
           className="cache-clear"

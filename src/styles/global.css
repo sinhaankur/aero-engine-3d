@@ -304,6 +304,67 @@ a:focus-visible, button:focus-visible { outline-offset: 3px; }
   border-radius: 4px; font-size: 12px;
   background: var(--accent); color: #000;
 }
+
+/* ── L1/L2 primary navigation (NavMenu) ──────────────────────────────────── */
+.topnav2 { display: flex; align-items: center; gap: 2px; }
+.nav2-group { position: relative; }
+.nav2-trigger {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: 1px solid transparent; border-radius: 7px;
+  color: var(--muted); cursor: pointer;
+  font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em;
+  text-transform: uppercase; padding: 7px 12px;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+.nav2-trigger:hover { color: var(--ink); background: rgba(255,255,255,0.03); }
+.nav2-group.open .nav2-trigger { color: var(--ink); border-color: var(--border); background: rgba(255,255,255,0.04); }
+.nav2-group.current .nav2-trigger { color: var(--ink); }
+.nav2-group.current .nav2-trigger::after {
+  content: ''; position: absolute; left: 12px; right: 12px; bottom: 2px; height: 1.5px;
+  background: var(--accent); border-radius: 2px;
+}
+.nav2-caret { font-size: 8px; opacity: 0.6; transition: transform 0.2s ease; }
+.nav2-group.open .nav2-caret { transform: rotate(180deg); opacity: 1; }
+
+/* the dropdown panel: a floating, layered card — the premium depth cue */
+.nav2-panel {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 40;
+  min-width: 268px; padding: 8px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--border-2); border-radius: 12px;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset,
+              0 18px 40px -12px rgba(0,0,0,0.7),
+              0 4px 12px -6px rgba(0,0,0,0.5);
+}
+.nav2-panel-head {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 6px 10px 8px; border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.nav2-item {
+  display: grid; gap: 2px; padding: 9px 10px; border-radius: 8px;
+  text-decoration: none; transition: background 0.16s ease;
+}
+.nav2-item:hover { background: rgba(255,255,255,0.045); text-decoration: none; }
+.nav2-item-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 500; color: var(--ink); letter-spacing: 0.01em;
+}
+.nav2-item:hover .nav2-item-label { color: var(--accent); }
+.nav2-item-desc { font-size: 11.5px; line-height: 1.4; color: var(--muted); }
+.nav2-live {
+  font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.08em;
+  color: var(--accent); border: 1px solid var(--accent-dim);
+  border-radius: 999px; padding: 1px 6px; line-height: 1.4;
+}
+
+@media (max-width: 760px) {
+  .topnav2 { flex-wrap: wrap; gap: 0; }
+  .nav2-trigger { padding: 6px 9px; font-size: 11px; }
+  .nav2-panel { min-width: 220px; left: auto; }
+}
 .footer { margin-top: 60px; padding-top: 32px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
 .footer-cols { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 28px; margin-bottom: 28px; }
 .footer-brand .brand { margin-bottom: 10px; }
