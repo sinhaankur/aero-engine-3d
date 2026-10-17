@@ -88,13 +88,15 @@ export default function Home() {
           animate="show"
         >
           <m.h1 variants={reduce ? itemReduced : item}>
-            Aircraft Design <span className="accent">Archive</span>
+            The Aviation <span className="accent">Experience</span>
             <span className="cursor">_</span>
           </m.h1>
           <m.p variants={reduce ? itemReduced : item}>
-            An interactive, engineering-grade catalog of aircraft families — every
-            variant in 3D, dimensioned blueprints, exploded engines, live traffic
-            and the systems that keep them flying. Everything is one click away.
+            I spent years fascinated by how airliners actually work — not the
+            brochure version, the real engineering. So I built the thing I wish
+            I'd had: every family in 3D, engines you can pull apart, the systems
+            that keep them flying, and a cockpit you can take off in. Public data,
+            honest numbers, nothing faked. Have a look around.
           </m.p>
           <m.div className="map-stats" variants={reduce ? itemReduced : item}>
             <div className="map-stat"><span className="n"><CountUp to={FAMILIES.length} /></span><span className="l">Families</span></div>

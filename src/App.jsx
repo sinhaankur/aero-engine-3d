@@ -6,11 +6,11 @@ import { TECH_STACK } from './data/techStack.js'
 import { hardReload } from './lib/hardReload.js'
 import NavMenu from './components/NavMenu.jsx'
 
-const BASE_TITLE = 'Aircraft Design Archive'
+const BASE_TITLE = 'The Aviation Experience'
 const BASE_DESC =
-  'An interactive encyclopedia of aircraft families: rotate every Airbus and ' +
-  'Boeing variant in 3D, read engineering blueprints, explode the engines, ' +
-  'simulate the physics and explore attributed safety records.'
+  'How airliners really work, built by someone who wanted to know — every ' +
+  'family in 3D, engines you can pull apart, the systems that keep them flying, ' +
+  'live traffic, and a cockpit you can take off in. Public data, honest numbers.'
 
 // per-route <title> + meta description, resolved from the data layer so
 // aircraft/engine pages get real names in search results and link previews
@@ -219,7 +219,7 @@ export default function App() {
       </div>
       <header className="topbar">
         <Link to="/" className="brand">
-          <span className="brand-mark">✈</span> ADA / Aircraft Design Archive
+          <span className="brand-mark">✈</span> The Aviation Experience
         </Link>
         <NavMenu />
         <button
